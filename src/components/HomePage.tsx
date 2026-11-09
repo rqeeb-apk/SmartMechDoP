@@ -138,42 +138,42 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
             </p>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              البيئة الهندسة الشاملة لطلاب ومهندسي الميكاترونكس. ارفع المحاضرات والمستندات للشرح التفاعلي مع دكتور الميكاترونكس، وانتقل مباشرة للمختبرات ثلاثية الأبعاد لتطبيق الدوائر والروبوتات والأنظمة.
+              البيئة الهندسية الشاملة لطلاب ومهندسي الميكاترونكس. ارفع المحاضرات والمستندات للشرح التفاعلي مع دكتور الميكاترونكس، وانتقل مباشرة للمختبرات ثلاثية الأبعاد لتطبيق الدوائر والروبوتات والأنظمة.
             </p>
 
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 w-full max-w-xl">
               <button
                 onClick={() => setCurrentTab('explain_lesson')}
-                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all flex items-center gap-2"
+                className="w-full px-5 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
               >
-                <Sparkles className="w-5 h-5 fill-slate-950" />
-                <span>خدمة «اشرح لي الدرس»</span>
-                <ArrowLeft className="w-4 h-4" />
+                <Sparkles className="w-5 h-5 fill-slate-950 shrink-0" />
+                <span className="truncate">خدمة «اشرح لي الدرس»</span>
+                <ArrowLeft className="w-4 h-4 shrink-0" />
               </button>
 
               <button
                 onClick={() => setCurrentTab('summarize')}
-                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-600/25 hover:shadow-amber-600/40 hover:scale-[1.02] transition-all flex items-center gap-2"
+                className="w-full px-5 py-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-600/25 hover:shadow-amber-600/40 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
               >
-                <BookOpen className="w-5 h-5" />
-                <span>خدمة «لخّص لي»</span>
-                <ArrowLeft className="w-4 h-4" />
+                <BookOpen className="w-5 h-5 shrink-0" />
+                <span className="truncate">خدمة «لخّص لي»</span>
+                <ArrowLeft className="w-4 h-4 shrink-0" />
               </button>
 
               <button
                 onClick={() => setCurrentTab('doctor_hall')}
-                className="px-6 py-3.5 rounded-xl bg-slate-800/90 text-amber-300 border border-amber-500/40 font-bold text-sm hover:bg-slate-800 hover:border-amber-400 transition-all flex items-center gap-2"
+                className="w-full px-5 py-3.5 rounded-xl bg-slate-800/90 text-amber-300 border border-amber-500/40 font-bold text-sm hover:bg-slate-800 hover:border-amber-400 transition-all flex items-center justify-center gap-2"
               >
-                <Bot className="w-5 h-5" />
-                <span>قاعة الدكتور الذكي</span>
+                <Bot className="w-5 h-5 shrink-0" />
+                <span className="truncate">قاعة الدكتور الذكي</span>
               </button>
 
               <button
                 onClick={() => setCurrentTab('lab_3d')}
-                className="px-6 py-3.5 rounded-xl bg-slate-800/90 text-cyan-300 border border-cyan-500/40 font-bold text-sm hover:bg-slate-800 hover:border-cyan-400 transition-all flex items-center gap-2"
+                className="w-full px-5 py-3.5 rounded-xl bg-slate-800/90 text-cyan-300 border border-cyan-500/40 font-bold text-sm hover:bg-slate-800 hover:border-cyan-400 transition-all flex items-center justify-center gap-2"
               >
-                <Layers className="w-5 h-5" />
-                <span>المختبر 3D</span>
+                <Layers className="w-5 h-5 shrink-0" />
+                <span className="truncate">المختبر 3D</span>
               </button>
             </div>
           </div>

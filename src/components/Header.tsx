@@ -170,10 +170,11 @@ export const Header: React.FC<HeaderProps> = ({
             {user.role !== 'owner' && (
               <button
                 onClick={onOpenAuthModal}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-md shadow-cyan-500/20 transition-all"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-md shadow-cyan-500/20 transition-all shrink-0"
               >
-                <User className="w-4 h-4" />
-                <span>{user.email !== 'student@mechatronics.dr-smart.edu' ? user.name : 'تسجيل الدخول / إنشاء حساب'}</span>
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden sm:inline">{user.email !== 'student@mechatronics.dr-smart.edu' ? user.name : 'تسجيل الدخول / إنشاء حساب'}</span>
+                <span className="sm:hidden text-[11px]">{user.email !== 'student@mechatronics.dr-smart.edu' ? user.name.split(' ')[0] : 'حسابي / دخول'}</span>
               </button>
             )}
 
