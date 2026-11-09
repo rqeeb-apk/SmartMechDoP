@@ -106,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
                   دكتور <span className="gold-gradient-text">الميكاترونكس</span> الذكي
                 </span>
                 <span className="text-[9px] text-cyan-400 font-bold tracking-widest block font-mono">
-                  DR. SMART MECHATRONICS
+                  DR MECHA SMART · DR-MECHASMART.ONLINE
                 </span>
               </div>
             </button>

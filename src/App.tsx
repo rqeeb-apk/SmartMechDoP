@@ -195,18 +195,31 @@ export default function App() {
       {/* Footer */}
       <footer className="w-full bg-[#0D1B2A] border-t border-slate-800/80 py-6 px-4 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-cyan-400" />
-            <span className="font-bold text-slate-200">منصة دكتور الميكاترونكس الذكي</span>
-            <span>· تعلّم بذكاء، جرّب بواقعية، وابتكر بلا حدود</span>
+          <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-right">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <span className="font-bold text-slate-200">دكتور الميكاترونكس الذكي (Dr Mecha Smart)</span>
+            </div>
+            <a
+              href="https://dr-mechasmart.online"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400/90 hover:text-amber-300 font-mono text-[11px] underline underline-offset-2"
+            >
+              dr-mechasmart.online
+            </a>
+            <span className="hidden sm:inline text-slate-600">|</span>
+            <span>تعلّم بذكاء، جرّب بواقعية، وابتكر بلا حدود</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
-            <button onClick={() => setCurrentTab('home')} className="hover:text-cyan-400">الرئيسية</button>
-            <button onClick={() => setCurrentTab('doctor_hall')} className="hover:text-cyan-400">قاعة الدكتور</button>
-            <button onClick={() => setCurrentTab('lab_3d')} className="hover:text-cyan-400">المختبر 3D</button>
-            <button onClick={() => setCurrentTab('library')} className="hover:text-cyan-400">المكتبة</button>
-            <button onClick={toggleRole} className="hover:text-amber-400 font-mono">
+          <div className="flex flex-wrap justify-center items-center gap-3 text-[11px]">
+            <button onClick={() => setCurrentTab('home')} className="hover:text-cyan-400 transition-colors">الرئيسية</button>
+            <button onClick={() => setCurrentTab('explain_lesson')} className="hover:text-amber-400 transition-colors">اشرح لي الدرس</button>
+            <button onClick={() => setCurrentTab('summarize')} className="hover:text-purple-400 transition-colors">لخّص لي</button>
+            <button onClick={() => setCurrentTab('doctor_hall')} className="hover:text-cyan-400 transition-colors">قاعة الدكتور</button>
+            <button onClick={() => setCurrentTab('lab_3d')} className="hover:text-cyan-400 transition-colors">المختبر 3D</button>
+            <button onClick={() => setCurrentTab('library')} className="hover:text-cyan-400 transition-colors">المكتبة</button>
+            <button onClick={toggleRole} className="hover:text-amber-400 font-mono transition-colors">
               {user.role === 'owner' ? '[وضع المالك]' : '[وضع الطالب]'}
             </button>
           </div>

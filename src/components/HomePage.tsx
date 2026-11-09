@@ -152,6 +152,15 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
               </button>
 
               <button
+                onClick={() => setCurrentTab('summarize')}
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-orange-500 to-amber-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-600/25 hover:shadow-amber-600/40 hover:scale-[1.02] transition-all flex items-center gap-2"
+              >
+                <BookOpen className="w-5 h-5" />
+                <span>خدمة «لخّص لي»</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+
+              <button
                 onClick={() => setCurrentTab('doctor_hall')}
                 className="px-6 py-3.5 rounded-xl bg-slate-800/90 text-amber-300 border border-amber-500/40 font-bold text-sm hover:bg-slate-800 hover:border-amber-400 transition-all flex items-center gap-2"
               >

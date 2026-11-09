@@ -1,0 +1,23 @@
+{
+  "short_name": "دكتور الميكاترونكس",
+  "name": "دكتور الميكاترونكس الذكي | Dr Mecha Smart",
+  "description": "منصة تعليمية وهندسية تفاعلية متكاملة لطلاب ومهندسي الميكاترونكس",
+  "id": "https://dr-mechasmart.online/",
+  "start_url": "https://dr-mechasmart.online/",
+  "scope": "https://dr-mechasmart.online/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0A192F",
+  "theme_color": "#0A192F",
+  "icons": [
+    {
+      "src": "/assets/aistudio/Meta_AI_896179206_2087651808526245_1938029499613582859_n_20261107_214439.webp_fa36f2e3.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "engineering", "productivity"],
+  "lang": "ar",
+  "dir": "rtl"
+}
