@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Zap, Cpu, Play, Square, RotateCcw, Plus, Trash2, Code, Download, Upload, Eye,
-  Sparkles, Layers, Sliders, Activity, Shield, Box, Bot, AlertTriangle, CheckCircle2,
-  Move, Radio, Disc, Maximize2, Minimize2, Copy, FileText, RotateCw, ZoomIn, ZoomOut,
-  MousePointer, Grid, Settings
+  Zap, Play, Square, RotateCcw, Plus, Trash2, Eye,
+  Sparkles, Layers, Sliders, Activity, Shield, Box, Bot,
+  AlertTriangle, CheckCircle2, Move, Copy, RotateCw,
+  ZoomIn, ZoomOut, MousePointer, Grid, Settings, X,
+  Palette, Scissors, Wrench, Check, HelpCircle
 } from 'lucide-react';
 import { CircuitComponent, WireConnection } from '../../types';
 import {
@@ -39,7 +40,7 @@ const MECHATRONICS_LIBRARY: LibraryItem[] = [
       { id: 'p1', name: 'طرف 1 (Lead A)', x: 12, y: 22 },
       { id: 'p2', name: 'طرف 2 (Lead B)', x: 138, y: 22 },
     ],
-    description: 'مقاومة كربونية بألوان قياسية لحماية الليدات وتحديد التيار.',
+    description: 'مقاومة كربونية بألوان قياسية EIA لحماية الليدات وتحديد التيار.',
   },
   {
     id: 'potentiometer',
@@ -125,6 +126,20 @@ const MECHATRONICS_LIBRARY: LibraryItem[] = [
     description: 'ليد أصفر للتنبيهات والمحاكاة التفاعلية.',
   },
   {
+    id: 'led_blue',
+    type: 'led',
+    name: 'دايود ضوئي LED أزرق 5mm',
+    category: 'passives',
+    defaultVal: 3.0,
+    unit: 'V',
+    color: '#3b82f6',
+    pins: [
+      { id: 'p1', name: 'الموجب Anode (+)', x: 30, y: 88 },
+      { id: 'p2', name: 'السالب Cathode (-)', x: 42, y: 80 },
+    ],
+    description: 'ليد أزرق نقي عالي الكفاءة الضوئية.',
+  },
+  {
     id: 'switch',
     type: 'switch',
     name: 'مفتاح ضاغط Tactile Pushbutton',
@@ -149,16 +164,28 @@ const MECHATRONICS_LIBRARY: LibraryItem[] = [
     defaultVal: 400,
     unit: 'pins',
     pins: [
-      { id: 'rail_pos_1', name: 'خط الطاقة (+) العلوي', x: 26, y: 17 },
-      { id: 'rail_neg_1', name: 'خط الأرضي (-) العلوي', x: 26, y: 33 },
-      { id: 'rail_pos_2', name: 'خط الطاقة (+) السفلي', x: 26, y: 115 },
-      { id: 'rail_neg_2', name: 'خط الأرضي (-) السفلي', x: 26, y: 131 },
-      { id: 'tie_1', name: 'مقبس صف A-E (عمود 1)', x: 60, y: 55 },
-      { id: 'tie_2', name: 'مقبس صف F-J (عمود 1)', x: 60, y: 92 },
-      { id: 'tie_3', name: 'مقبس صف A-E (عمود 10)', x: 140, y: 55 },
-      { id: 'tie_4', name: 'مقبس صف F-J (عمود 10)', x: 140, y: 92 },
+      { id: 'rail_pos_1', name: 'خط الطاقة (+) العلوي [أحمر]', x: 26, y: 17 },
+      { id: 'rail_neg_1', name: 'خط الأرضي (-) العلوي [أزرق]', x: 26, y: 33 },
+      { id: 'rail_pos_mid', name: 'خط الطاقة (+) العلوي [منتصف]', x: 130, y: 17 },
+      { id: 'rail_neg_mid', name: 'خط الأرضي (-) العلوي [منتصف]', x: 130, y: 33 },
+      { id: 'rail_pos_end', name: 'خط الطاقة (+) العلوي [طرف]', x: 235, y: 17 },
+      { id: 'rail_neg_end', name: 'خط الأرضي (-) العلوي [طرف]', x: 235, y: 33 },
+      { id: 'rail_pos_2', name: 'خط الطاقة (+) السفلي [أحمر]', x: 26, y: 115 },
+      { id: 'rail_neg_2', name: 'خط الأرضي (-) السفلي [أزرق]', x: 26, y: 131 },
+      { id: 'rail_pos_2_mid', name: 'خط الطاقة (+) السفلي [منتصف]', x: 130, y: 115 },
+      { id: 'rail_neg_2_mid', name: 'خط الأرضي (-) السفلي [منتصف]', x: 130, y: 131 },
+      { id: 'tie_1', name: 'مقبس صف A-E (عمود 1)', x: 26, y: 55 },
+      { id: 'tie_2', name: 'مقبس صف F-J (عمود 1)', x: 26, y: 92 },
+      { id: 'tie_5', name: 'مقبس صف A-E (عمود 5)', x: 64, y: 55 },
+      { id: 'tie_6', name: 'مقبس صف F-J (عمود 5)', x: 64, y: 92 },
+      { id: 'tie_10', name: 'مقبس صف A-E (عمود 10)', x: 111, y: 55 },
+      { id: 'tie_11', name: 'مقبس صف F-J (عمود 10)', x: 111, y: 92 },
+      { id: 'tie_15', name: 'مقبس صف A-E (عمود 15)', x: 159, y: 55 },
+      { id: 'tie_16', name: 'مقبس صف F-J (عمود 15)', x: 159, y: 92 },
+      { id: 'tie_20', name: 'مقبس صف A-E (عمود 20)', x: 206, y: 55 },
+      { id: 'tie_21', name: 'مقبس صف F-J (عمود 20)', x: 206, y: 92 },
     ],
-    description: 'لوحة تجارب بيضاء واقعية مع ممرات الطاقة لتوصيل الدوائر دون لحام.',
+    description: 'لوحة تجارب بيضاء واقعية مع ممرات الطاقة ومقابس الربط لتوصيل الدوائر دون لحام.',
   },
   {
     id: 'arduino',
@@ -168,14 +195,14 @@ const MECHATRONICS_LIBRARY: LibraryItem[] = [
     defaultVal: 5,
     unit: 'V',
     pins: [
-      { id: 'pin5v', name: 'منفذ الطاقة 5V', x: 76, y: 138 },
-      { id: 'gnd_pwr', name: 'منفذ الأرضي GND', x: 92, y: 138 },
-      { id: 'pinA0', name: 'مدخل تناظري A0', x: 142, y: 138 },
-      { id: 'pinA1', name: 'مدخل تناظري A1', x: 152, y: 138 },
-      { id: 'pin13', name: 'منفذ رقمي 13 (LED)', x: 110, y: 16 },
-      { id: 'pin11', name: 'منفذ رقمي 11 (PWM)', x: 128, y: 16 },
-      { id: 'pin9', name: 'منفذ رقمي 9 (PWM)', x: 145, y: 16 },
-      { id: 'gnd_dig', name: 'أرضي GND العلوي', x: 92, y: 16 },
+      { id: 'pin5v', name: 'منفذ الطاقة 5V Power', x: 76, y: 138 },
+      { id: 'gnd_pwr', name: 'منفذ الأرضي GND Power', x: 92, y: 138 },
+      { id: 'pinA0', name: 'مدخل تناظري A0 Analog', x: 142, y: 138 },
+      { id: 'pinA1', name: 'مدخل تناظري A1 Analog', x: 152, y: 138 },
+      { id: 'pin13', name: 'منفذ رقمي D13 (LED)', x: 110, y: 16 },
+      { id: 'pin11', name: 'منفذ رقمي D11 (PWM)', x: 128, y: 16 },
+      { id: 'pin9', name: 'منفذ رقمي D9 (PWM)', x: 145, y: 16 },
+      { id: 'gnd_dig', name: 'أرضي GND Digital', x: 92, y: 16 },
     ],
     description: 'لوحة تحكم إلكترونية مبرمجة بلغة C++ مع مخرج USB ومتحكم ATmega328P.',
   },
@@ -187,11 +214,11 @@ const MECHATRONICS_LIBRARY: LibraryItem[] = [
     defaultVal: 3.3,
     unit: 'V',
     pins: [
-      { id: 'v33', name: '3.3V Power', x: 24, y: 11 },
+      { id: 'v33', name: '3.3V Power Out', x: 24, y: 11 },
       { id: 'gnd', name: 'GND الأرضي', x: 44, y: 11 },
       { id: 'gpio2', name: 'GPIO 2 (LED)', x: 64, y: 11 },
       { id: 'gpio4', name: 'GPIO 4', x: 84, y: 11 },
-      { id: 'gpio18', name: 'GPIO 18', x: 124, y: 11 },
+      { id: 'gpio18', name: 'GPIO 18 (VSPI SCK)', x: 124, y: 11 },
     ],
     description: 'معالج ثنائي النواة عالي السرعة يدعم الاتصال اللاسلكي وتطبيقات IoT.',
   },
@@ -296,12 +323,14 @@ export const InteractiveLabWorkspace: React.FC = () => {
       y: 120,
       rotation: 0,
       pins: [
-        { id: 'rail_pos_1', name: '+ Rail', x: 26, y: 17 },
-        { id: 'rail_neg_1', name: '- Rail', x: 26, y: 33 },
-        { id: 'tie_1', name: 'Node 1', x: 95, y: 55 },
-        { id: 'tie_2', name: 'Node 2', x: 125, y: 55 },
-        { id: 'tie_3', name: 'Node 3', x: 155, y: 55 },
-        { id: 'tie_sw', name: 'Node SW', x: 185, y: 92 },
+        { id: 'rail_pos_1', name: 'خط الطاقة (+) العلوي', x: 26, y: 17 },
+        { id: 'rail_neg_1', name: 'خط الأرضي (-) العلوي', x: 26, y: 33 },
+        { id: 'rail_pos_2', name: 'خط الطاقة (+) السفلي', x: 26, y: 115 },
+        { id: 'rail_neg_2', name: 'خط الأرضي (-) السفلي', x: 26, y: 131 },
+        { id: 'tie_1', name: 'Node 1 (A-E)', x: 95, y: 55 },
+        { id: 'tie_2', name: 'Node 2 (A-E)', x: 125, y: 55 },
+        { id: 'tie_3', name: 'Node 3 (A-E)', x: 155, y: 55 },
+        { id: 'tie_sw', name: 'Node SW (F-J)', x: 185, y: 92 },
       ],
     },
     {
@@ -384,6 +413,7 @@ export const InteractiveLabWorkspace: React.FC = () => {
         { id: 'sw1', name: 'Terminal A', x: 8, y: 20 },
         { id: 'sw2', name: 'Terminal B', x: 72, y: 60 },
       ],
+      state: { isOn: true },
     },
   ]);
 
@@ -423,17 +453,24 @@ export const InteractiveLabWorkspace: React.FC = () => {
     },
   ]);
 
-  // UI States
+  // UI Selection & Wiring States
   const [selectedCompId, setSelectedCompId] = useState<string | null>('comp_led_red');
   const [selectedWireId, setSelectedWireId] = useState<string | null>(null);
   const [wiringStart, setWiringStart] = useState<{ compId: string; pinId: string } | null>(null);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [hoveredPin, setHoveredPin] = useState<{ compId: string; pinId: string } | null>(null);
+
+  // Settings & Navigation
   const [wireColor, setWireColor] = useState('#3b82f6');
   const [isSimulating, setIsSimulating] = useState(true);
   const [activeCategory, setActiveCategory] = useState<'all' | 'passives' | 'mcu' | 'motors' | 'sensors' | 'displays' | 'power'>('all');
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [activeTemplate, setActiveTemplate] = useState<string>('led_circuit');
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
+  const [showGridLines, setShowGridLines] = useState<boolean>(true);
+  const [isDragOverCanvas, setIsDragOverCanvas] = useState<boolean>(false);
 
-  // Dragging state
+  // Dragging state on canvas
   const [draggingCompId, setDraggingCompId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -442,6 +479,16 @@ export const InteractiveLabWorkspace: React.FC = () => {
     if (!isSimulating) {
       setBenchCurrent(0);
       setBenchResistance(0);
+      return;
+    }
+
+    // Check if any switch in circuit is open
+    const switches = components.filter((c) => c.type === 'switch');
+    const isAnySwitchOpen = switches.some((s) => s.state && s.state.isOn === false);
+
+    if (isAnySwitchOpen) {
+      setBenchCurrent(0);
+      setBenchResistance(9999);
       return;
     }
 
@@ -456,32 +503,112 @@ export const InteractiveLabWorkspace: React.FC = () => {
     setBenchCurrent(parseFloat(calculatedI.toFixed(2)));
   }, [benchVoltage, components, isSimulating]);
 
-  // Add Component to Workbench
-  const handleAddComponent = (item: LibraryItem) => {
-    const count = components.filter((c) => c.name === item.name).length + 1;
-    const newComp: CircuitComponent = {
-      id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: item.name,
-      type: item.type as any,
-      label: `${item.id.toUpperCase()}-${count}`,
-      value: item.defaultVal,
-      unit: item.unit,
-      color: item.color,
-      x: 350 + (components.length % 4) * 35,
-      y: 130 + (components.length % 3) * 30,
-      rotation: 0,
-      pins: item.pins.map((p) => ({ ...p })),
-      state: { isOn: true, angle: 90 },
+  // Global Keyboard Shortcuts (Delete, Backspace, Esc, R to rotate)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing inside an input
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedWireId) {
+          handleDeleteWire(selectedWireId);
+        } else if (selectedCompId) {
+          handleDeleteSelectedComp();
+        }
+      } else if (e.key === 'Escape') {
+        setWiringStart(null);
+        setSelectedWireId(null);
+      } else if ((e.key === 'r' || e.key === 'R') && selectedCompId) {
+        handleRotateComponent(selectedCompId, 90);
+      } else if ((e.key === 'd' || e.key === 'D') && selectedCompId) {
+        handleDuplicateComponent(selectedCompId);
+      }
     };
 
-    setComponents([...components, newComp]);
-    setSelectedCompId(newComp.id);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCompId, selectedWireId, components, wires]);
+
+  // Add Component to Workbench (Click or Drop)
+  const addComponentToCanvas = useCallback(
+    (item: LibraryItem, dropX?: number, dropY?: number) => {
+      const count = components.filter((c) => c.name === item.name).length + 1;
+
+      let targetX = dropX ?? (350 + (components.length % 4) * 45);
+      let targetY = dropY ?? (130 + (components.length % 3) * 35);
+
+      if (snapToGrid) {
+        targetX = Math.round(targetX / 15) * 15;
+        targetY = Math.round(targetY / 15) * 15;
+      }
+
+      const newComp: CircuitComponent = {
+        id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: item.name,
+        type: item.type as any,
+        label: `${item.id.toUpperCase()}-${count}`,
+        value: item.defaultVal,
+        unit: item.unit,
+        color: item.color,
+        x: targetX,
+        y: targetY,
+        rotation: 0,
+        pins: item.pins.map((p) => ({ ...p })),
+        state: { isOn: true, angle: 90 },
+      };
+
+      setComponents((prev) => [...prev, newComp]);
+      setSelectedCompId(newComp.id);
+      setSelectedWireId(null);
+    },
+    [components, snapToGrid]
+  );
+
+  // HTML5 Drag and Drop Handlers
+  const handleDragStartSidebar = (e: React.DragEvent, item: LibraryItem) => {
+    e.dataTransfer.setData('application/mechatronics-comp', item.id);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleDragOverCanvas = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!isDragOverCanvas) setIsDragOverCanvas(true);
+  };
+
+  const handleDragLeaveCanvas = () => {
+    setIsDragOverCanvas(false);
+  };
+
+  const handleDropCanvas = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverCanvas(false);
+    const itemId = e.dataTransfer.getData('application/mechatronics-comp');
+    if (!itemId || !canvasRef.current) return;
+
+    const targetItem = MECHATRONICS_LIBRARY.find((it) => it.id === itemId);
+    if (!targetItem) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const rawX = (e.clientX - rect.left) / zoomLevel;
+    const rawY = (e.clientY - rect.top) / zoomLevel;
+
+    addComponentToCanvas(targetItem, Math.max(20, rawX - 60), Math.max(20, rawY - 40));
   };
 
   // Rotate component
-  const handleRotateComponent = (compId: string) => {
-    setComponents(
-      components.map((c) => (c.id === compId ? { ...c, rotation: (c.rotation + 90) % 360 } : c))
+  const handleRotateComponent = (compId: string, deltaAngle: number = 90) => {
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === compId ? { ...c, rotation: (c.rotation + deltaAngle + 360) % 360 } : c
+      )
+    );
+  };
+
+  // Set precise rotation angle
+  const handleSetComponentRotation = (compId: string, exactAngle: number) => {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === compId ? { ...c, rotation: exactAngle % 360 } : c))
     );
   };
 
@@ -493,13 +620,44 @@ export const InteractiveLabWorkspace: React.FC = () => {
     const cloned: CircuitComponent = {
       ...comp,
       id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      label: `${comp.label}_Copy`,
-      x: comp.x + 35,
-      y: comp.y + 35,
+      label: `${comp.label}_نسخة`,
+      x: comp.x + 40,
+      y: comp.y + 30,
     };
 
-    setComponents([...components, cloned]);
+    setComponents((prev) => [...prev, cloned]);
     setSelectedCompId(cloned.id);
+    setSelectedWireId(null);
+  };
+
+  // Toggle switch/pushbutton state
+  const handleToggleComponentState = (compId: string) => {
+    setComponents((prev) =>
+      prev.map((c) => {
+        if (c.id === compId) {
+          const currentIsOn = c.state?.isOn ?? true;
+          return {
+            ...c,
+            state: { ...c.state, isOn: !currentIsOn },
+          };
+        }
+        return c;
+      })
+    );
+  };
+
+  // Update component color (e.g. for LEDs)
+  const handleUpdateComponentColor = (compId: string, newColor: string) => {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === compId ? { ...c, color: newColor } : c))
+    );
+  };
+
+  // Update component value
+  const handleUpdateComponentValue = (compId: string, newVal: number) => {
+    setComponents((prev) =>
+      prev.map((c) => (c.id === compId ? { ...c, value: newVal } : c))
+    );
   };
 
   // Pin Wiring handler
@@ -508,25 +666,69 @@ export const InteractiveLabWorkspace: React.FC = () => {
       setWiringStart({ compId, pinId });
     } else {
       if (wiringStart.compId === compId && wiringStart.pinId === pinId) {
+        // Cancel wiring if clicked on same pin
         setWiringStart(null);
         return;
       }
 
-      const newWire: WireConnection = {
-        id: `wire_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        fromCompId: wiringStart.compId,
-        fromPinId: wiringStart.pinId,
-        toCompId: compId,
-        toPinId: pinId,
-        color: wireColor,
-      };
+      // Check if wire between these two already exists
+      const wireExists = wires.some(
+        (w) =>
+          (w.fromCompId === wiringStart.compId &&
+            w.fromPinId === wiringStart.pinId &&
+            w.toCompId === compId &&
+            w.toPinId === pinId) ||
+          (w.fromCompId === compId &&
+            w.fromPinId === pinId &&
+            w.toCompId === wiringStart.compId &&
+            w.toPinId === wiringStart.pinId)
+      );
 
-      setWires([...wires, newWire]);
+      if (!wireExists) {
+        const newWire: WireConnection = {
+          id: `wire_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          fromCompId: wiringStart.compId,
+          fromPinId: wiringStart.pinId,
+          toCompId: compId,
+          toPinId: pinId,
+          color: wireColor,
+        };
+        setWires((prev) => [...prev, newWire]);
+        setSelectedWireId(newWire.id);
+      }
+
       setWiringStart(null);
     }
   };
 
-  // Mouse Drag handlers
+  // Mouse / Pointer Move on Canvas
+  const handleMouseMoveCanvas = (e: React.MouseEvent) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+
+    const canvasX = (e.clientX - rect.left) / zoomLevel;
+    const canvasY = (e.clientY - rect.top) / zoomLevel;
+    setCursorPos({ x: canvasX, y: canvasY });
+
+    if (!draggingCompId) return;
+
+    let newX = canvasX - dragOffset.x;
+    let newY = canvasY - dragOffset.y;
+
+    if (snapToGrid) {
+      newX = Math.round(newX / 15) * 15;
+      newY = Math.round(newY / 15) * 15;
+    }
+
+    newX = Math.max(10, Math.min(1800, newX));
+    newY = Math.max(10, Math.min(1100, newY));
+
+    setComponents((prev) =>
+      prev.map((c) => (c.id === draggingCompId ? { ...c, x: newX, y: newY } : c))
+    );
+  };
+
+  // Mouse Down on Component for Dragging
   const handleMouseDownComp = (e: React.MouseEvent, compId: string) => {
     e.stopPropagation();
     setSelectedCompId(compId);
@@ -543,21 +745,6 @@ export const InteractiveLabWorkspace: React.FC = () => {
     }
   };
 
-  const handleMouseMoveCanvas = (e: React.MouseEvent) => {
-    if (!draggingCompId || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-
-    const rawX = (e.clientX - rect.left) / zoomLevel - dragOffset.x;
-    const rawY = (e.clientY - rect.top) / zoomLevel - dragOffset.y;
-
-    const newX = Math.max(10, Math.min(1600, rawX));
-    const newY = Math.max(10, Math.min(1000, rawY));
-
-    setComponents(
-      components.map((c) => (c.id === draggingCompId ? { ...c, x: newX, y: newY } : c))
-    );
-  };
-
   const handleMouseUpCanvas = () => {
     setDraggingCompId(null);
   };
@@ -565,19 +752,31 @@ export const InteractiveLabWorkspace: React.FC = () => {
   // Deletions
   const handleDeleteSelectedComp = () => {
     if (!selectedCompId) return;
-    setComponents(components.filter((c) => c.id !== selectedCompId));
-    setWires(wires.filter((w) => w.fromCompId !== selectedCompId && w.toCompId !== selectedCompId));
+    setComponents((prev) => prev.filter((c) => c.id !== selectedCompId));
+    setWires((prev) =>
+      prev.filter((w) => w.fromCompId !== selectedCompId && w.toCompId !== selectedCompId)
+    );
     setSelectedCompId(null);
   };
 
   const handleDeleteWire = (wireId: string) => {
-    setWires(wires.filter((w) => w.id !== wireId));
+    setWires((prev) => prev.filter((w) => w.id !== wireId));
     if (selectedWireId === wireId) setSelectedWireId(null);
   };
 
-  // Load Experiment Templates (matching user reference image)
+  // Update Wire Color
+  const handleUpdateWireColor = (wireId: string, newColor: string) => {
+    setWires((prev) =>
+      prev.map((w) => (w.id === wireId ? { ...w, color: newColor } : w))
+    );
+  };
+
+  // Load Experiment Templates
   const handleLoadTemplate = (templateKey: string) => {
     setActiveTemplate(templateKey);
+    setSelectedCompId(null);
+    setSelectedWireId(null);
+    setWiringStart(null);
 
     if (templateKey === 'led_circuit') {
       setBenchVoltage(12.0);
@@ -739,6 +938,37 @@ export const InteractiveLabWorkspace: React.FC = () => {
   };
 
   const selectedComp = components.find((c) => c.id === selectedCompId);
+  const selectedWire = wires.find((w) => w.id === selectedWireId);
+
+  // Helper to compute pin absolute canvas coordinates
+  const getPinAbsolutePos = (compId: string, pinId: string) => {
+    const comp = components.find((c) => c.id === compId);
+    if (!comp) return null;
+    const pin = comp.pins.find((p) => p.id === pinId);
+    if (!pin) return null;
+
+    // Apply component rotation if rotated
+    if (comp.rotation === 0) {
+      return { x: comp.x + pin.x, y: comp.y + pin.y };
+    }
+
+    // SVG renders with transform-origin center
+    // Approximate component visual center (default ~80x60)
+    const cx = comp.x + 40;
+    const cy = comp.y + 40;
+    const rad = (comp.rotation * Math.PI) / 180;
+    const px = comp.x + pin.x - cx;
+    const py = comp.y + pin.y - cy;
+
+    return {
+      x: cx + px * Math.cos(rad) - py * Math.sin(rad),
+      y: cy + px * Math.sin(rad) + py * Math.cos(rad),
+    };
+  };
+
+  const startPinPos = wiringStart
+    ? getPinAbsolutePos(wiringStart.compId, wiringStart.pinId)
+    : null;
 
   return (
     <div className="space-y-6 pb-12 select-none font-sans text-slate-100">
@@ -773,15 +1003,17 @@ export const InteractiveLabWorkspace: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         
         {/* Left Sidebar: "أدوات المختبر" (Realistic Photorealistic Components Library) */}
-        <div className="lg:col-span-3 bg-[#0D1B2A] border border-cyan-500/30 rounded-2xl p-4 space-y-3 shadow-xl">
+        <div className="lg:col-span-3 bg-[#0D1B2A] border border-cyan-500/30 rounded-2xl p-4 space-y-3 shadow-xl flex flex-col">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
                 🛠️
               </div>
-              <h3 className="text-sm font-bold text-white">أدوات المختبر الواقعي</h3>
+              <h3 className="text-sm font-bold text-white">مكتبة العناصر الهندسية</h3>
             </div>
-            <span className="text-[10px] font-mono text-cyan-400 font-bold">اسحب أو انقر للإضافة</span>
+            <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-950/60 px-2 py-0.5 rounded-full border border-cyan-800/40">
+              اسحب أو انقر
+            </span>
           </div>
 
           {/* Filter Categories */}
@@ -807,15 +1039,24 @@ export const InteractiveLabWorkspace: React.FC = () => {
             ))}
           </div>
 
-          {/* Realistic Component Cards List */}
-          <div className="space-y-2.5 max-h-[580px] overflow-y-auto no-scrollbar pr-1">
+          {/* Drag & Drop Hint */}
+          <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] text-slate-300 flex items-center gap-2">
+            <Move className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>اسحب أي قطعة بالفأرة وأفلتها مباشرة على مساحة العمل أو انقر (+ سحب).</span>
+          </div>
+
+          {/* Realistic Component Cards List with HTML5 Drag & Drop */}
+          <div className="space-y-2.5 max-h-[580px] overflow-y-auto no-scrollbar pr-1 flex-1">
             {MECHATRONICS_LIBRARY.filter(
               (item) => activeCategory === 'all' || item.category === activeCategory
             ).map((item) => (
               <div
                 key={item.id}
-                onClick={() => handleAddComponent(item)}
-                className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-400 cursor-pointer transition-all hover:scale-[1.02] flex items-center justify-between group shadow-sm hover:shadow-cyan-500/10"
+                draggable={true}
+                onDragStart={(e) => handleDragStartSidebar(e, item)}
+                onClick={() => addComponentToCanvas(item)}
+                className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-400 cursor-grab active:cursor-grabbing transition-all hover:scale-[1.02] flex items-center justify-between group shadow-sm hover:shadow-cyan-500/15"
+                title="اسحب العنصر إلى الطاولة أو انقر لإضافته"
               >
                 <div className="flex items-center gap-3">
                   {/* Realistic 3D Photorealistic Thumbnail */}
@@ -834,7 +1075,14 @@ export const InteractiveLabWorkspace: React.FC = () => {
                   </div>
                 </div>
 
-                <button className="px-2 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-extrabold group-hover:bg-cyan-500 group-hover:text-slate-950 transition-colors shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addComponentToCanvas(item);
+                  }}
+                  className="px-2 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-extrabold group-hover:bg-cyan-500 group-hover:text-slate-950 transition-colors shrink-0"
+                >
                   + سحب
                 </button>
               </div>
@@ -846,7 +1094,8 @@ export const InteractiveLabWorkspace: React.FC = () => {
         <div className="lg:col-span-7 space-y-3">
           
           {/* Action Toolbar above Canvas */}
-          <div className="bg-[#0D1B2A] border border-cyan-500/30 rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="bg-[#0D1B2A] border border-cyan-500/30 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg">
+            
             <div className="flex items-center gap-3">
               <span className="font-bold text-white flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -857,49 +1106,123 @@ export const InteractiveLabWorkspace: React.FC = () => {
               </span>
             </div>
 
-            {/* Wire Color Picker */}
+            {/* Wire Color Palette Picker */}
             <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg">
               <span className="text-[10px] text-slate-400 font-bold">لون السلك:</span>
-              {['#3b82f6', '#ef4444', '#0f172a', '#22c55e', '#f59e0b', '#f8fafc'].map((c) => (
+              {[
+                { color: '#3b82f6', label: 'أزرق (إشارة)' },
+                { color: '#ef4444', label: 'أحمر (تغذية +V)' },
+                { color: '#0f172a', label: 'أسود (أرضي GND)' },
+                { color: '#22c55e', label: 'أخضر (بيانات)' },
+                { color: '#eab308', label: 'أصفر (تزامن)' },
+                { color: '#f97316', label: 'برتقالي (تحكم)' },
+                { color: '#f8fafc', label: 'أبيض' },
+              ].map(({ color, label }) => (
                 <button
-                  key={c}
-                  onClick={() => setWireColor(c)}
-                  className={`w-4 h-4 rounded-full border transition-transform ${
-                    wireColor === c ? 'scale-125 border-white ring-2 ring-cyan-400' : 'border-slate-700'
+                  key={color}
+                  onClick={() => setWireColor(color)}
+                  title={label}
+                  className={`w-4 h-4 rounded-full border transition-all ${
+                    wireColor === color ? 'scale-125 border-white ring-2 ring-cyan-400 shadow-md' : 'border-slate-700 hover:scale-110'
                   }`}
-                  style={{ backgroundColor: c }}
+                  style={{ backgroundColor: color }}
                 />
               ))}
             </div>
 
-            {/* Zoom Controls */}
-            <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg p-0.5">
-              <button onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.1))} className="p-1 text-slate-400 hover:text-white"><ZoomOut className="w-3.5 h-3.5" /></button>
-              <span className="text-[10px] font-mono font-bold text-cyan-400 px-1">{Math.round(zoomLevel * 100)}%</span>
-              <button onClick={() => setZoomLevel((z) => Math.min(1.4, z + 0.1))} className="p-1 text-slate-400 hover:text-white"><ZoomIn className="w-3.5 h-3.5" /></button>
+            {/* Grid & Alignment Controls */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setSnapToGrid(!snapToGrid)}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 border transition-all ${
+                  snapToGrid
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                    : 'bg-slate-900 text-slate-400 border-slate-700'
+                }`}
+                title="محاذاة القطع إلى شبكة نقاط التوصيل المغناطيسية"
+              >
+                <Grid className="w-3 h-3" />
+                <span>محاذاة Snap</span>
+              </button>
+
+              <button
+                onClick={() => setShowGridLines(!showGridLines)}
+                className={`p-1 rounded-lg border ${
+                  showGridLines ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : 'bg-slate-900 text-slate-400 border-slate-700'
+                }`}
+                title="إظهار / إخفاء خطوط الشبكة"
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-700 rounded-lg p-0.5">
+                <button onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.1))} className="p-1 text-slate-400 hover:text-white" title="تصغير">
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[10px] font-mono font-bold text-cyan-400 px-1">{Math.round(zoomLevel * 100)}%</span>
+                <button onClick={() => setZoomLevel((z) => Math.min(1.4, z + 0.1))} className="p-1 text-slate-400 hover:text-white" title="تكبير">
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
+
           </div>
 
           {/* Interactive Workspace Canvas */}
           <div
             ref={canvasRef}
+            onDragOver={handleDragOverCanvas}
+            onDragLeave={handleDragLeaveCanvas}
+            onDrop={handleDropCanvas}
             onMouseMove={handleMouseMoveCanvas}
             onMouseUp={handleMouseUpCanvas}
             onMouseLeave={handleMouseUpCanvas}
-            className="relative w-full h-[580px] rounded-2xl bg-[#091527] border-2 border-slate-800 overflow-hidden shadow-2xl cursor-default"
+            onClick={() => {
+              // Click on empty space cancels wiring or wire selection
+              if (wiringStart) setWiringStart(null);
+              setSelectedWireId(null);
+            }}
+            className={`relative w-full h-[600px] rounded-2xl bg-[#091527] border-2 transition-colors overflow-hidden shadow-2xl cursor-default select-none ${
+              isDragOverCanvas
+                ? 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)] bg-[#0c1f38]'
+                : 'border-slate-800'
+            }`}
             style={{
-              backgroundImage: 'radial-gradient(rgba(0, 240, 255, 0.08) 1.5px, transparent 1.5px)',
+              backgroundImage: showGridLines
+                ? 'radial-gradient(rgba(0, 240, 255, 0.12) 1.5px, transparent 1.5px)'
+                : 'none',
               backgroundSize: `${24 * zoomLevel}px ${24 * zoomLevel}px`,
             }}
           >
-            {/* Prompt when wiring */}
-            {wiringStart && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-1.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs shadow-xl animate-bounce">
-                ⚡ انقر على الطرف الآخر لإكمال التوصيل بالسلك...
+            {/* Overlay Banner when dragging a component from sidebar */}
+            {isDragOverCanvas && (
+              <div className="absolute inset-0 z-40 bg-cyan-950/40 backdrop-blur-[2px] border-4 border-dashed border-amber-400 rounded-2xl flex flex-col items-center justify-center pointer-events-none">
+                <div className="p-4 rounded-2xl bg-[#0D1B2A]/90 border border-amber-400 shadow-2xl flex items-center gap-3 text-amber-300 font-extrabold text-sm">
+                  <Plus className="w-6 h-6 animate-spin" />
+                  <span>أفلت القطعة هنا لتثبيتها مباشرة على طاولة التوصيل!</span>
+                </div>
               </div>
             )}
 
-            {/* Transform Container with Zoom */}
+            {/* Prompt when active wiring mode is engaged */}
+            {wiringStart && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs shadow-2xl flex items-center gap-2 border border-white/50 animate-pulse">
+                <Zap className="w-4 h-4 fill-slate-950" />
+                <span>انقر على منفذ الطرف الآخر لإتمام التوصيل بالسلك (أو اضغط Esc للإلغاء)</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWiringStart(null);
+                  }}
+                  className="w-4 h-4 rounded-full bg-slate-950/30 text-white flex items-center justify-center hover:bg-slate-950"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* Zoom Transform Container */}
             <div
               style={{
                 transform: `scale(${zoomLevel})`,
@@ -909,66 +1232,140 @@ export const InteractiveLabWorkspace: React.FC = () => {
               }}
               className="relative w-full h-full"
             >
-              {/* Render Connecting Jumper Wires with Realistic Curves */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+              {/* Connecting Jumper Wires SVG Layer */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible">
+                <defs>
+                  {/* Subtle drop shadow for wires */}
+                  <filter id="wireShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#000000" floodOpacity="0.45" />
+                  </filter>
+                </defs>
+
+                {/* Render Existing Placed Wires */}
                 {wires.map((w) => {
-                  const fromComp = components.find((c) => c.id === w.fromCompId);
-                  const toComp = components.find((c) => c.id === w.toCompId);
-                  if (!fromComp || !toComp) return null;
+                  const p1 = getPinAbsolutePos(w.fromCompId, w.fromPinId);
+                  const p2 = getPinAbsolutePos(w.toCompId, w.toPinId);
+                  if (!p1 || !p2) return null;
 
-                  const fromPin = fromComp.pins.find((p) => p.id === w.fromPinId);
-                  const toPin = toComp.pins.find((p) => p.id === w.toPinId);
+                  const x1 = p1.x;
+                  const y1 = p1.y;
+                  const x2 = p2.x;
+                  const y2 = p2.y;
 
-                  const x1 = fromComp.x + (fromPin?.x || 20);
-                  const y1 = fromComp.y + (fromPin?.y || 20);
-                  const x2 = toComp.x + (toPin?.x || 20);
-                  const y2 = toComp.y + (toPin?.y || 20);
+                  // Compute natural droop / catenary Bezier curve
+                  const dx = x2 - x1;
+                  const dy = y2 - y1;
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  const sag = Math.max(30, Math.min(85, dist * 0.28));
 
                   const controlX = (x1 + x2) / 2;
-                  const controlY = (y1 + y2) / 2 + 35;
+                  const controlY = (y1 + y2) / 2 + sag;
                   const isWireSelected = selectedWireId === w.id;
 
                   return (
-                    <g key={w.id} className="pointer-events-auto cursor-pointer" onClick={() => setSelectedWireId(w.id)}>
-                      {/* Wire Outer Shadow */}
+                    <g
+                      key={w.id}
+                      className="pointer-events-auto cursor-pointer group"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedWireId(w.id);
+                        setSelectedCompId(null);
+                      }}
+                    >
+                      {/* Wire Drop Shadow */}
                       <path
-                        d={`M ${x1} ${y1} Q ${controlX} ${controlY + 4} ${x2} ${y2}`}
+                        d={`M ${x1} ${y1} Q ${controlX} ${controlY + 5} ${x2} ${y2}`}
                         fill="none"
                         stroke="#000000"
-                        strokeWidth={6}
+                        strokeWidth={7}
                         opacity={0.35}
+                        filter="url(#wireShadow)"
                       />
-                      {/* Realistic Insulated Copper Wire */}
+
+                      {/* Wide invisible path for easy clicking / hovering */}
                       <path
                         d={`M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`}
                         fill="none"
-                        stroke={isWireSelected ? '#ffffff' : w.color || '#3b82f6'}
-                        strokeWidth={isWireSelected ? 5 : 3.8}
-                        strokeLinecap="round"
-                        className="transition-all hover:stroke-white"
+                        stroke="transparent"
+                        strokeWidth={18}
                       />
-                      {/* Wire Midpoint Delete Button */}
+
+                      {/* Glowing outline when selected */}
                       {isWireSelected && (
-                        <circle
-                          cx={controlX}
-                          cy={controlY}
-                          r={10}
-                          fill="#ef4444"
+                        <path
+                          d={`M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={8}
+                          strokeLinecap="round"
+                          opacity={0.8}
+                          className="animate-pulse"
+                        />
+                      )}
+
+                      {/* Insulated PVC Jumper Wire */}
+                      <path
+                        d={`M ${x1} ${y1} Q ${controlX} ${controlY} ${x2} ${y2}`}
+                        fill="none"
+                        stroke={w.color || '#3b82f6'}
+                        strokeWidth={isWireSelected ? 5.5 : 4}
+                        strokeLinecap="round"
+                        className="transition-all group-hover:brightness-125"
+                      />
+
+                      {/* Pin Terminals / Dupont Connector Housings at endpoints */}
+                      <circle cx={x1} cy={y1} r={4.5} fill="#1e293b" stroke="#ffffff" strokeWidth={1.5} />
+                      <circle cx={x2} cy={y2} r={4.5} fill="#1e293b" stroke="#ffffff" strokeWidth={1.5} />
+
+                      {/* Wire Midpoint Badge (Click to delete or inspect) */}
+                      {isWireSelected && (
+                        <g
+                          transform={`translate(${controlX}, ${controlY})`}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteWire(w.id);
                           }}
                           className="cursor-pointer"
-                        />
+                        >
+                          <circle r={11} fill="#ef4444" stroke="#ffffff" strokeWidth={2} />
+                          <text x="0" y="3.5" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">✕</text>
+                        </g>
                       )}
                     </g>
                   );
                 })}
+
+                {/* Live Rubber-Band Wire Preview while user is dragging wire to target pin */}
+                {wiringStart && startPinPos && (
+                  <g className="pointer-events-none">
+                    {/* Shadow for preview wire */}
+                    <path
+                      d={`M ${startPinPos.x} ${startPinPos.y} Q ${(startPinPos.x + cursorPos.x) / 2} ${(startPinPos.y + cursorPos.y) / 2 + 25} ${cursorPos.x} ${cursorPos.y}`}
+                      fill="none"
+                      stroke="#000000"
+                      strokeWidth={5}
+                      opacity={0.3}
+                    />
+                    {/* Dashed animated stretching wire */}
+                    <path
+                      d={`M ${startPinPos.x} ${startPinPos.y} Q ${(startPinPos.x + cursorPos.x) / 2} ${(startPinPos.y + cursorPos.y) / 2 + 25} ${cursorPos.x} ${cursorPos.y}`}
+                      fill="none"
+                      stroke={wireColor}
+                      strokeWidth={4.5}
+                      strokeDasharray="6 4"
+                      strokeLinecap="round"
+                      className="animate-pulse"
+                    />
+                    {/* Cursor tip target indicator */}
+                    <circle cx={cursorPos.x} cy={cursorPos.y} r={6} fill={wireColor} stroke="#ffffff" strokeWidth={2} />
+                  </g>
+                )}
               </svg>
 
-              {/* Render Realistic Draggable Components on Workbench */}
+              {/* Render Placed Draggable Components */}
               {components.map((comp) => {
                 const isSelected = selectedCompId === comp.id;
+                const isDraggingThis = draggingCompId === comp.id;
 
                 return (
                   <div
@@ -979,11 +1376,14 @@ export const InteractiveLabWorkspace: React.FC = () => {
                       top: `${comp.y}px`,
                       transform: `rotate(${comp.rotation}deg)`,
                       transformOrigin: 'center center',
+                      zIndex: isDraggingThis ? 40 : isSelected ? 30 : 20,
                     }}
-                    className={`absolute z-20 cursor-grab active:cursor-grabbing transition-shadow select-none group ${
-                      isSelected
-                        ? 'ring-4 ring-amber-400/50 rounded-2xl drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]'
-                        : 'hover:drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]'
+                    className={`absolute transition-shadow select-none group cursor-grab active:cursor-grabbing ${
+                      isDraggingThis
+                        ? 'scale-105 shadow-[0_20px_35px_rgba(0,0,0,0.6)] ring-4 ring-amber-400'
+                        : isSelected
+                        ? 'ring-4 ring-amber-400/70 rounded-2xl drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]'
+                        : 'hover:drop-shadow-[0_0_12px_rgba(56,189,248,0.4)]'
                     }`}
                   >
                     {/* Realistic SVG Rendering */}
@@ -991,13 +1391,38 @@ export const InteractiveLabWorkspace: React.FC = () => {
                       {renderRealisticInteractiveComponent(comp, isSimulating)}
                     </div>
 
-                    {/* Exact Electrical Pin Terminals for Live Wiring */}
+                    {/* Interactive Actuation Overlay (e.g. Tactile Pushbutton Click) */}
+                    {comp.type === 'switch' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleComponentState(comp.id);
+                        }}
+                        className={`absolute top-4 left-4 w-12 h-12 rounded-full cursor-pointer transition-transform active:scale-90 ${
+                          comp.state?.isOn
+                            ? 'bg-amber-400/20 ring-2 ring-amber-400/50'
+                            : 'bg-black/30'
+                        }`}
+                        title="انقر لضغط الزر وتشغيل/قطع الدائرة"
+                      />
+                    )}
+
+                    {/* Electrical Pin Terminals for Live Wiring */}
                     {comp.pins.map((pin) => {
-                      const isWiringTarget = wiringStart?.compId === comp.id && wiringStart?.pinId === pin.id;
+                      const isWiringStartPin =
+                        wiringStart?.compId === comp.id && wiringStart?.pinId === pin.id;
+                      const isHovered =
+                        hoveredPin?.compId === comp.id && hoveredPin?.pinId === pin.id;
+                      const isPotentialTarget =
+                        wiringStart !== null && wiringStart.compId !== comp.id;
 
                       return (
                         <button
                           key={pin.id}
+                          type="button"
+                          onMouseEnter={() => setHoveredPin({ compId: comp.id, pinId: pin.id })}
+                          onMouseLeave={() => setHoveredPin(null)}
                           onClick={(e) => {
                             e.stopPropagation();
                             handlePinClick(comp.id, pin.id);
@@ -1007,15 +1432,24 @@ export const InteractiveLabWorkspace: React.FC = () => {
                             top: `${pin.y}px`,
                             transform: 'translate(-50%, -50%)',
                           }}
-                          className={`absolute z-30 w-3.5 h-3.5 rounded-full border-2 transition-transform ${
-                            isWiringTarget
-                              ? 'bg-amber-400 border-white scale-150 ring-4 ring-amber-500/60'
+                          className={`absolute z-30 w-4 h-4 rounded-full border-2 transition-all ${
+                            isWiringStartPin
+                              ? 'bg-amber-400 border-white scale-150 ring-4 ring-amber-500/80 animate-bounce'
+                              : isPotentialTarget
+                              ? 'bg-emerald-500 border-white scale-125 ring-4 ring-emerald-500/50 animate-pulse'
+                              : isHovered
+                              ? 'bg-cyan-400 border-white scale-150 ring-2 ring-cyan-300'
                               : 'bg-slate-900 border-cyan-400 hover:scale-150 hover:bg-cyan-400'
                           }`}
-                          title={`منفذ كهربائي: ${pin.name}`}
+                          title={`منفذ: ${pin.name}`}
                         >
-                          {/* Tooltip on pin hover */}
-                          <span className="absolute bottom-5 left-1/2 -translate-x-1/2 hidden group-hover:block bg-black/95 text-cyan-300 font-mono text-[9px] px-2 py-0.5 rounded whitespace-nowrap z-50 border border-cyan-500/40 shadow-lg">
+                          {/* Rich Pin Tooltip */}
+                          <span
+                            className={`absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/95 text-cyan-300 font-mono text-[9px] px-2.5 py-1 rounded-lg whitespace-nowrap z-50 border border-cyan-500/50 shadow-2xl pointer-events-none ${
+                              isHovered || isWiringStartPin ? 'block' : 'hidden'
+                            }`}
+                          >
+                            <span className="font-bold text-amber-300 block">{comp.label}</span>
                             {pin.name}
                           </span>
                         </button>
@@ -1024,67 +1458,273 @@ export const InteractiveLabWorkspace: React.FC = () => {
                   </div>
                 );
               })}
+
+              {/* Floating Quick Action Bar for the Currently Selected Component */}
+              {selectedComp && (
+                <div
+                  style={{
+                    left: `${Math.max(10, selectedComp.x - 20)}px`,
+                    top: `${Math.max(10, selectedComp.y - 48)}px`,
+                    transform: 'none',
+                    zIndex: 50,
+                  }}
+                  className="absolute bg-[#0D1B2A]/95 backdrop-blur-md border border-cyan-400/60 rounded-xl px-2 py-1 shadow-2xl flex items-center gap-1 text-[11px] font-bold text-slate-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="text-[10px] text-amber-400 font-mono font-bold px-1 border-r border-slate-700/80">
+                    {selectedComp.label}
+                  </span>
+
+                  {/* Rotate +90 */}
+                  <button
+                    onClick={() => handleRotateComponent(selectedComp.id, 90)}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-amber-400 hover:text-white transition-colors"
+                    title="تدوير مع عقارب الساعة +90° (مفتاح R)"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Rotate -90 */}
+                  <button
+                    onClick={() => handleRotateComponent(selectedComp.id, -90)}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-amber-400 hover:text-white transition-colors"
+                    title="تدوير عكس عقارب الساعة -90°"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Duplicate */}
+                  <button
+                    onClick={() => handleDuplicateComponent(selectedComp.id)}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-cyan-300 hover:text-white transition-colors"
+                    title="مضاعفة القطعة (مفتاح D)"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Toggle state if switch */}
+                  {selectedComp.type === 'switch' && (
+                    <button
+                      onClick={() => handleToggleComponentState(selectedComp.id)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                        selectedComp.state?.isOn
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}
+                    >
+                      {selectedComp.state?.isOn ? 'تشغيل' : 'إيقاف'}
+                    </button>
+                  )}
+
+                  {/* Delete */}
+                  <button
+                    onClick={handleDeleteSelectedComp}
+                    className="p-1 rounded-lg hover:bg-rose-500 text-rose-400 hover:text-white transition-colors"
+                    title="حذف القطعة (مفتاح Delete أو Backspace)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Floating Quick Action Bar for the Currently Selected Wire */}
+              {selectedWire && (
+                <div
+                  style={{
+                    left: `${cursorPos.x}px`,
+                    top: `${cursorPos.y - 40}px`,
+                    zIndex: 50,
+                  }}
+                  className="absolute bg-[#0D1B2A]/95 backdrop-blur-md border border-amber-400/60 rounded-xl px-2.5 py-1.5 shadow-2xl flex items-center gap-2 text-xs font-bold text-white pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="text-[10px] text-amber-400 font-mono">سلك محدد:</span>
+
+                  {/* Wire Color Chooser */}
+                  <div className="flex items-center gap-1">
+                    {['#3b82f6', '#ef4444', '#0f172a', '#22c55e', '#eab308', '#f8fafc'].map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => handleUpdateWireColor(selectedWire.id, c)}
+                        className={`w-3.5 h-3.5 rounded-full border ${
+                          selectedWire.color === c ? 'scale-125 border-white ring-1 ring-amber-400' : 'border-slate-700'
+                        }`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteWire(selectedWire.id)}
+                    className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white text-[10px] font-bold flex items-center gap-1 border border-rose-500/40"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>حذف السلك</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Component Parameter Inspector */}
-          {selectedComp && (
-            <div className="bg-[#0D1B2A] border border-cyan-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
-                  ⚙️
+          {/* Component Parameter Inspector Panel (Below Canvas) */}
+          {selectedComp ? (
+            <div className="bg-[#0D1B2A] border border-cyan-500/30 rounded-2xl p-4 space-y-3 shadow-xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-lg">
+                    ⚙️
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-white text-sm">
+                      تعديل وتحكم: {selectedComp.name} ({selectedComp.label})
+                    </h4>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      الموقع: X={Math.round(selectedComp.x)}, Y={Math.round(selectedComp.y)} | زاوية التدوير: {selectedComp.rotation}°
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-extrabold text-white block">
-                    التحكم وتعديل القطعة: {selectedComp.name}
-                  </span>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    الموقع: X={Math.round(selectedComp.x)}, Y={Math.round(selectedComp.y)} | الزاوية: {selectedComp.rotation}°
-                  </span>
+
+                {/* Quick Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleRotateComponent(selectedComp.id, 90)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700"
+                  >
+                    <RotateCw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>تدوير +90°</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleDuplicateComponent(selectedComp.id)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold flex items-center gap-1.5 border border-slate-700"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>مضاعفة</span>
+                  </button>
+
+                  <button
+                    onClick={handleDeleteSelectedComp}
+                    className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-300 text-xs font-bold flex items-center gap-1.5 border border-rose-500/40"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>حذف</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Action Buttons: Rotate, Duplicate, Delete, Value */}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-slate-300 font-bold">القيمة ({selectedComp.unit}):</label>
+              {/* Dynamic Value and Property Modifiers */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                
+                {/* 1. Value Modifier */}
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-300 font-bold">القيمة الكهربائية ({selectedComp.unit}):</label>
+                    <span className="text-amber-400 font-mono font-bold">
+                      {selectedComp.value} {selectedComp.unit}
+                    </span>
+                  </div>
                   <input
                     type="number"
                     value={selectedComp.value}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setComponents(
-                        components.map((c) => (c.id === selectedComp.id ? { ...c, value: val } : c))
-                      );
-                    }}
-                    className="w-24 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-400 font-mono font-bold"
+                    onChange={(e) =>
+                      handleUpdateComponentValue(selectedComp.id, parseFloat(e.target.value) || 0)
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-amber-400 font-mono font-bold text-sm focus:border-cyan-400 outline-none"
                   />
+                  {/* Resistor Standard Presets */}
+                  {selectedComp.type === 'resistor' && (
+                    <div className="flex items-center gap-1 pt-1 flex-wrap">
+                      <span className="text-[10px] text-slate-400">قيم قياسية:</span>
+                      {[220, 330, 1000, 4700, 10000].map((val) => (
+                        <button
+                          key={val}
+                          onClick={() => handleUpdateComponentValue(selectedComp.id, val)}
+                          className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-cyan-300 hover:bg-slate-700"
+                        >
+                          {val >= 1000 ? `${val / 1000}k` : val}Ω
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => handleRotateComponent(selectedComp.id)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center gap-1.5 border border-slate-700"
-                >
-                  <RotateCw className="w-3.5 h-3.5 text-amber-400" />
-                  <span>تدوير +90°</span>
-                </button>
+                {/* 2. Rotation Angle Slider */}
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-300 font-bold">الزاوية (0° - 360°):</label>
+                    <span className="text-cyan-400 font-mono font-bold">{selectedComp.rotation}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="15"
+                    value={selectedComp.rotation}
+                    onChange={(e) =>
+                      handleSetComponentRotation(selectedComp.id, parseInt(e.target.value))
+                    }
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>0°</span>
+                    <span>90°</span>
+                    <span>180°</span>
+                    <span>270°</span>
+                    <span>360°</span>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => handleDuplicateComponent(selectedComp.id)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold flex items-center gap-1.5 border border-slate-700"
-                >
-                  <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>مضاعفة</span>
-                </button>
+                {/* 3. Color Chooser (For LEDs) or State */}
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                  {selectedComp.type === 'led' ? (
+                    <>
+                      <label className="text-slate-300 font-bold block">لون إضاءة الدايود:</label>
+                      <div className="flex items-center gap-2 pt-1">
+                        {[
+                          { color: '#ef4444', label: 'أحمر' },
+                          { color: '#22c55e', label: 'أخضر' },
+                          { color: '#eab308', label: 'أصفر' },
+                          { color: '#3b82f6', label: 'أزرق' },
+                          { color: '#f8fafc', label: 'أبيض' },
+                        ].map((c) => (
+                          <button
+                            key={c.color}
+                            onClick={() => handleUpdateComponentColor(selectedComp.id, c.color)}
+                            className={`w-6 h-6 rounded-full border-2 transition-all ${
+                              selectedComp.color === c.color
+                                ? 'scale-125 border-white ring-2 ring-cyan-400'
+                                : 'border-slate-700 hover:scale-110'
+                            }`}
+                            style={{ backgroundColor: c.color }}
+                            title={c.label}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <label className="text-slate-300 font-bold block">تسمية المكون في المخطط:</label>
+                      <input
+                        type="text"
+                        value={selectedComp.label}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setComponents((prev) =>
+                            prev.map((c) => (c.id === selectedComp.id ? { ...c, label: val } : c))
+                          );
+                        }}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:border-cyan-400 outline-none"
+                      />
+                    </>
+                  )}
+                </div>
 
-                <button
-                  onClick={handleDeleteSelectedComp}
-                  className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-300 font-bold flex items-center gap-1.5 border border-rose-500/40"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>حذف القطعة</span>
-                </button>
               </div>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-[#0D1B2A]/60 border border-slate-800/80 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+              <MousePointer className="w-4 h-4 text-cyan-400" />
+              <span>انقر على أي عنصر أو سلك في الطاولة للتحكم والتعديل والتدوير.</span>
             </div>
           )}
         </div>
@@ -1138,6 +1778,15 @@ export const InteractiveLabWorkspace: React.FC = () => {
                 <span>{isSimulating ? 'المحاكاة نشطة ومستقرة' : 'المحاكاة متوقفة'}</span>
               </div>
             </div>
+
+            {/* Reset to Default */}
+            <button
+              onClick={() => handleLoadTemplate('led_circuit')}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+              <span>إعادة تهيئة الطاولة</span>
+            </button>
           </div>
         </div>
 
@@ -1183,7 +1832,7 @@ export const InteractiveLabWorkspace: React.FC = () => {
         <div className="shrink-0 flex flex-col items-center gap-2">
           <button
             onClick={() => setIsSimulating(!isSimulating)}
-            className={`w-24 h-24 rounded-full border-4 shadow-2xl flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+            className={`w-24 h-24 rounded-full border-4 shadow-2xl flex flex-col items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer ${
               isSimulating
                 ? 'bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 border-white text-slate-950 shadow-emerald-500/50 drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]'
                 : 'bg-gradient-to-tr from-slate-800 to-slate-900 border-slate-700 text-slate-400'

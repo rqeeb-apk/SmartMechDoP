@@ -306,6 +306,8 @@ function geminiQuotaAndQueueMiddleware(req: Request, res: Response, next: NextFu
 
 // Attach Middleware to /api/gemini routes
 app.use('/api/gemini/explain', geminiQuotaAndQueueMiddleware);
+app.use('/api/gemini/explain-lesson', geminiQuotaAndQueueMiddleware);
+app.use('/api/gemini/summarize', geminiQuotaAndQueueMiddleware);
 app.use('/api/gemini/assistant', geminiQuotaAndQueueMiddleware);
 
 // API: Dr. Smart Lecture Explanation Engine with Multimodal Vision & Whiteboard Focus
@@ -411,6 +413,530 @@ ${safeContentChunk && !isBase64Image ? `نص المستند المرفوق:\n${s
   }
 });
 
+// ==========================================
+// API: «اشرح لي الدرس» (Explain the Lesson Service)
+// Multimodal, strictly grounded, 14-step academic explanation engine
+// ==========================================
+app.post('/api/gemini/explain-lesson', async (req: Request, res: Response) => {
+  const ip = (req as any).clientIp || '127.0.0.1';
+  const estimatedTokens = (req as any).estimatedTokens || 1000;
+
+  try {
+    const {
+      sourceType,
+      content,
+      fileName,
+      fileMimeType,
+      studentLevel = 'intermediate',
+      mode = 'full_explanation',
+      followupQuestion,
+      historyContext,
+      lessonContext,
+    } = req.body;
+
+    // Student Level Directive
+    const levelMap: Record<string, string> = {
+      beginner: 'مستوى مبتدئ: لغة عربية سهلة ومبسطة جداً، تفكيك المفاهيم المعقدة، تشبيهات عملية مبسطة، وتجنب الرموز الرياضية المعقدة دون تمهيد.',
+      intermediate: 'مستوى متوسط: مناسب لطلاب البكالوريوس في هندسة الميكاترونكس، توازن بين الشرح النظري والقوانين الرياضية مع توضيح الوحدات والرموز.',
+      advanced: 'مستوى متقدم: تفصيل رياضي وهندسي عميق، اشتقاقات القوانين، دوال التحويل، الاستجابة الترددية والزمنية، واستكشاف المشكلات.',
+      specialized: 'مستوى هندسي متخصص: معايير التصميم الصناعي (ISO/IEEE)، اختيار المكونات الدقيقة، التوافق الكهرومغناطيسي، والتحكم المتقدم.',
+    };
+
+    const studentLevelInstruction = levelMap[studentLevel] || levelMap.intermediate;
+
+    // Check if handling followup question or alternative mode
+    if (mode === 'followup_question') {
+      const prompt = `أنت المدرس الذكي في خدمة «اشرح لي الدرس» لطلاب هندسة الميكاترونكس.
+قاعدة الدقة الصارمة: أجب فقط بناءً على محتوى الدرس المرفوع وسياقه.
+إذا كان سؤال الطالب خارج موضوع ومحتوى الدرس، ابدأ إجابتك بوضوح بعبارة:
+"[تنبيه: هذا السؤال يقع خارج سياق الدرس المرفوع] " ثم قدم إجابة علمية دقيقة وموجزة.
+تأكد من صحة الحسابات الرياضية، الوحدات الفيزيائية (SI Units)، والإشارات.
+
+سياق الدرس الحالي:
+${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonContext || '')}
+
+سؤال الطالب:
+"${followupQuestion || 'اشرح هذه النقطة أكثر'}"`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({
+          contents: prompt,
+        });
+      });
+
+      const isOut = text.includes('[تنبيه: هذا السؤال يقع خارج سياق الدرس المرفوع]');
+      return res.json({
+        success: true,
+        answer: text,
+        isOutOfLessonContext: isOut,
+      });
+    }
+
+    if (mode === 'simplify') {
+      const prompt = `أعد شرح الدرس التالي بأسلوب أبسط بكثير ("شرح أبسط") لطلاب هندسة الميكاترونكس، مع الحفاظ التام على الحقائق والمعادلات الموجودة في المصدر دون اختراع:
+سياق الدرس:
+${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonContext || '')}
+
+قدم الشرح بأسلوب مبسط وممتع وباللغة العربية الفصيحة السهلة.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, answer: text });
+    }
+
+    if (mode === 'deepen') {
+      const prompt = `قدم تعمقاً هندسياً وتحليلاً متقدماً ("شرح أعمق") للدرس التالي لطلاب هندسة الميكاترونكس:
+سياق الدرس:
+${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonContext || '')}
+
+اشرح النظريات الفيزيائية الكامنة، اشتقاق العلاقات، التأثيرات الجانبية، والتفاصيل الهندسية الدقيقة.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, answer: text });
+    }
+
+    if (mode === 'solved_example') {
+      const prompt = `استخرج أو صغ مسألة وتطبيقاً محلولاً خطوة بخطوة ("مثال محلول") مستوحى تماماً ومطابق للقوانين والمعادلات والأرقام الواردة في هذا الدرس:
+سياق الدرس:
+${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonContext || '')}
+
+اعرض المسألة بوضوح، المعطيات بالوحدات، القانون المستخدم، خطوات التعويض الرياضي خطوة بخطوة، والنتيجة النهائية مع الوحدة الفيزيائية الصحيحة.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, answer: text });
+    }
+
+    // Default: 'full_explanation' - Complete 14-Step Grounded Engine
+    const systemPrompt = `أنت المدرس الأكاديمي المتخصص في منصة «دكتور الميكاترونكس الذكي» لخدمة «اشرح لي الدرس».
+مستوى الشرح المطلوب: ${studentLevelInstruction}
+
+قواعد الدقة والأمانة العلمية الصارمة:
+1. قاعدة المصدر أولاً: اشرح ما هو موجود في المحتوى المرفوع أولاً، ولا تخترع معلومات أو معادلات أو أرقام أو نتائج غير موجودة في المصدر.
+2. المعلومة الخارجية: إذا احتجت إلى مفهوم أساسي خارجي لفهم الدرس، وضّح للطالب بوضوح أن هذه "[معلومة توضيحية إضافية وليست من المحتوى المرفوع]".
+3. الأخطاء العلمية بالمصدر: إذا كان هناك خطأ علمي واضح أو مطبعي في المحتوى المرفوع، لا تعدله بصمت! اذكره في مصفوفة scientificErrorsFound، واعرض المعلومة كما هي في المصدر ثم وضّح التصحيح العلمي الصحيح.
+4. المحتوى غير الواضح: إذا كانت الصورة أو الصفحة أو المعادلة غير مقروءة أو ضبابية، لا تخمن إطلاقاً، وحدد sourceQuality كـ "unclear" أو "partially_clear" مع رسالة: "لم أتمكن من قراءة هذا الجزء بدقة. يرجى رفع صورة أو ملف أوضح حتى أتمكن من شرحه بشكل صحيح."
+5. إذا كان المحتوى صورة: قم بتحليل جميع العناصر المرئية (دوائر كهربائية، مقاومات، Arduino، محركات، حساسات، تروس، معادلات).
+6. إذا كان المحتوى فيديو: قسّم الشرح إلى أجزاء زمنية محددة (مثل: من 00:00 إلى 02:30 ...)، ولخص المحتوى المسموع والمرئي والمكونات الظاهرة.
+7. الدقة الحسابية: تحقق بدقة متناهية من الوحدات (SI Units) والإشارات والمعادلات الرياضية.
+
+يجب إرجاع الإجابة بتنسيق JSON حصراً يطابق الهيكل التالي:
+{
+  "lessonTitle": "عنوان الدرس المستخرج بدقة من المحتوى",
+  "studentLevel": "${studentLevel}",
+  "sourceType": "${sourceType || 'text'}",
+  "objectives": [
+    "الهدف التعليمي 1 المستخرج من المصدر",
+    "الهدف التعليمي 2"
+  ],
+  "coreIdea": "الفكرة الأساسية للدرس في فقرة مركزة ومفهومة",
+  "sourceAnalysis": {
+    "detectedType": "نوع المحتوى المكتشف (ورقة كتاب / رسم دائرة / مسألة حسابية / مخطط تحكم / فيديو)",
+    "sourceQuality": "clear",
+    "unclearNotice": "",
+    "scientificErrorsFound": [
+      {
+        "sourceText": "النص أو المعادلة الخاطئة كما ظهرت في المصدر",
+        "correction": "التصحيح العلمي الدقيق",
+        "explanation": "سبب التصحيح وتوضيح الخطأ العلمي"
+      }
+    ],
+    "visualElements": [
+      {
+        "element": "اسم العنصر المرئي (مثل: مقاومة R1، محرك سيرفو، منفذ Arduino A0)",
+        "description": "وصف وظيفته في المخطط",
+        "connection": "طريقة توصيله ومسار الإشارة"
+      }
+    ],
+    "timelineParts": [
+      {
+        "timeRange": "من 00:00 إلى 02:15",
+        "title": "مقدمة وتوصيل الدائرة",
+        "content": "شرح ما تم في هذا الجزء من الفيديو"
+      }
+    ]
+  },
+  "concepts": [
+    {
+      "title": "المفهوم الأول",
+      "explanation": "شرح تفصيلي تدريجي واضح",
+      "engineeringNotes": "ملاحظة هندسية تطبيقية"
+    }
+  ],
+  "terminology": [
+    {
+      "termArabic": "المصطلح بالعربية",
+      "termEnglish": "English Term",
+      "simpleDefinition": "تعريف مبسط وسهل"
+    }
+  ],
+  "equations": [
+    {
+      "formula": "المعادلة الرياضية بصيغة نصية واضحة (مثال: V = I * R)",
+      "name": "اسم القانون أو المعادلة",
+      "description": "شرح ما تصفه هذه المعادلة وتفسير أجزائها",
+      "symbols": [
+        {
+          "symbol": "V",
+          "name": "الجهد الكهربائي",
+          "unit": "فولت (V)",
+          "valueFromSource": "12V إن وجدت في المصدر"
+        }
+      ],
+      "stepByStepSolution": [
+        "خطوة التعويض 1",
+        "خطوة الحساب 2"
+      ]
+    }
+  ],
+  "solutionSteps": [
+    {
+      "stepNumber": 1,
+      "title": "عنوان الخطوة",
+      "description": "شرح ما نقوم به",
+      "calculation": "العملية الحسابية إن وجدت"
+    }
+  ],
+  "practicalApplication": "تطبيق عملي واقعي على ما ورد في الدرس",
+  "diagramsExplanation": "شرح الرسومات والمخططات الهندسية الموجودة في المصدر إن وُجدت",
+  "mechatronicsConnection": "ربط المفاهيم بأنظمة الميكاترونكس والروبوتات والمتحكمات",
+  "summary": [
+    "أهم نقطة ملخصة 1",
+    "أهم نقطة ملخصة 2",
+    "أهم نقطة ملخصة 3"
+  ],
+  "quizQuestions": [
+    {
+      "question": "سؤال قصير للتحقق من الفهم مبني على محتوى الدرس؟",
+      "options": ["خيار أ", "خيار ب", "خيار ج", "خيار د"],
+      "correctIndex": 0,
+      "explanation": "تفسير الإجابة الصحيحة علمياً"
+    }
+  ],
+  "quickOptions": [
+    "شرح أبسط",
+    "شرح أعمق",
+    "مثال محلول",
+    "اختبرني",
+    "أعد الشرح من البداية"
+  ]
+}`;
+
+    let contentsPayload: any;
+
+    const isBase64 =
+      typeof content === 'string' &&
+      (content.startsWith('data:') || content.length > 500 && (sourceType === 'image' || sourceType === 'video' || sourceType === 'pdf'));
+
+    if (isBase64) {
+      let mime = fileMimeType || 'image/jpeg';
+      let cleanData = content;
+
+      if (content.startsWith('data:')) {
+        const matches = content.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mime = matches[1] || mime;
+          cleanData = matches[2];
+        }
+      }
+
+      contentsPayload = {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mime,
+              data: cleanData,
+            },
+          },
+          { text: systemPrompt },
+        ],
+      };
+    } else {
+      const textToAnalyze = typeof content === 'string' && content.trim()
+        ? `المحتوى المرفوع من الطالب (${fileName || 'نص / مستند'}):\n${content}`
+        : `المحتوى: ${fileName || 'درس ميكاترونكس'}`;
+
+      contentsPayload = {
+        parts: [
+          { text: systemPrompt },
+          { text: textToAnalyze },
+        ],
+      };
+    }
+
+    const rawResult = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+      return await generateGeminiContentWithRetry({
+        contents: contentsPayload,
+        config: { responseMimeType: 'application/json' },
+      });
+    });
+
+    const cleanJson = (rawResult || '{}')
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    const parsedData = JSON.parse(cleanJson);
+
+    return res.json({
+      success: true,
+      data: parsedData,
+      meta: {
+        sourceType,
+        studentLevel,
+        fileName,
+      },
+    });
+  } catch (error: any) {
+    console.error('Explain Lesson API Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'حدث خطأ أثناء تحليل وشرح الدرس.',
+    });
+  }
+});
+
+// ==========================================
+// API: «لخّص لي» (Summarize For Me Service)
+// High-fidelity academic summarization, cheatsheet generator & exam review
+// ==========================================
+app.post('/api/gemini/summarize', async (req: Request, res: Response) => {
+  const ip = (req as any).clientIp || '127.0.0.1';
+  const estimatedTokens = (req as any).estimatedTokens || 1000;
+
+  try {
+    const {
+      summaryType = 'medium',
+      content,
+      fileName = 'محاضرة ميكاترونكس',
+      fileMimeType,
+      mode = 'summarize',
+      summaryContext,
+      chapterSelection = 'all',
+    } = req.body;
+
+    // Type descriptions
+    const typeGuide: Record<string, string> = {
+      quick: 'ملخص سريع: قصير وموجز جداً للمراجعة السريعة في 3 دقائق، يركز فقط على أهم 5 خلاصات والقوانين الجوهرية دون تفاصيل ثانوية.',
+      medium: 'ملخص متوسط: متوازن وواضح يحتوي على أهم الأفكار والقوانين والتعريفات والأمثلة التطبيقية دون حشو.',
+      comprehensive: 'ملخص شامل: تفصيلي ومكتمل، يحافظ على كافة المعلومات الهندسية والأرقام والاشتقاقات المهمة مع التخلص من الكلام الإنشائي والتكرار.',
+      study: 'ملخص للمذاكرة والاختبار: يركز تحديداً على النقاط المرشحة للاختبارات، القوانين وطريقة التعويض، والتعريفات التي يجب حفظها وفهمها.',
+      cheatsheet: 'ورقة مراجعة (Cheat Sheet): جدول وقوائم مكثفة جداً وسريعة القراءة للمراجعة في ليلة الاختبار (القوانين، الرموز، الوحدات، أهم الملاحظات).',
+    };
+
+    // Sub-services: transform to questions, formulas, definitions, quiz, hard points
+    if (mode === 'to_questions') {
+      const prompt = `بناءً على محتوى هذا الملخص والمحاضرة فقط دون اختراع معلومات خارجية:
+سياق الملخص:
+${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryContext || '')}
+
+حوّل هذا الملخص إلى 8 أسئلة مراجعة وتدريب ذكية (أسئلة امتحانات مقالية وقصيرة ومسائل) مع الإجابة النموذجية الكاملة والدقيقة لكل سؤال مستخرجة حصراً من المحاضرة.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, resultText: text });
+    }
+
+    if (mode === 'extract_formulas') {
+      const prompt = `استخرج ورقة القوانين والمعادلات الرياضية والهندسية فقط ("بطاقة القوانين") من هذه المحاضرة:
+سياق الملخص:
+${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryContext || '')}
+
+لكل قانون:
+1. اعرض صيغته كما وردت في المصدر.
+2. وضح معنى كل رمز ووحدته الفيزيائية (SI Units).
+3. وضح متى وكيف يستخدم القانون، وأي شروط خاصة.
+لا تخترع قوانين غير موجودة في المحتوى.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, resultText: text });
+    }
+
+    if (mode === 'extract_definitions') {
+      const prompt = `استخرج معجم المفاهيم والتعريفات الهندسية من هذه المحاضرة:
+سياق الملخص:
+${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryContext || '')}
+
+لكل مصطلح:
+- المصطلح بالعربية مع المصطلح الإنجليزي المقابل: مثل المقاومة الكهربائية (Electrical Resistance).
+- التعريف العلمي المبسط والدقيق بدون تعقيد.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, resultText: text });
+    }
+
+    if (mode === 'explain_hard_points') {
+      const prompt = `استخرج واشرح "النقاط الصعبة" أو المعقدة في هذه المحاضرة بأسلوب مبسط وتوضيحي:
+سياق الملخص:
+${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryContext || '')}
+
+فكك الأفكار الصعبة، اشرح السبب الفيزيائي، واستخدم تشبيهات هندسية سهلة الفهم لطلاب الميكاترونكس.`;
+
+      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+        return await generateGeminiContentWithRetry({ contents: prompt });
+      });
+
+      return res.json({ success: true, resultText: text });
+    }
+
+    // Default mode: Generate Full Structured Summary JSON
+    const systemPrompt = `أنت الخبير الأكاديمي المتخصص في خدمة «لخّص لي» لطلاب هندسة الميكاترونكس.
+مهمتك: تحويل المحاضرة أو الملف إلى ملخص هندسي واضح ومنظم للمراجعة.
+نوع التلخيص المطلوب: ${typeGuide[summaryType] || typeGuide.medium}
+اختيار الفصل أو الجزء: ${chapterSelection === 'all' ? 'كامل الملف' : chapterSelection}
+
+قواعد الأمانة والدقة الهندسية:
+1. قاعدة الحقيقة والمصدر: لا تخترع معلومات أو أرقام أو قوانين غير موجودة في الملف.
+2. لا تغير الأرقام أو المعادلات أو نتائج المسائل الموجودة في المصدر.
+3. التبسيط الذكي: لغة عربية فصحى سهلة، خالية من الحشو والإنشاء، مع الحفاظ الكامل على المفاهيم الجوهرية.
+4. المصطلحات الإنجليزية: اعرض المصطلح الإنجليزي بين قوسين بجانب العربي مثل: الحث الكهرومغناطيسي (Electromagnetic Induction).
+5. المعادلات والقوانين: اعرض القانون بصيغة واضحة، وفسّر كل رمز ووحدته (SI)، ومتى يستخدم.
+6. الرسوم والمخططات: حلل الرسومات الهندسية والدوائر والتروس والجداول واختصرها بوضوح.
+7. الملفات غير الواضحة: إذا كانت هناك صفحات أو أجزاء غير مقروءة، لا تخمنها بل اذكرها بوضوح في importantNotes.
+
+يجب إرجاع النتيجة بتنسيق JSON حصراً كالتالي:
+{
+  "title": "عنوان المحاضرة أو الموضوع الرئيسي",
+  "summaryType": "${summaryType}",
+  "generalIdea": "شرح مختصر ومكثف جداً عن موضوع المحاضرة وفكرتها العامة",
+  "keyPoints": [
+    "النقطة الجوهرية الأولى",
+    "النقطة الجوهرية الثانية",
+    "النقطة الجوهرية الثالثة"
+  ],
+  "conceptsAndDefinitions": [
+    {
+      "termArabic": "المصطلح بالعربية",
+      "termEnglish": "English Term",
+      "definition": "تعريف مبسط ومباشر وسهل الحفظ"
+    }
+  ],
+  "equations": [
+    {
+      "formula": "V = I * R",
+      "name": "قانون أوم",
+      "symbolMeanings": [
+        { "symbol": "V", "meaning": "فرق الجهد الكهربائي", "unit": "فولت (V)" },
+        { "symbol": "I", "meaning": "شدة التيار", "unit": "أمبير (A)" },
+        { "symbol": "R", "meaning": "المقاومة الكهربائية", "unit": "أوم (Ω)" }
+      ],
+      "usageContext": "يستخدم لحساب الجهد أو التيار أو المقاومة في الدوائر الخطية"
+    }
+  ],
+  "examples": [
+    {
+      "problem": "نص المسألة أو المثال المذكور في المحاضرة",
+      "solutionOutline": "خطوات الحل المختصرة والواضحة مع الحفاظ على طريقة الحل",
+      "result": "النتيجة النهائية بالوحدات إن وجدت"
+    }
+  ],
+  "importantNotes": [
+    "ملاحظة هامة يجب الانتباه لها في الاختبار",
+    "تنبيه حول الشروط أو الوحدات"
+  ],
+  "conclusion": "خلاصة مكثفة بأهم ما يجب أن يتذكره الطالب دائماً",
+  "diagramsSummary": [
+    {
+      "diagramName": "مخطط الدائرة / الرسم الميكانيكي",
+      "description": "وصف ما يوضحه الرسم باختصار",
+      "keyTakeaway": "الفائدة الهندسية الرئيسية من الرسم"
+    }
+  ],
+  "chaptersOrSections": [
+    {
+      "sectionTitle": "القسم الأول",
+      "summary": "ملخص هذا القسم"
+    }
+  ]
+}`;
+
+    let contentsPayload: any;
+
+    const isBase64 =
+      typeof content === 'string' &&
+      (content.startsWith('data:') || (content.length > 500 && (fileMimeType?.startsWith('image/') || fileMimeType?.startsWith('application/pdf'))));
+
+    if (isBase64) {
+      let mime = fileMimeType || 'application/pdf';
+      let cleanData = content;
+
+      if (content.startsWith('data:')) {
+        const matches = content.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mime = matches[1] || mime;
+          cleanData = matches[2];
+        }
+      }
+
+      contentsPayload = {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mime,
+              data: cleanData,
+            },
+          },
+          { text: systemPrompt },
+        ],
+      };
+    } else {
+      const textToAnalyze = typeof content === 'string' && content.trim()
+        ? `محتوى الملف / المحاضرة (${fileName}):\n${content}`
+        : `المحتوى: ${fileName}`;
+
+      contentsPayload = {
+        parts: [
+          { text: systemPrompt },
+          { text: textToAnalyze },
+        ],
+      };
+    }
+
+    const rawResult = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+      return await generateGeminiContentWithRetry({
+        contents: contentsPayload,
+        config: { responseMimeType: 'application/json' },
+      });
+    });
+
+    const cleanJson = (rawResult || '{}')
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    const parsedData = JSON.parse(cleanJson);
+
+    return res.json({
+      success: true,
+      data: parsedData,
+      meta: {
+        summaryType,
+        fileName,
+      },
+    });
+  } catch (error: any) {
+    console.error('Summarize API Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'حدث خطأ أثناء تلخيص المحتوى.',
+    });
+  }
+});
 
 // API: Smart Mechatronics AI Assistant
 app.post('/api/gemini/assistant', async (req: Request, res: Response) => {

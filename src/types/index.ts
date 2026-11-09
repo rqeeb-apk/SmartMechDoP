@@ -246,3 +246,94 @@ export interface PlatformSystemConfig {
   currency: string;
 }
 
+export type StudentLevel = 'beginner' | 'intermediate' | 'advanced' | 'specialized';
+export type LessonSourceType = 'text' | 'image' | 'pdf' | 'document' | 'video';
+
+export interface LessonExplanationData {
+  lessonTitle: string;
+  studentLevel?: StudentLevel;
+  sourceType?: LessonSourceType;
+  objectives: string[];
+  coreIdea: string;
+  sourceAnalysis: {
+    detectedType: string;
+    sourceQuality: 'clear' | 'partially_clear' | 'unclear';
+    unclearNotice?: string;
+    scientificErrorsFound?: { sourceText: string; correction: string; explanation: string }[];
+    visualElements?: { element: string; description: string; connection: string }[];
+    timelineParts?: { timeRange: string; title: string; content: string }[];
+  };
+  concepts: { title: string; explanation: string; engineeringNotes?: string }[];
+  terminology: { termArabic: string; termEnglish: string; simpleDefinition: string }[];
+  equations: {
+    formula: string;
+    name: string;
+    description: string;
+    symbols: { symbol: string; name: string; unit: string; valueFromSource?: string }[];
+    stepByStepSolution?: string[];
+  }[];
+  solutionSteps?: { stepNumber: number; title: string; description: string; calculation?: string }[];
+  practicalApplication: string;
+  diagramsExplanation?: string;
+  mechatronicsConnection: string;
+  summary: string[];
+  quizQuestions: { question: string; options: string[]; correctIndex: number; explanation: string }[];
+  quickOptions?: string[];
+}
+
+export interface LessonFollowupMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  isOutOfLessonContext?: boolean;
+}
+
+export type SummaryType = 'quick' | 'medium' | 'comprehensive' | 'study' | 'cheatsheet';
+
+export interface LectureSummaryData {
+  id?: string;
+  title: string;
+  summaryType: SummaryType;
+  generalIdea: string;
+  keyPoints: string[];
+  conceptsAndDefinitions: {
+    termArabic: string;
+    termEnglish?: string;
+    definition: string;
+  }[];
+  equations: {
+    formula: string;
+    name?: string;
+    symbolMeanings: { symbol: string; meaning: string; unit: string }[];
+    usageContext: string;
+  }[];
+  examples: {
+    problem: string;
+    solutionOutline: string;
+    result?: string;
+  }[];
+  importantNotes: string[];
+  conclusion: string;
+  diagramsSummary?: {
+    diagramName: string;
+    description: string;
+    keyTakeaway: string;
+  }[];
+  chaptersOrSections?: {
+    sectionTitle: string;
+    summary: string;
+  }[];
+  fileName?: string;
+  createdAt?: string;
+}
+
+export interface SavedSummaryItem {
+  id: string;
+  fileName: string;
+  title: string;
+  summaryType: SummaryType;
+  createdAt: string;
+  data: LectureSummaryData;
+}
+

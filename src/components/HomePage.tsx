@@ -10,12 +10,30 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }) => {
   const mainServices = [
     {
+      id: 'explain_lesson',
+      title: 'اشرح لي الدرس',
+      subtitle: 'الخدمة الذكية للدروس والمرفقات',
+      description: 'ارفع نصاً أو صورة أو فيديو أو PDF وسيقوم المدرس الذكي بتحليل المحتوى وشرحه بدقة متناهية خطوة بخطوة وفق 14 مرحلة أكاديمية.',
+      icon: Sparkles,
+      color: 'from-amber-500 via-orange-500 to-amber-600',
+      badge: 'جديد · شرح مطابق للمصدر 100%',
+    },
+    {
+      id: 'summarize',
+      title: 'لخّص لي',
+      subtitle: 'ملخصات ذكية وأوراق مراجعة',
+      description: 'ارفع محاضرتك أو ملفك وسأحوّله إلى ملخص واضح وسهل للمراجعة مع 5 طرق تلخيص ذكية واستخراج القوانين والتعريفات.',
+      icon: BookOpen,
+      color: 'from-amber-600 via-orange-500 to-amber-500',
+      badge: 'جديد · مراجعة سريعة',
+    },
+    {
       id: 'doctor_hall',
       title: 'قاعة الدكتور الذكي',
       subtitle: 'القلب التعليمي للمنصة',
       description: 'استمع لشرح تفاعلي مباشر من دكتور الميكاترونكس الذكي مع سبورة إلكترونية تدمج الرسومات والمعادلات.',
       icon: Bot,
-      color: 'from-amber-500 via-orange-500 to-amber-600',
+      color: 'from-cyan-500 via-blue-500 to-cyan-600',
       badge: 'مُعزز بالذكاء الاصطناعي',
     },
     {
@@ -125,12 +143,20 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <button
-                onClick={() => setCurrentTab('doctor_hall')}
+                onClick={() => setCurrentTab('explain_lesson')}
                 className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 font-extrabold text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all flex items-center gap-2"
               >
-                <Bot className="w-5 h-5" />
-                <span>دخول قاعة الدكتور الذكي</span>
+                <Sparkles className="w-5 h-5 fill-slate-950" />
+                <span>خدمة «اشرح لي الدرس»</span>
                 <ArrowLeft className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setCurrentTab('doctor_hall')}
+                className="px-6 py-3.5 rounded-xl bg-slate-800/90 text-amber-300 border border-amber-500/40 font-bold text-sm hover:bg-slate-800 hover:border-amber-400 transition-all flex items-center gap-2"
+              >
+                <Bot className="w-5 h-5" />
+                <span>قاعة الدكتور الذكي</span>
               </button>
 
               <button
@@ -138,7 +164,7 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
                 className="px-6 py-3.5 rounded-xl bg-slate-800/90 text-cyan-300 border border-cyan-500/40 font-bold text-sm hover:bg-slate-800 hover:border-cyan-400 transition-all flex items-center gap-2"
               >
                 <Layers className="w-5 h-5" />
-                <span>بدء التجارب بالمختبر 3D</span>
+                <span>المختبر 3D</span>
               </button>
             </div>
           </div>

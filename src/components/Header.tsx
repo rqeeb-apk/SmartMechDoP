@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User, ShieldAlert, Sparkles, Moon, Sun, BookOpen, Layers, Calculator, Award, Users, Bot, Cpu } from 'lucide-react';
+import { User, ShieldAlert, Sparkles, Moon, Sun, BookOpen, Layers, Calculator, Award, Users, Bot, Cpu, FileText } from 'lucide-react';
 import { UserProfile } from '../types';
 import { OFFICIAL_LOGO_URL } from '../services/storage';
 import { OwnerLoginModal } from './OwnerDashboard/OwnerLoginModal';
@@ -32,10 +32,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navItems = [
     { id: 'home', label: 'الرئيسية', icon: Cpu },
+    { id: 'explain_lesson', label: 'اشرح لي الدرس', icon: Sparkles },
+    { id: 'summarize', label: 'لخّص لي', icon: FileText },
     { id: 'doctor_hall', label: 'قاعة الدكتور الذكي', icon: Bot },
     { id: 'lab_3d', label: 'المختبر 3D', icon: Layers },
     { id: 'library', label: 'المكتبة الهندسية', icon: BookOpen },
-    { id: 'assistant', label: 'المساعد الذكي', icon: Sparkles },
+    { id: 'assistant', label: 'المساعد الذكي', icon: Bot },
     { id: 'calculators', label: 'الحاسبات الهندسية', icon: Calculator },
     { id: 'projects', label: 'مركز المشاريع', icon: Cpu },
     { id: 'quizzes', label: 'الاختبارات', icon: Award },

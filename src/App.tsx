@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { HomePage } from './components/HomePage';
 import { DoctorHallPage } from './components/DoctorHall/DoctorHallPage';
+import { ExplainLessonPage } from './components/ExplainLesson/ExplainLessonPage';
+import { SummarizePage } from './components/Summarize/SummarizePage';
 import { LabWorkspace3D } from './components/Lab3D/LabWorkspace3D';
 import { EngineeringLibraryPage } from './components/EngineeringLibrary/EngineeringLibraryPage';
 import { VideoCenterPage } from './components/VideoCenter/VideoCenterPage';
@@ -145,6 +147,10 @@ export default function App() {
         {currentTab === 'home' && (
           <HomePage setCurrentTab={setCurrentTab} onSelectLab={handleSelectLab} />
         )}
+
+        {currentTab === 'explain_lesson' && <ExplainLessonPage />}
+
+        {currentTab === 'summarize' && <SummarizePage />}
 
         {currentTab === 'doctor_hall' && <DoctorHallPage />}
 
