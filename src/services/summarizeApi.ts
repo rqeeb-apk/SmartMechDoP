@@ -11,6 +11,48 @@ export interface SummarizeParams {
 const SUMMARIES_STORAGE_KEY = 'dr_smart_saved_summaries';
 
 /**
+ * Robust JSON response parser handling plain-text / HTML Vercel errors gracefully
+ */
+async function parseSafeJsonResponse<T>(response: Response, defaultErrorMsg: string): Promise<T> {
+  const rawText = await response.text();
+  let json: any;
+
+  try {
+    json = JSON.parse(rawText);
+  } catch (_e) {
+    console.error('[API Non-JSON Response in Summarize]:', response.status, rawText.slice(0, 250));
+
+    if (response.status === 413) {
+      throw new Error(
+        'حجم الملف المرفوع تجاوز الحد الأقصى المسموح به لخادم Vercel (413 Payload Too Large). تم تفعيل الضغط التلقائي للصور، يرجى إعادة المحاولة.'
+      );
+    }
+    if (response.status === 504 || response.status === 408) {
+      throw new Error(
+        'استغرق إعداد الملخص وقتاً أطول من المعتاد (انتهت مهلة 504). يرجى إعادة المحاولة.'
+      );
+    }
+    if (response.status === 500) {
+      if (rawText.toLowerCase().includes('server error') || rawText.includes('FUNCTION_INVOCATION')) {
+        throw new Error(
+          'تعذر استدعاء دالة الخادم على Vercel (500). يرجى التأكد من إضافة مفتاح GEMINI_API_KEY داخل لوحة تحكم Vercel (Settings > Environment Variables).'
+        );
+      }
+    }
+
+    throw new Error(
+      `استجاب الخادم بخطأ (${response.status}): ${rawText.slice(0, 150) || defaultErrorMsg}`
+    );
+  }
+
+  if (!response.ok || !json.success) {
+    throw new Error(json.error || defaultErrorMsg);
+  }
+
+  return json;
+}
+
+/**
  * Call backend to generate structured lecture summary
  */
 export async function requestLectureSummary(
@@ -32,10 +74,10 @@ export async function requestLectureSummary(
     }),
   });
 
-  const json = await response.json();
-  if (!response.ok || !json.success) {
-    throw new Error(json.error || 'تعذر إعداد الملخص. يرجى إعادة المحاولة.');
-  }
+  const json = await parseSafeJsonResponse<any>(
+    response,
+    'تعذر إعداد الملخص. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.'
+  );
 
   return json.data as LectureSummaryData;
 }
@@ -56,11 +98,7 @@ export async function requestSummaryTransformation(
     }),
   });
 
-  const json = await response.json();
-  if (!response.ok || !json.success) {
-    throw new Error(json.error || 'تعذر تنفيذ عملية التحويل.');
-  }
-
+  const json = await parseSafeJsonResponse<any>(response, 'تعذر تنفيذ عملية التحويل.');
   return json.resultText;
 }
 
