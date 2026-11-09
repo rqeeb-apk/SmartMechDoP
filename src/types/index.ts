@@ -73,10 +73,11 @@ export type LabType =
 export interface CircuitComponent {
   id: string;
   name: string;
-  type: 'resistor' | 'capacitor' | 'inductor' | 'dc_source' | 'ac_source' | 'led' | 'diode' | 'switch' | 'meter' | 'arduino' | 'servo' | 'motor' | 'sensor_ultrasonic' | 'lcd';
+  type: 'resistor' | 'capacitor' | 'inductor' | 'dc_source' | 'ac_source' | 'led' | 'diode' | 'transistor' | 'switch' | 'meter' | 'arduino' | 'servo' | 'motor' | 'sensor_ultrasonic' | 'lcd';
   label: string;
   value: number; // e.g. resistance in ohms, voltage in volts, capacity in uF
   unit: string;
+  color?: string;
   x: number;
   y: number;
   rotation: number;
@@ -183,6 +184,7 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  university?: string;
   role: 'student' | 'engineer' | 'owner';
   specialization: string;
   level: string;
@@ -191,15 +193,19 @@ export interface UserProfile {
   savedExperimentsCount: number;
   createdProjectsCount: number;
   certificates: { title: string; date: string; score: number }[];
+  createdAt?: string;
   subscription?: {
-    status: 'active' | 'inactive' | 'expired' | 'frozen';
+    status: 'active' | 'trial' | 'trial_expired' | 'inactive' | 'expired' | 'frozen';
     codeUsed?: string;
+    trialStartedAt?: string;
+    trialExpiresAt?: string;
     activatedAt?: string;
     expiresAt?: string;
     priceYER: number;
     durationDays: number;
   };
 }
+
 
 export interface ActivationCode {
   code: string;

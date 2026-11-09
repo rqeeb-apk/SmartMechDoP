@@ -10,9 +10,9 @@ interface OwnerLoginModalProps {
 
 export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [stage, setStage] = useState<1 | 2 | 3>(1);
-  const [email, setEmail] = useState('admin@dr-smart.edu');
-  const [password, setPassword] = useState('Admin#Smart2026!');
-  const [pin, setPin] = useState('9876');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -184,20 +184,17 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-amber-400" />
-                <span>المرحلة 1: البريد الإلكتروني للمالك الرئيسي</span>
+                <span>المرحلة 1: البريد الإلكتروني للمالك</span>
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@dr-smart.edu"
+                placeholder="أدخل البريد الإلكتروني للمالك"
                 disabled={!!lockedSec}
                 required
                 className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-sm"
               />
-              <p className="text-[11px] text-slate-400">
-                البريد الافتراضي للنظام: <code className="text-amber-300 font-mono">admin@dr-smart.edu</code>
-              </p>
             </div>
           )}
 
@@ -205,20 +202,17 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
                 <Lock className="w-4 h-4 text-amber-400" />
-                <span>المرحلة 2: كلمة المرور المشفرة</span>
+                <span>المرحلة 2: كلمة المرور</span>
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
+                placeholder="أدخل كلمة المرور"
                 disabled={!!lockedSec}
                 required
                 className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-sm"
               />
-              <p className="text-[11px] text-slate-400">
-                كلمة المرور الافتراضية: <code className="text-amber-300 font-mono">Admin#Smart2026!</code>
-              </p>
             </div>
           )}
 
@@ -226,21 +220,18 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-amber-400" />
-                <span>المرحلة 3: الرمز السري الحصين (Secret 4-Digit PIN)</span>
+                <span>المرحلة 3: الرمز السري PIN</span>
               </label>
               <input
                 type="password"
                 maxLength={6}
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="9876"
+                placeholder="••••"
                 disabled={!!lockedSec}
                 required
                 className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-amber-500/50 text-amber-400 text-center font-mono text-2xl tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:border-amber-400"
               />
-              <p className="text-[11px] text-slate-400 text-center">
-                الرمز السري الافتراضي: <code className="text-amber-300 font-mono">9876</code>
-              </p>
             </div>
           )}
 

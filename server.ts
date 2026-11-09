@@ -657,7 +657,112 @@ app.get('/api/owner/codes', (req: Request, res: Response) => {
   });
 });
 
-// POST /api/subscriptions/redeem - Atomic Student Activation Code Redemption
+// Active User Subscriptions Binding Store
+interface UserSubscriptionRecord {
+  email: string;
+  name: string;
+  role: 'student' | 'engineer' | 'owner';
+  status: 'active' | 'trial' | 'trial_expired' | 'expired';
+  codeUsed?: string;
+  trialStartedAt: string;
+  trialExpiresAt: string;
+  activatedAt?: string;
+  expiresAt?: string;
+  priceYER: number;
+  durationDays: number;
+}
+
+const userSubscriptionsStore = new Map<string, UserSubscriptionRecord>();
+
+// POST /api/subscriptions/check-access - Subscriptions Middleware for 2-Day Trial & Activation Verification
+app.post('/api/subscriptions/check-access', (req: Request, res: Response) => {
+  const { email, role, subscription } = req.body || {};
+  const ip = String(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
+
+  if (role === 'owner') {
+    return res.json({
+      success: true,
+      isAccessAllowed: true,
+      statusType: 'owner',
+      formattedCountdown: 'مالك المنصة الإدارية',
+    });
+  }
+
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  let userSub = userSubscriptionsStore.get(cleanEmail);
+
+  if (!userSub && subscription) {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const trialExp = subscription.trialExpiresAt || new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+
+    userSub = {
+      email: cleanEmail || 'student@mechatronics.dr-smart.edu',
+      name: subscription.name || 'طالب ميكاترونكس',
+      role: 'student',
+      status: subscription.status || 'trial',
+      codeUsed: subscription.codeUsed,
+      trialStartedAt: subscription.trialStartedAt || nowIso,
+      trialExpiresAt: trialExp,
+      activatedAt: subscription.activatedAt,
+      expiresAt: subscription.expiresAt,
+      priceYER: 4000,
+      durationDays: 365,
+    };
+    userSubscriptionsStore.set(cleanEmail, userSub);
+  }
+
+  // Check if Active Code Subscription
+  if (userSub && userSub.status === 'active' && userSub.codeUsed) {
+    const activeCode = activationCodesStore.find((c) => c.code === userSub?.codeUsed);
+    if (activeCode && activeCode.status === 'active') {
+      return res.json({
+        success: true,
+        isAccessAllowed: true,
+        statusType: 'active',
+        subscription: userSub,
+        formattedCountdown: 'اشتراك سنوي نشط (365 يومًا)',
+      });
+    }
+  }
+
+  // Calculate 2-Day Trial Precision
+  const nowMs = Date.now();
+  const trialExpMs = userSub?.trialExpiresAt ? new Date(userSub.trialExpiresAt).getTime() : nowMs + 48 * 3600 * 1000;
+  const diffMs = trialExpMs - nowMs;
+
+  if (diffMs > 0) {
+    const totalSec = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+
+    return res.json({
+      success: true,
+      isAccessAllowed: true,
+      statusType: 'trial',
+      remainingSec: totalSec,
+      subscription: userSub,
+      formattedCountdown: `تجربة مجانية متبقية: ${hours} ساعة و ${mins} دقيقة`,
+    });
+  }
+
+  // Trial Expired
+  if (userSub) {
+    userSub.status = 'trial_expired';
+  }
+
+  return res.json({
+    success: true,
+    isAccessAllowed: false,
+    statusType: 'trial_expired',
+    remainingSec: 0,
+    subscription: userSub,
+    formattedCountdown: 'انتهت التجربة المجانية (48 ساعة)',
+  });
+});
+
+// POST /api/subscriptions/redeem - Atomic Student Activation Code Redemption & User Key Binding
 app.post('/api/subscriptions/redeem', (req: Request, res: Response) => {
   const { code, studentName, studentEmail } = req.body;
   const ip = String(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
@@ -667,6 +772,7 @@ app.post('/api/subscriptions/redeem', (req: Request, res: Response) => {
   }
 
   const cleanCode = code.trim().toUpperCase();
+  const cleanEmail = String(studentEmail || 'student@mechatronics.dr-smart.edu').trim().toLowerCase();
   const codeIndex = activationCodesStore.findIndex((c) => c.code === cleanCode);
 
   if (codeIndex === -1) {
@@ -697,7 +803,7 @@ app.post('/api/subscriptions/redeem', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'عذراً، كود التفعيل هذا منتهي الصلاحية.' });
   }
 
-  // Atomic Update
+  // Atomic Code Redemption Update
   const redeemedAt = new Date().toISOString();
   const expiresDate = new Date();
   expiresDate.setDate(expiresDate.getDate() + (targetCode.durationDays || 365));
@@ -710,31 +816,42 @@ app.post('/api/subscriptions/redeem', (req: Request, res: Response) => {
     expiresAt,
     redeemedBy: {
       studentName: studentName || 'طالب ميكاترونكس',
-      studentEmail: studentEmail || 'student@mechatronics.dr-smart.edu',
+      studentEmail: cleanEmail,
     },
   };
 
+  // Bind key to user subscription record in server DB
+  const userSubRecord: UserSubscriptionRecord = {
+    email: cleanEmail,
+    name: studentName || 'طالب ميكاترونكس',
+    role: 'student',
+    status: 'active',
+    codeUsed: cleanCode,
+    trialStartedAt: redeemedAt,
+    trialExpiresAt: redeemedAt,
+    activatedAt: redeemedAt,
+    expiresAt,
+    priceYER: 4000,
+    durationDays: 365,
+  };
+
+  userSubscriptionsStore.set(cleanEmail, userSubRecord);
+
   addAuditLog({
-    event: 'تفعيل اشتراك سنوي ناجح',
+    event: 'تفعيل اشتراك سنوي ونقل من trial إلى active',
     category: 'redemption',
     ip,
-    details: `تم تفعيل الكود (${cleanCode}) بنجاح للمستخدم (${studentName || 'طالب'}). قيمة الاشتراك: 4000 ريال يمني (365 يومًا).`,
+    details: `تم ربط كود التفعيل (${cleanCode}) بحساب الطالب (${cleanEmail}) وتحديث حالته إلى active بنجاح (365 يوماً).`,
     severity: 'info',
   });
 
   return res.json({
     success: true,
-    message: '🎉 تم تفعيل اشتراكك السنوي في منصة الدكتور الذكي بنجاح!',
-    subscription: {
-      status: 'active',
-      codeUsed: cleanCode,
-      priceYER: 4000,
-      durationDays: 365,
-      activatedAt: redeemedAt,
-      expiresAt,
-    },
+    message: '🎉 تم تفعيل كود الاشتراك السنوي بنجاح وترقية حسابك إلى (365 يوماً)!',
+    subscription: userSubRecord,
   });
 });
+
 
 // POST /api/owner/codes/revoke - Revoke Activation Code
 app.post('/api/owner/codes/revoke', (req: Request, res: Response) => {

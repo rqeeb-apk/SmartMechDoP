@@ -1,6 +1,7 @@
 {
-  "name": "منصة الدكتور الذكي للميكاترونكس - Dr. Smart Mechatronics Platform",
+  "name": "منصة دكتور الميكاترونكس الذكي",
   "description": "منصة تعليمية وهندسية تفاعلية متكاملة للميكاترونكس تتضمن قاعة الدكتور الذكي، المختبر الواقعي 3D، المكتبة الهندسية، حاسبات هندسية، ومجتمع المهندسين.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+

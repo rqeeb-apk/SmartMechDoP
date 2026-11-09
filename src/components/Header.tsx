@@ -12,6 +12,7 @@ interface HeaderProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onOwnerAuthSuccess?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDark,
   setIsDark,
   onOwnerAuthSuccess,
+  onOpenAuthModal,
 }) => {
   const [logoClicks, setLogoClicks] = useState<number>(0);
   const [showClickToast, setShowClickToast] = useState<boolean>(false);
@@ -140,6 +142,39 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Zone 3: Primary Action & Profile Switcher */}
           <div className="flex items-center gap-3 shrink-0">
             
+            {/* Live Trial / Subscription Status Badge */}
+            {user.role !== 'owner' && (
+              <div
+                onClick={() => {
+                  if (user.subscription?.status !== 'active') {
+                    // Open redemption modal if trial or expired
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold font-mono border hidden sm:flex items-center gap-1.5 transition-all ${
+                  user.subscription?.status === 'active'
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-300 animate-pulse'
+                }`}
+              >
+                {user.subscription?.status === 'active' ? (
+                  <span>✅ اشتراك سنوي مفعل (365 يوم)</span>
+                ) : (
+                  <span>⏳ تجربة مجانية 48 ساعة</span>
+                )}
+              </div>
+            )}
+
+            {/* Student Auth Button / Profile Status */}
+            {user.role !== 'owner' && (
+              <button
+                onClick={onOpenAuthModal}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-md shadow-cyan-500/20 transition-all"
+              >
+                <User className="w-4 h-4" />
+                <span>{user.email !== 'student@mechatronics.dr-smart.edu' ? user.name : 'تسجيل الدخول / إنشاء حساب'}</span>
+              </button>
+            )}
+
             {/* Dark Mode Toggle */}
             <button
               onClick={() => setIsDark(!isDark)}
@@ -149,34 +184,18 @@ export const Header: React.FC<HeaderProps> = ({
               {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-cyan-400" />}
             </button>
 
-            {/* User Profile / Role Toggle */}
-            <button
-              onClick={() => {
-                if (user.role === 'owner') {
-                  toggleRole();
-                } else {
-                  setIsOwnerModalOpen(true);
-                }
-              }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                user.role === 'owner'
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm shadow-amber-500/15'
-                  : 'bg-slate-800/80 text-cyan-400 border-slate-700 hover:border-cyan-500/40'
-              }`}
-            >
-              {user.role === 'owner' ? (
-                <>
-                  <ShieldAlert className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline">لوحة المالك (نشطة)</span>
-                </>
-              ) : (
-                <>
-                  <User className="w-4 h-4 text-cyan-400" />
-                  <span className="hidden sm:inline">حساب الطالب</span>
-                </>
-              )}
-            </button>
+            {/* Owner Console Quick Access */}
+            {user.role === 'owner' && (
+              <button
+                onClick={toggleRole}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm shadow-amber-500/15"
+              >
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">لوحة المالك (نشطة)</span>
+              </button>
+            )}
           </div>
+
         </div>
 
         {/* Mobile Navigation Strip */}

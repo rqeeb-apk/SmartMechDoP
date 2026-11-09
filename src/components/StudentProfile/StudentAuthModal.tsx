@@ -20,11 +20,15 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
 
   // Form states
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [university, setUniversity] = useState('');
+  const [level, setLevel] = useState('المستوى الثالث');
   const [specialization, setSpecialization] = useState('هندسة الميكاترونكس والنظم المدمجة');
-  const [level, setLevel] = useState('السنة الثالثة الجامعية');
+  const [password, setPassword] = useState('');
   const [activationCode, setActivationCode] = useState('');
+
+  // Login form state
+  const [loginNameOrCode, setLoginNameOrCode] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,36 +41,51 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     setError(null);
     setSuccessMsg(null);
 
-    if (!name.trim() || !email.trim() || !password.trim() || !activationCode.trim()) {
-      setError('جميع الحقول مطلوبة، بما في ذلك كود التفعيل السنوي.');
+    if (!name.trim() || !university.trim() || !password.trim()) {
+      setError('يرجى كتابة الاسم الكامل، اسم الجامعة، وكلمة المرور.');
       return;
     }
 
     setLoading(true);
 
     try {
-      // Validate & Redeem Activation Code via Server API
-      const res = await fetch('/api/subscriptions/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: activationCode.trim().toUpperCase(),
-          studentName: name.trim(),
-          studentEmail: email.trim().toLowerCase(),
-        }),
-      });
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const trialExpiresIso = new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+      const generatedEmail = `student_${Date.now()}@mechatronics.dr-smart.edu`;
 
-      const data = await res.json();
+      let subData: any = {
+        status: 'trial',
+        trialStartedAt: nowIso,
+        trialExpiresAt: trialExpiresIso,
+        priceYER: 4000,
+        durationDays: 365,
+      };
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'كود التفعيل الذي أدخلته غير صحيح أو تم استخدامه سابقاً.');
+      // If student provided an activation code during registration
+      if (activationCode.trim()) {
+        const res = await fetch('/api/subscriptions/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: activationCode.trim().toUpperCase(),
+            studentName: name.trim(),
+            studentEmail: generatedEmail,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'كود التفعيل الذي أدخلته غير صحيح أو تم استخدامه سابقاً.');
+        }
+        subData = data.subscription;
       }
 
-      // Code Validated & Activated -> Create Student Profile
       const newUser: UserProfile = {
         id: `usr_${Date.now()}`,
         name: name.trim(),
-        email: email.trim().toLowerCase(),
+        email: generatedEmail,
+        university: university.trim(),
         role: 'student',
         specialization: specialization.trim(),
         level: level.trim(),
@@ -75,11 +94,16 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
         savedExperimentsCount: 0,
         createdProjectsCount: 0,
         certificates: [],
-        subscription: data.subscription,
+        createdAt: nowIso,
+        subscription: subData,
       };
 
       const savedUser = updateUserProfile(newUser);
-      setSuccessMsg('🎉 تم إنشاء حسابك وتفعيل الاشتراك السنوي الشامل بنجاح!');
+      setSuccessMsg(
+        subData.status === 'active'
+          ? '🎉 تم إنشاء حسابك وتفعيل الاشتراك السنوي الشامل (365 يوماً) بنجاح!'
+          : '🎉 تم إنشاء حسابك ومنحك تجربة مجانية كاملة لمدة 48 ساعة!'
+      );
 
       setTimeout(() => {
         onSuccess(savedUser);
@@ -96,53 +120,53 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    if (!email.trim() || !password.trim()) {
-      setError('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
+    if (!loginNameOrCode.trim() || !loginPassword.trim()) {
+      setError('يرجى إدخال اسم الطالب أو كود التفعيل وكلمة المرور.');
       return;
     }
 
     setLoading(true);
 
     try {
-      // Existing User verification check
       const currentStored = localStorage.getItem('dr_smart_user');
       let userObj: UserProfile | null = currentStored ? JSON.parse(currentStored) : null;
 
-      if (!userObj || userObj.email.toLowerCase() !== email.trim().toLowerCase()) {
-        // Create student account on login if email provided, but enforce subscription code
-        if (!activationCode.trim()) {
-          throw new Error('حسابك يتطلب إدخال كود تفعيل سنوي للوصول للمنصة.');
+      if (!userObj || (userObj.name.toLowerCase() !== loginNameOrCode.trim().toLowerCase() && userObj.email !== loginNameOrCode.trim())) {
+        if (activationCode.trim()) {
+          const res = await fetch('/api/subscriptions/redeem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: activationCode.trim().toUpperCase(),
+              studentName: loginNameOrCode.trim(),
+              studentEmail: `student_${Date.now()}@mechatronics.dr-smart.edu`,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'كود التفعيل المدخل غير صحيح.');
+          }
+
+          userObj = {
+            id: `usr_${Date.now()}`,
+            name: loginNameOrCode.trim(),
+            email: `student_${Date.now()}@mechatronics.dr-smart.edu`,
+            role: 'student',
+            specialization: 'هندسة الميكاترونكس',
+            level: 'المستوى الثالث',
+            points: 300,
+            completedQuizzesCount: 0,
+            savedExperimentsCount: 0,
+            createdProjectsCount: 0,
+            certificates: [],
+            subscription: data.subscription,
+          };
+        } else if (userObj) {
+          // Continue with existing user
+        } else {
+          throw new Error('يرجى التأكد من اسم الحساب أو إدخال كود التفعيل.');
         }
-
-        const res = await fetch('/api/subscriptions/redeem', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code: activationCode.trim().toUpperCase(),
-            studentName: email.split('@')[0],
-            studentEmail: email.trim().toLowerCase(),
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'كود التفعيل المدخل غير صحيح.');
-        }
-
-        userObj = {
-          id: `usr_${Date.now()}`,
-          name: email.split('@')[0],
-          email: email.trim().toLowerCase(),
-          role: 'student',
-          specialization: 'هندسة الميكاترونكس',
-          level: 'طالب جامعي',
-          points: 300,
-          completedQuizzesCount: 0,
-          savedExperimentsCount: 0,
-          createdProjectsCount: 0,
-          certificates: [],
-          subscription: data.subscription,
-        };
       }
 
       const savedUser = updateUserProfile(userObj);
@@ -174,7 +198,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
               <h2 className="text-xl font-bold text-white">بوابة دخول المنصة التعليمية للطلاب</h2>
             </div>
             <p className="text-xs text-amber-300/90 font-medium mt-0.5">
-              الدخول والوصول للمنصة مشروط بكود تفعيل سنوي ساري (4000 ريال يمني / 365 يوم)
+              منصة دكتور الميكاترونكس الذكي · تجربة مجانية 48 ساعة أو تفعيل كود الاشتراك السنوي
             </p>
           </div>
         </div>
@@ -192,7 +216,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            إنشاء حساب طالب جديد بكود التفعيل
+            إنشاء حساب طالب جديد
           </button>
           <button
             onClick={() => {
@@ -234,7 +258,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                   <User className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
                   <input
                     type="text"
-                    placeholder="مثال: أحمد عبد الله الشمري"
+                    placeholder="أدخل الاسم الكامل"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
@@ -244,16 +268,16 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">البريد الإلكتروني</label>
+                <label className="block text-slate-300 font-semibold mb-1">اسم الجامعة / الكلية</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                  <BookOpen className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
                   <input
-                    type="email"
-                    placeholder="student@mechatronics.edu"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    placeholder="أدخل اسم الجامعة"
+                    value={university}
+                    onChange={(e) => setUniversity(e.target.value)}
                     required
-                    className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none font-mono"
+                    className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none"
                   />
                 </div>
               </div>
@@ -261,18 +285,19 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">كلمة المرور</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none font-mono"
-                  />
-                </div>
+                <label className="block text-slate-300 font-semibold mb-1">المستوى الدراسي</label>
+                <select
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400 focus:outline-none"
+                >
+                  <option value="المستوى الأول">المستوى الأول (السنة الأولى)</option>
+                  <option value="المستوى الثاني">المستوى الثاني (السنة الثانية)</option>
+                  <option value="المستوى الثالث">المستوى الثالث (السنة الثالثة)</option>
+                  <option value="المستوى الرابع">المستوى الرابع (السنة الرابعة)</option>
+                  <option value="المستوى الخامس">المستوى الخامس (مشروع التخرج)</option>
+                  <option value="مهندس خريج">مهندس خريج / دراسات عليا</option>
+                </select>
               </div>
 
               <div>
@@ -281,59 +306,8 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                   type="text"
                   value={specialization}
                   onChange={(e) => setSpecialization(e.target.value)}
+                  placeholder="أدخل التخصص"
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Mandatory Activation Code Input */}
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 space-y-2">
-              <label className="text-xs font-extrabold text-amber-300 flex items-center gap-2">
-                <Key className="w-4 h-4 text-amber-400" />
-                <span>كود التفعيل السنوي الإجباري (Mandatory Activation Code)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="أدخل كودك مثل: DR-248G3C7X"
-                value={activationCode}
-                onChange={(e) => setActivationCode(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 font-mono font-bold text-sm tracking-wider placeholder-slate-600 focus:outline-none focus:border-amber-400"
-              />
-              <p className="text-[11px] text-slate-400">
-                ملاحظة: لا يمكن إنشاء أي حساب طالب بدون كود تفعيل صادر ومسجل من المالك.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs shadow-xl shadow-amber-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <span>جاري تفعيل الكود وإنشاء الحساب...</span>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>تفعيل كود الاشتراك وإنشاء الحساب</span>
-                </>
-              )}
-            </button>
-          </form>
-        ) : (
-          /* Login Form */
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">البريد الإلكتروني للطالب</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
-                <input
-                  type="email"
-                  placeholder="student@mechatronics.edu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400 focus:outline-none font-mono"
                 />
               </div>
             </div>
@@ -344,11 +318,77 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                 <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
                 <input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="أدخل كلمة المرور الخاصة بك"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400 focus:outline-none font-mono"
+                  className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Optional Activation Code Input */}
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 space-y-2">
+              <label className="text-xs font-extrabold text-amber-300 flex items-center gap-2">
+                <Key className="w-4 h-4 text-amber-400" />
+                <span>كود التفعيل السنوي (اختياري - يمنحك 365 يوماً فورا)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="أدخل كود التفعيل الخاص بك إن وجد"
+                value={activationCode}
+                onChange={(e) => setActivationCode(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 font-mono font-bold text-sm tracking-wider placeholder-slate-600 focus:outline-none focus:border-amber-400"
+              />
+              <p className="text-[11px] text-slate-400">
+                ملاحظة: في حال عدم إدخال كود التفعيل، ستحصل تلقائياً على تجربة مجانية لمدة 48 ساعة.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs shadow-xl shadow-amber-500/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span>جاري إنشاء الحساب...</span>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>إنشاء حساب البدء بالتجربة المجانية</span>
+                </>
+              )}
+            </button>
+          </form>
+        ) : (
+          /* Login Form */
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">اسم الطالب أو كود التفعيل</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="أدخل الاسم الكامل أو كود التفعيل"
+                  value={loginNameOrCode}
+                  onChange={(e) => setLoginNameOrCode(e.target.value)}
+                  required
+                  className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">كلمة المرور</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                <input
+                  type="password"
+                  placeholder="أدخل كلمة المرور"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  className="w-full pr-9 pl-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400 focus:outline-none"
                 />
               </div>
             </div>
@@ -356,11 +396,11 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-amber-400" />
-                <span>كود التفعيل (في حال انتهاء أو تفعيل حساب جديد):</span>
+                <span>كود التفعيل السنوي:</span>
               </label>
               <input
                 type="text"
-                placeholder="DR-248G3C7X (اختياري عند تسجيل الدخول)"
+                placeholder="أدخل كود التفعيل الخاص بك"
                 value={activationCode}
                 onChange={(e) => setActivationCode(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-amber-300 font-mono text-xs"

@@ -1,71 +1,177 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { CircuitComponent, WireConnection, DiagnosticError, LabType } from '../../types';
-import { Zap, Play, RotateCcw, AlertTriangle, Code, Sliders, CheckCircle2, ChevronUp, ChevronDown, Layers, Activity, Shield, Box, Bot, Flame } from 'lucide-react';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { DiagnosticError, LabType } from '../../types';
+import {
+  Zap, Play, RotateCcw, AlertTriangle, Code, Sliders, CheckCircle2, ChevronUp, ChevronDown,
+  Layers, Activity, Shield, Box, Bot, Flame, Move, Eye, Plus, Trash2, Copy, RotateCw,
+  Camera, Maximize2, Compass, Radio, Disc, Sparkles, SlidersHorizontal
+} from 'lucide-react';
+
+import { InteractiveLabWorkspace } from './InteractiveLabWorkspace';
 
 interface LabWorkspace3DProps {
   initialLabType?: LabType;
+}
+
+// Interactive 3D item placed on the workbench table
+export interface Interactive3DItem {
+  id: string;
+  name: string;
+  type: 'arduino' | 'breadboard' | 'servo' | 'dc_motor' | 'ultrasonic' | 'led' | 'resistor' | 'battery9v' | 'relay';
+  label: string;
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
+  scale: number;
+  value: number;
+  unit: string;
+  color?: string;
 }
 
 export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType = 'circuits' }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const canvasOscilloscopeRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Lab Type & View Mode
   const [activeLab, setActiveLab] = useState<LabType>(initialLabType);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [viewMode, setViewMode] = useState<'3d_sim' | 'drag_drop'>('drag_drop');
+  const [isSimulating, setIsSimulating] = useState(true);
   const [showControlsDock, setShowControlsDock] = useState(true);
-  const [showCodeEditor, setShowCodeEditor] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [interactionMode, setInteractionMode] = useState<'drag' | 'orbit'>('drag');
 
-  // Components & Circuit State
-  const [dcVoltage, setDcVoltage] = useState(12); // Volts
-  const [resistorValue, setResistorValue] = useState(220); // Ohms
-  const [frequency, setFrequency] = useState(50); // Hz
+  // Interactive 3D Objects on Table
+  const [placedItems, setPlacedItems] = useState<Interactive3DItem[]>([
+    {
+      id: 'item_arduino_1',
+      name: 'لوحة Arduino UNO R3',
+      type: 'arduino',
+      label: 'Arduino-1',
+      x: -3.5,
+      y: 0,
+      z: 0.5,
+      rotationY: 0,
+      scale: 1.0,
+      value: 5,
+      unit: 'V',
+    },
+    {
+      id: 'item_breadboard_1',
+      name: 'لوحة تجارب Breadboard',
+      type: 'breadboard',
+      label: 'Breadboard-1',
+      x: 3.5,
+      y: 0,
+      z: 0.5,
+      rotationY: 0,
+      scale: 1.0,
+      value: 400,
+      unit: 'pins',
+    },
+    {
+      id: 'item_servo_1',
+      name: 'محرك سيرفو SG90',
+      type: 'servo',
+      label: 'Servo-1',
+      x: 3.5,
+      y: 0.25,
+      z: -2.8,
+      rotationY: 45,
+      scale: 1.0,
+      value: 90,
+      unit: '°',
+    },
+    {
+      id: 'item_led_1',
+      name: 'دايود ضوئي LED متوهج',
+      type: 'led',
+      label: 'LED-Red',
+      x: 1.5,
+      y: 0.2,
+      z: 0.5,
+      rotationY: 0,
+      scale: 1.0,
+      value: 2.1,
+      unit: 'V',
+      color: '#ef4444',
+    },
+    {
+      id: 'item_ultrasonic_1',
+      name: 'حساس المسافة HC-SR04',
+      type: 'ultrasonic',
+      label: 'Sonar-1',
+      x: -3.5,
+      y: 0.2,
+      z: -2.8,
+      rotationY: 0,
+      scale: 1.0,
+      value: 25,
+      unit: 'cm',
+    },
+  ]);
 
-  // Robotic Arm State
+  const [selectedItemId, setSelectedItemId] = useState<string | null>('item_arduino_1');
+
+  // Robotic Arm 4-DOF Angles
   const [jointBase, setJointBase] = useState(45);
   const [jointShoulder, setJointShoulder] = useState(30);
   const [jointElbow, setJointElbow] = useState(-45);
+  const [jointGripper, setJointGripper] = useState(25);
+  const [robotPosX, setRobotPosX] = useState(0);
+  const [robotPosZ, setRobotPosZ] = useState(0);
 
-  // Drone State
-  const [droneAltitude, setDroneAltitude] = useState(5.0);
+  // Drone 3D Flight State
+  const [dronePos, setDronePos] = useState({ x: 0, y: 4.5, z: 0 });
   const [dronePitch, setDronePitch] = useState(0);
+  const [droneRoll, setDroneRoll] = useState(0);
+  const [droneYaw, setDroneYaw] = useState(0);
+  const [propellerSpeed, setPropellerSpeed] = useState(1.0);
 
-  // Mechanical Gear State
+  // Mechanical Gear Assembly State
   const [gearRatio, setGearRatio] = useState(2.0); // 1:2
   const [motorRpm, setMotorRpm] = useState(1200);
+  const [gear1PosX, setGear1PosX] = useState(-2.6);
+  const [gear2PosX, setGear2PosX] = useState(3.8);
 
-  // C++ Arduino Code
-  const [arduinoCode, setArduinoCode] = useState<string>(
-`// Dr. Smart Arduino LED & Servo Controller
-void setup() {
-  pinMode(13, OUTPUT);
-  Serial.begin(9600);
-}
+  // Conveyor & Automated Sorting State
+  const [conveyorSpeed, setConveyorSpeed] = useState(1.5);
+  const [sensorPosition, setSensorPosition] = useState(-2.0);
+  const [sorterAngle, setSorterAngle] = useState(0);
 
-void loop() {
-  digitalWrite(13, HIGH);
-  delay(500);
-  digitalWrite(13, LOW);
-  delay(500);
-}`
-  );
-
-  // Live Measurements
-  const [calculatedCurrent, setCalculatedCurrent] = useState(0); // mA
-  const [calculatedPower, setCalculatedPower] = useState(0); // mW
+  // Circuit Electrical Telemetry
+  const [dcVoltage, setDcVoltage] = useState(12);
+  const [resistorValue, setResistorValue] = useState(220);
+  const [frequency, setFrequency] = useState(50);
+  const [calculatedCurrent, setCalculatedCurrent] = useState(0);
+  const [calculatedPower, setCalculatedPower] = useState(0);
   const [diagnosticsList, setDiagnosticsList] = useState<DiagnosticError[]>([]);
 
-  // Three.js Scene Refs
+  // Three.js Scene References
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+
+  // 3D Object Group References
+  const itemsGroupsMap = useRef<Map<string, THREE.Group>>(new Map());
   const robotArmGroupRef = useRef<THREE.Group | null>(null);
   const droneGroupRef = useRef<THREE.Group | null>(null);
   const gear1Ref = useRef<THREE.Group | null>(null);
   const gear2Ref = useRef<THREE.Group | null>(null);
-  const ledMeshRef = useRef<THREE.Mesh | null>(null);
+  const conveyorGroupRef = useRef<THREE.Group | null>(null);
+  const selectionBoxRef = useRef<THREE.BoxHelper | null>(null);
 
-  // Detect software WebGL as per Three.js directives
+  // Dragging in 3D space refs
+  const isDragging3DRef = useRef(false);
+  const dragPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const mouseVecRef = useRef(new THREE.Vector2());
+  const dragOffsetRef = useRef(new THREE.Vector3());
+
+  // Software WebGL Detection Directive
   const isSoftwareGl = (() => {
     if (typeof window === 'undefined') return true;
     const canvas = document.createElement('canvas');
@@ -78,23 +184,24 @@ void loop() {
     return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
   })();
 
-  // Main Three.js Scene Mounting
+  // Main Three.js Scene Mounting & Setup
   useEffect(() => {
     if (!mountRef.current) return;
 
     const width = mountRef.current.clientWidth;
-    const height = mountRef.current.clientHeight || 500;
+    const height = mountRef.current.clientHeight || 560;
 
     // 1. Scene setup
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     scene.background = new THREE.Color(0x0a192f);
-    scene.fog = new THREE.FogExp2(0x0a192f, 0.015);
+    scene.fog = new THREE.FogExp2(0x0a192f, 0.012);
 
     // 2. Camera setup
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 10, 18);
-    camera.lookAt(0, 2, 0);
+    camera.position.set(0, 11, 18);
+    camera.lookAt(0, 1.5, 0);
+    cameraRef.current = camera;
 
     // 3. Renderer setup
     const renderer = new THREE.WebGLRenderer({
@@ -104,10 +211,11 @@ void loop() {
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.15;
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    rendererRef.current = renderer;
 
     mountRef.current.appendChild(renderer.domElement);
 
@@ -117,67 +225,125 @@ void loop() {
     pmremGenerator.dispose();
 
     // 5. Studio Lighting Rig
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    keyLight.position.set(10, 15, 10);
+    const keyLight = new THREE.DirectionalLight(0xfff7ed, 2.8);
+    keyLight.position.set(12, 16, 12);
     keyLight.castShadow = !isSoftwareGl;
     keyLight.shadow.bias = -0.0005;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
     scene.add(keyLight);
 
-    const fillLight = new THREE.HemisphereLight(0x00f0ff, 0x0a192f, 1.2);
+    const fillLight = new THREE.HemisphereLight(0x00f0ff, 0x0a192f, 1.4);
     scene.add(fillLight);
 
-    // Ground Grid & Workbench Table Surface
-    const gridHelper = new THREE.GridHelper(30, 30, 0x00f0ff, 0x1e293b);
-    gridHelper.position.y = -0.01;
+    // 6. Workbench Table Surface & Technical Grid
+    const tableGeo = new THREE.BoxGeometry(26, 0.6, 18);
+    const tableMat = new THREE.MeshStandardMaterial({
+      color: 0x0c1b30,
+      metalness: 0.3,
+      roughness: 0.5,
+    });
+    const tableMesh = new THREE.Mesh(tableGeo, tableMat);
+    tableMesh.position.y = -0.3;
+    tableMesh.receiveShadow = !isSoftwareGl;
+    scene.add(tableMesh);
+
+    const gridHelper = new THREE.GridHelper(26, 26, 0x00f0ff, 0x1e3a5f);
+    gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // Build 3D Objects according to Active Lab
-    buildLabScene(scene, activeLab);
+    // 7. OrbitControls setup
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below workbench
+    controls.minDistance = 4;
+    controls.maxDistance = 40;
+    controlsRef.current = controls;
+
+    // 8. Visual Selection Box Helper
+    const dummyBox = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
+    const selectionBox = new THREE.BoxHelper(dummyBox, 0xf59e0b);
+    selectionBox.visible = false;
+    scene.add(selectionBox);
+    selectionBoxRef.current = selectionBox;
+
+    // Build Current Lab 3D Scene
+    rebuild3DScene(scene, activeLab, placedItems);
 
     // Animation Loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
       const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
 
-      // Dynamic animations
-      if (robotArmGroupRef.current) {
-        // Robot Arm joint rotations
-        const b = robotArmGroupRef.current.children[0];
-        const shoulder = b?.children[0];
-        const elbow = shoulder?.children[0];
+      controls.update();
 
-        if (b) b.rotation.y = THREE.MathUtils.degToRad(jointBase);
+      // Dynamic animations per active project
+      if (activeLab === 'robotics' && robotArmGroupRef.current) {
+        const base = robotArmGroupRef.current.children[0];
+        const shoulder = base?.children[0];
+        const elbow = shoulder?.children[0];
+        const gripper = elbow?.children[0];
+
+        robotArmGroupRef.current.position.set(robotPosX, 0, robotPosZ);
+        if (base) base.rotation.y = THREE.MathUtils.degToRad(jointBase);
         if (shoulder) shoulder.rotation.z = THREE.MathUtils.degToRad(jointShoulder);
         if (elbow) elbow.rotation.z = THREE.MathUtils.degToRad(jointElbow);
       }
 
-      if (droneGroupRef.current && isSimulating) {
-        // Drone floating hover animation
-        droneGroupRef.current.position.y = droneAltitude + Math.sin(elapsed * 4) * 0.2;
-        droneGroupRef.current.rotation.z = Math.sin(elapsed * 2) * 0.05;
-        // Rotate 4 propellers
-        droneGroupRef.current.children.forEach((child) => {
-          if (child.name === 'propeller') {
-            child.rotation.y += 0.4;
+      if (activeLab === 'drones' && droneGroupRef.current) {
+        if (isSimulating) {
+          droneGroupRef.current.position.y = dronePos.y + Math.sin(elapsed * 3.5) * 0.15;
+          droneGroupRef.current.rotation.x = THREE.MathUtils.degToRad(dronePitch) + Math.sin(elapsed * 2) * 0.02;
+          droneGroupRef.current.rotation.z = THREE.MathUtils.degToRad(droneRoll) + Math.cos(elapsed * 2) * 0.02;
+          droneGroupRef.current.rotation.y = THREE.MathUtils.degToRad(droneYaw);
+
+          // Spin propellers
+          droneGroupRef.current.children.forEach((child) => {
+            if (child.name === 'propeller') {
+              child.rotation.y += 0.5 * propellerSpeed;
+            }
+          });
+        }
+      }
+
+      if (activeLab === 'mechanical' && gear1Ref.current && gear2Ref.current) {
+        if (isSimulating) {
+          const rotSpeed = (motorRpm / 60) * delta * Math.PI * 2;
+          gear1Ref.current.rotation.y += rotSpeed;
+          gear2Ref.current.rotation.y -= rotSpeed / Math.max(0.2, gearRatio);
+        }
+      }
+
+      // Animate active LED glows or motors on table
+      if (isSimulating) {
+        itemsGroupsMap.current.forEach((grp, id) => {
+          const itemData = placedItems.find((p) => p.id === id);
+          if (itemData?.type === 'servo') {
+            const horn = grp.getObjectByName('servo_horn');
+            if (horn) {
+              horn.rotation.y = THREE.MathUtils.degToRad(itemData.value);
+            }
+          }
+          if (itemData?.type === 'dc_motor') {
+            const shaft = grp.getObjectByName('motor_shaft');
+            if (shaft) {
+              shaft.rotation.y += 0.2;
+            }
           }
         });
       }
 
-      if (gear1Ref.current && gear2Ref.current && isSimulating) {
-        // Synchronized Gear rotations
-        const rotSpeed = (motorRpm / 60) * delta * Math.PI * 2;
-        gear1Ref.current.rotation.y += rotSpeed;
-        gear2Ref.current.rotation.y -= rotSpeed / gearRatio;
-      }
-
-      if (ledMeshRef.current && isSimulating) {
-        const mat = ledMeshRef.current.material as THREE.MeshStandardMaterial;
-        mat.emissive.setHex(isSimulating ? 0x00f0ff : 0x000000);
-        mat.emissiveIntensity = isSimulating ? 1.5 : 0;
+      // Update Selection Box Position
+      if (selectionBoxRef.current && selectionBoxRef.current.visible && selectedItemId) {
+        const selectedGroup = itemsGroupsMap.current.get(selectedItemId);
+        if (selectedGroup) {
+          selectionBoxRef.current.update();
+        }
       }
 
       renderer.render(scene, camera);
@@ -188,7 +354,7 @@ void loop() {
     const handleResize = () => {
       if (!mountRef.current) return;
       const w = mountRef.current.clientWidth;
-      const h = mountRef.current.clientHeight || 500;
+      const h = mountRef.current.clientHeight || 560;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -199,6 +365,7 @@ void loop() {
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
+      controls.dispose();
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
@@ -206,255 +373,513 @@ void loop() {
     };
   }, [activeLab]);
 
-  // Construct Composite 3D Models (3-12 parts per Three.js directives)
-  const buildLabScene = (scene: THREE.Scene, labType: LabType) => {
-    // Clear previous models except lights/grid
-    scene.children = scene.children.filter((c) => c instanceof THREE.Light || c instanceof THREE.GridHelper);
+  // Rebuild 3D scene whenever items or lab type change
+  const rebuild3DScene = (scene: THREE.Scene, labType: LabType, items: Interactive3DItem[]) => {
+    // Clean old groups
+    itemsGroupsMap.current.forEach((grp) => scene.remove(grp));
+    itemsGroupsMap.current.clear();
+
+    if (robotArmGroupRef.current) scene.remove(robotArmGroupRef.current);
+    if (droneGroupRef.current) scene.remove(droneGroupRef.current);
+    if (gear1Ref.current) scene.remove(gear1Ref.current);
+    if (gear2Ref.current) scene.remove(gear2Ref.current);
+    if (conveyorGroupRef.current) scene.remove(conveyorGroupRef.current);
 
     if (labType === 'robotics') {
       // 3D 4-DOF Robotic Arm Group
-      const robotGroup = new THREE.Group();
+      const robotGroup = createRoboticArm3D();
       robotArmGroupRef.current = robotGroup;
-
-      // Base pedestal
-      const baseGeo = new THREE.CylinderGeometry(2, 2.5, 0.8, 32);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
-      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-      baseMesh.position.y = 0.4;
-      robotGroup.add(baseMesh);
-
-      // Shoulder Joint
-      const shoulderGeo = new THREE.BoxGeometry(1.2, 3.5, 1.2);
-      const shoulderMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.9, roughness: 0.1 });
-      const shoulderMesh = new THREE.Mesh(shoulderGeo, shoulderMat);
-      shoulderMesh.position.y = 1.75;
-      baseMesh.add(shoulderMesh);
-
-      // Elbow Arm
-      const elbowGeo = new THREE.BoxGeometry(1.0, 3.0, 1.0);
-      const elbowMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.8, roughness: 0.2 });
-      const elbowMesh = new THREE.Mesh(elbowGeo, elbowMat);
-      elbowMesh.position.y = 3.0;
-      shoulderMesh.add(elbowMesh);
-
-      // Gripper End Effector
-      const gripperGeo = new THREE.SphereGeometry(0.6, 16, 16);
-      const gripperMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.1 });
-      const gripperMesh = new THREE.Mesh(gripperGeo, gripperMat);
-      gripperMesh.position.y = 1.8;
-      elbowMesh.add(gripperMesh);
-
       scene.add(robotGroup);
     } else if (labType === 'drones') {
       // 3D Quadcopter Drone Group
-      const droneGroup = new THREE.Group();
+      const droneGroup = createQuadcopterDrone3D();
       droneGroupRef.current = droneGroup;
-      droneGroup.position.set(0, droneAltitude, 0);
-
-      // Frame
-      const bodyGeo = new THREE.BoxGeometry(2, 0.4, 2);
-      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.3 });
-      const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-      droneGroup.add(bodyMesh);
-
-      // 4 Arms & Propellers
-      const armPositions = [
-        [-2, 0, -2],
-        [2, 0, -2],
-        [-2, 0, 2],
-        [2, 0, 2],
-      ];
-
-      armPositions.forEach(([x, y, z]) => {
-        const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 2.8);
-        const armMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.9 });
-        const arm = new THREE.Mesh(armGeo, armMat);
-        arm.position.set(x / 2, 0, z / 2);
-        arm.rotation.z = Math.PI / 4;
-        droneGroup.add(arm);
-
-        // Propeller disc
-        const propGeo = new THREE.BoxGeometry(1.4, 0.05, 0.2);
-        const propMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8 });
-        const prop = new THREE.Mesh(propGeo, propMat);
-        prop.name = 'propeller';
-        prop.position.set(x, 0.3, z);
-        droneGroup.add(prop);
-      });
-
       scene.add(droneGroup);
     } else if (labType === 'mechanical') {
-      // Mechanical Gears Assembly
-      const g1Group = new THREE.Group();
-      gear1Ref.current = g1Group;
+      // 3D Mechanical Gears Assembly
+      const [g1, g2] = createMechanicalGears3D();
+      gear1Ref.current = g1;
+      gear2Ref.current = g2;
+      scene.add(g1);
+      scene.add(g2);
+    }
 
-      const g1Geo = new THREE.CylinderGeometry(2.5, 2.5, 0.6, 24);
-      const g1Mat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.15 });
-      const g1Mesh = new THREE.Mesh(g1Geo, g1Mat);
-      g1Group.add(g1Mesh);
-      g1Group.position.set(-2.6, 2, 0);
+    // Always render placed interactive tools and boards on workbench
+    items.forEach((item) => {
+      const itemGroup = create3DComponentMesh(item);
+      itemGroup.position.set(item.x, item.y, item.z);
+      itemGroup.rotation.y = THREE.MathUtils.degToRad(item.rotationY);
+      itemGroup.scale.set(item.scale, item.scale, item.scale);
+      itemGroup.userData = { itemId: item.id };
 
-      const g2Group = new THREE.Group();
-      gear2Ref.current = g2Group;
+      scene.add(itemGroup);
+      itemsGroupsMap.current.set(item.id, itemGroup);
+    });
 
-      const g2Geo = new THREE.CylinderGeometry(4.0, 4.0, 0.6, 36);
-      const g2Mat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.95, roughness: 0.15 });
-      const g2Mesh = new THREE.Mesh(g2Geo, g2Mat);
-      g2Group.add(g2Mesh);
-      g2Group.position.set(3.8, 2, 0);
+    updateSelectionHighlight(selectedItemId);
+  };
 
-      scene.add(g1Group);
-      scene.add(g2Group);
+  // Update selection box on target object
+  const updateSelectionHighlight = (itemId: string | null) => {
+    if (!selectionBoxRef.current) return;
+    if (!itemId) {
+      selectionBoxRef.current.visible = false;
+      return;
+    }
+
+    const targetGroup = itemsGroupsMap.current.get(itemId);
+    if (targetGroup) {
+      selectionBoxRef.current.setFromObject(targetGroup);
+      selectionBoxRef.current.visible = true;
     } else {
-      // Electronics / Circuits / Arduino Workbench 3D Scene
-      const boardGroup = new THREE.Group();
-
-      // Arduino UNO PCB Board (Blue Glass PCB)
-      const pcbGeo = new THREE.BoxGeometry(7, 0.4, 5);
-      const pcbMat = new THREE.MeshStandardMaterial({ color: 0x0066ff, metalness: 0.4, roughness: 0.3 });
-      const pcbMesh = new THREE.Mesh(pcbGeo, pcbMat);
-      pcbMesh.position.set(-3, 0.2, 0);
-      boardGroup.add(pcbMesh);
-
-      // Microcontroller Chip
-      const chipGeo = new THREE.BoxGeometry(3, 0.3, 0.8);
-      const chipMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.9, roughness: 0.1 });
-      const chipMesh = new THREE.Mesh(chipGeo, chipMat);
-      chipMesh.position.set(-3, 0.5, 0);
-      boardGroup.add(chipMesh);
-
-      // Breadboard Component
-      const breadGeo = new THREE.BoxGeometry(8, 0.4, 4);
-      const breadMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6 });
-      const breadMesh = new THREE.Mesh(breadGeo, breadMat);
-      breadMesh.position.set(4, 0.2, 0);
-      boardGroup.add(breadMesh);
-
-      // 3D LED (Glowing mesh)
-      const ledGeo = new THREE.SphereGeometry(0.4, 16, 16);
-      const ledMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, roughness: 0.1, transparent: true, opacity: 0.9 });
-      const ledMesh = new THREE.Mesh(ledGeo, ledMat);
-      ledMeshRef.current = ledMesh;
-      ledMesh.position.set(4, 1.0, 0);
-      boardGroup.add(ledMesh);
-
-      scene.add(boardGroup);
+      selectionBoxRef.current.visible = false;
     }
   };
 
-  // Perform DC Circuit & Physical Calculations
-  const runSimulationMath = () => {
-    // I = V / R
-    const currentAmp = dcVoltage / Math.max(1, resistorValue);
-    const currentMmA = currentAmp * 1000;
-    const powerMw = dcVoltage * currentMmA;
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    rebuild3DScene(sceneRef.current, activeLab, placedItems);
+  }, [placedItems]);
 
-    setCalculatedCurrent(parseFloat(currentMmA.toFixed(2)));
-    setCalculatedPower(parseFloat(powerMw.toFixed(2)));
+  useEffect(() => {
+    updateSelectionHighlight(selectedItemId);
+  }, [selectedItemId]);
 
-    // Run Diagnostics
-    const errors: DiagnosticError[] = [];
+  // Procedural 3D Model Builders (Three.js Directives)
+  const create3DComponentMesh = (item: Interactive3DItem): THREE.Group => {
+    const group = new THREE.Group();
+    group.name = item.id;
 
-    if (dcVoltage > 24) {
-      errors.push({
-        id: 'err_overvoltage',
-        severity: 'error',
-        location: 'مصدر الجهد DC',
-        componentName: 'Power Source',
-        cause: 'تجاوز حدود الجهد الآمن (أعلى من 24V). قد يؤدي لاحتراق الدايود والمقاومة.',
-        fixGuide: 'قم بخفض الجهد إلى 5V أو 12V يناسب الدائرة.',
+    if (item.type === 'arduino') {
+      // Arduino UNO PCB Body
+      const pcbGeo = new THREE.BoxGeometry(6.8, 0.35, 5.3);
+      const pcbMat = new THREE.MeshStandardMaterial({ color: 0x0055bb, metalness: 0.3, roughness: 0.4 });
+      const pcb = new THREE.Mesh(pcbGeo, pcbMat);
+      pcb.position.y = 0.18;
+      pcb.castShadow = !isSoftwareGl;
+      group.add(pcb);
+
+      // Microcontroller IC
+      const chipGeo = new THREE.BoxGeometry(3.2, 0.25, 0.85);
+      const chipMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.8, roughness: 0.2 });
+      const chip = new THREE.Mesh(chipGeo, chipMat);
+      chip.position.set(0, 0.45, 0.2);
+      group.add(chip);
+
+      // USB Port
+      const usbGeo = new THREE.BoxGeometry(1.4, 0.9, 1.2);
+      const usbMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.95, roughness: 0.1 });
+      const usb = new THREE.Mesh(usbGeo, usbMat);
+      usb.position.set(-2.8, 0.7, -1.5);
+      group.add(usb);
+
+      // DC Barrel Jack
+      const jackGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.4, 16);
+      const jackMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.5, roughness: 0.3 });
+      const jack = new THREE.Mesh(jackGeo, jackMat);
+      jack.rotation.z = Math.PI / 2;
+      jack.position.set(-2.8, 0.7, 1.6);
+      group.add(jack);
+    } else if (item.type === 'breadboard') {
+      // Breadboard Body
+      const bbGeo = new THREE.BoxGeometry(8.2, 0.4, 5.5);
+      const bbMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.7 });
+      const bb = new THREE.Mesh(bbGeo, bbMat);
+      bb.position.y = 0.2;
+      bb.castShadow = !isSoftwareGl;
+      group.add(bb);
+
+      // Power rails red/blue stripes
+      const railGeo = new THREE.BoxGeometry(7.8, 0.05, 0.4);
+      const redMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+      const blueMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+
+      const r1 = new THREE.Mesh(railGeo, redMat);
+      r1.position.set(0, 0.41, -2.3);
+      group.add(r1);
+
+      const r2 = new THREE.Mesh(railGeo, blueMat);
+      r2.position.set(0, 0.41, 2.3);
+      group.add(r2);
+    } else if (item.type === 'servo') {
+      // SG90 Blue Casing
+      const bodyGeo = new THREE.BoxGeometry(2.3, 2.2, 1.2);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, metalness: 0.4, roughness: 0.3 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 1.1;
+      group.add(body);
+
+      // Servo Gear Horn (Rotatable)
+      const hornGroup = new THREE.Group();
+      hornGroup.name = 'servo_horn';
+      hornGroup.position.set(0.6, 2.3, 0);
+
+      const hornGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.25, 16);
+      const hornArmGeo = new THREE.BoxGeometry(1.6, 0.15, 0.35);
+      const hornMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+      const hornMesh = new THREE.Mesh(hornGeo, hornMat);
+      const armMesh = new THREE.Mesh(hornArmGeo, hornMat);
+      hornGroup.add(hornMesh);
+      hornGroup.add(armMesh);
+      group.add(hornGroup);
+    } else if (item.type === 'dc_motor') {
+      // DC Motor Cylindrical Canister
+      const motorGeo = new THREE.CylinderGeometry(1.0, 1.0, 2.6, 24);
+      const motorMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+      const motor = new THREE.Mesh(motorGeo, motorMat);
+      motor.rotation.z = Math.PI / 2;
+      motor.position.y = 1.0;
+      group.add(motor);
+
+      // Rotating Shaft
+      const shaftGeo = new THREE.CylinderGeometry(0.18, 0.18, 1.2, 16);
+      const shaftMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95 });
+      const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+      shaft.name = 'motor_shaft';
+      shaft.rotation.z = Math.PI / 2;
+      shaft.position.set(1.6, 1.0, 0);
+      group.add(shaft);
+    } else if (item.type === 'led') {
+      // LED Glowing Bulb
+      const ledGeo = new THREE.SphereGeometry(0.45, 20, 20);
+      const ledMat = new THREE.MeshStandardMaterial({
+        color: item.color ? parseInt(item.color.replace('#', '0x')) : 0xef4444,
+        emissive: item.color ? parseInt(item.color.replace('#', '0x')) : 0xef4444,
+        emissiveIntensity: isSimulating ? 1.6 : 0.2,
+        roughness: 0.1,
       });
+      const led = new THREE.Mesh(ledGeo, ledMat);
+      led.position.y = 1.0;
+      group.add(led);
+
+      // LED Legs
+      const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.8);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.9 });
+      const l1 = new THREE.Mesh(legGeo, legMat);
+      l1.position.set(-0.15, 0.4, 0);
+      const l2 = new THREE.Mesh(legGeo, legMat);
+      l2.position.set(0.15, 0.4, 0);
+      group.add(l1);
+      group.add(l2);
+    } else if (item.type === 'ultrasonic') {
+      // HC-SR04 PCB
+      const boardGeo = new THREE.BoxGeometry(4.2, 1.8, 0.25);
+      const boardMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.4 });
+      const board = new THREE.Mesh(boardGeo, boardMat);
+      board.position.y = 1.0;
+      group.add(board);
+
+      // Dual Ultrasonic Transducers
+      const eyeGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.7, 20);
+      const eyeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85 });
+      const eye1 = new THREE.Mesh(eyeGeo, eyeMat);
+      eye1.rotation.x = Math.PI / 2;
+      eye1.position.set(-1.1, 1.0, 0.4);
+      const eye2 = new THREE.Mesh(eyeGeo, eyeMat);
+      eye2.rotation.x = Math.PI / 2;
+      eye2.position.set(1.1, 1.0, 0.4);
+      group.add(eye1);
+      group.add(eye2);
+    } else if (item.type === 'resistor') {
+      // Resistor Ceramic Body
+      const rGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.8, 16);
+      const rMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 });
+      const r = new THREE.Mesh(rGeo, rMat);
+      r.rotation.z = Math.PI / 2;
+      r.position.y = 0.5;
+      group.add(r);
+
+      // Color bands
+      const bandGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.15, 16);
+      const b1 = new THREE.Mesh(bandGeo, new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+      b1.rotation.z = Math.PI / 2;
+      b1.position.set(-0.4, 0.5, 0);
+      const b2 = new THREE.Mesh(bandGeo, new THREE.MeshStandardMaterial({ color: 0x000000 }));
+      b2.rotation.z = Math.PI / 2;
+      b2.position.set(0.1, 0.5, 0);
+      group.add(b1);
+      group.add(b2);
+    } else {
+      // Generic component block
+      const defGeo = new THREE.BoxGeometry(2, 1, 1.5);
+      const defMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.6 });
+      const def = new THREE.Mesh(defGeo, defMat);
+      def.position.y = 0.5;
+      group.add(def);
     }
 
-    if (resistorValue < 10) {
-      errors.push({
-        id: 'err_short',
-        severity: 'warning',
-        location: 'مقاومة الحمل R1',
-        componentName: 'Resistor R1',
-        cause: 'قيمة المقاومة منخفضة جداً (قريبة من قصر الدائرة Short Circuit).',
-        fixGuide: 'استخدم مقاومة 220Ω أو 1kΩ لحماية الدايود والأنظمة المضمنة.',
-      });
-    }
-
-    setDiagnosticsList(errors);
+    return group;
   };
 
-  useEffect(() => {
-    runSimulationMath();
-  }, [dcVoltage, resistorValue, frequency]);
+  // 3D Robotic Arm
+  const createRoboticArm3D = (): THREE.Group => {
+    const robotGroup = new THREE.Group();
+    robotGroup.position.set(robotPosX, 0, robotPosZ);
 
-  // Oscilloscope Waveform Generator Canvas
-  useEffect(() => {
-    const canvas = canvasOscilloscopeRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    // Base pedestal
+    const baseGeo = new THREE.CylinderGeometry(2, 2.5, 0.8, 32);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.2 });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.position.y = 0.4;
+    robotGroup.add(baseMesh);
 
-    let animId: number;
-    let phase = 0;
+    // Shoulder Link
+    const shoulderGeo = new THREE.BoxGeometry(1.2, 3.8, 1.2);
+    const shoulderMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.9, roughness: 0.15 });
+    const shoulderMesh = new THREE.Mesh(shoulderGeo, shoulderMat);
+    shoulderMesh.position.y = 1.9;
+    baseMesh.add(shoulderMesh);
 
-    const renderWave = () => {
-      animId = requestAnimationFrame(renderWave);
-      phase += 0.08;
+    // Elbow Link
+    const elbowGeo = new THREE.BoxGeometry(1.0, 3.2, 1.0);
+    const elbowMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.8, roughness: 0.2 });
+    const elbowMesh = new THREE.Mesh(elbowGeo, elbowMat);
+    elbowMesh.position.y = 3.2;
+    shoulderMesh.add(elbowMesh);
 
-      ctx.fillStyle = '#0a192f';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Gripper Effector
+    const gripperGeo = new THREE.SphereGeometry(0.7, 16, 16);
+    const gripperMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95 });
+    const gripperMesh = new THREE.Mesh(gripperGeo, gripperMat);
+    gripperMesh.position.y = 1.8;
+    elbowMesh.add(gripperMesh);
 
-      // Grid lines
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < canvas.width; x += 20) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
+    return robotGroup;
+  };
+
+  // 3D Quadcopter Drone
+  const createQuadcopterDrone3D = (): THREE.Group => {
+    const droneGroup = new THREE.Group();
+    droneGroup.position.set(dronePos.x, dronePos.y, dronePos.z);
+
+    // Center body
+    const bodyGeo = new THREE.BoxGeometry(2.4, 0.5, 2.4);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.2 });
+    const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+    droneGroup.add(bodyMesh);
+
+    // 4 Arms and Propellers
+    const armOffsets = [
+      [-2.4, 0, -2.4],
+      [2.4, 0, -2.4],
+      [-2.4, 0, 2.4],
+      [2.4, 0, 2.4],
+    ];
+
+    armOffsets.forEach(([x, y, z]) => {
+      const armGeo = new THREE.CylinderGeometry(0.18, 0.18, 3.2);
+      const armMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.9 });
+      const arm = new THREE.Mesh(armGeo, armMat);
+      arm.position.set(x / 2, 0, z / 2);
+      arm.rotation.z = Math.PI / 4;
+      droneGroup.add(arm);
+
+      // Propeller Blades
+      const propGeo = new THREE.BoxGeometry(1.6, 0.06, 0.25);
+      const propMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8 });
+      const prop = new THREE.Mesh(propGeo, propMat);
+      prop.name = 'propeller';
+      prop.position.set(x, 0.35, z);
+      droneGroup.add(prop);
+    });
+
+    return droneGroup;
+  };
+
+  // 3D Mechanical Gears
+  const createMechanicalGears3D = (): [THREE.Group, THREE.Group] => {
+    const g1 = new THREE.Group();
+    const g1Geo = new THREE.CylinderGeometry(2.5, 2.5, 0.6, 24);
+    const g1Mat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.15 });
+    g1.add(new THREE.Mesh(g1Geo, g1Mat));
+    g1.position.set(gear1PosX, 1.5, 0);
+
+    const g2 = new THREE.Group();
+    const g2Geo = new THREE.CylinderGeometry(4.0, 4.0, 0.6, 36);
+    const g2Mat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.95, roughness: 0.15 });
+    g2.add(new THREE.Mesh(g2Geo, g2Mat));
+    g2.position.set(gear2PosX, 1.5, 0);
+
+    return [g1, g2];
+  };
+
+  // Direct 3D Mouse Dragging on Workbench Surface
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!rendererRef.current || !cameraRef.current || !sceneRef.current) return;
+
+    const rect = rendererRef.current.domElement.getBoundingClientRect();
+    mouseVecRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseVecRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycasterRef.current.setFromCamera(mouseVecRef.current, cameraRef.current);
+
+    // Collect all selectable meshes
+    const selectableMeshes: THREE.Object3D[] = [];
+    itemsGroupsMap.current.forEach((grp) => {
+      grp.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) selectableMeshes.push(child);
+      });
+    });
+
+    const intersects = raycasterRef.current.intersectObjects(selectableMeshes, false);
+
+    if (intersects.length > 0) {
+      // Find parent group with itemId
+      let curr: THREE.Object3D | null = intersects[0].object;
+      let foundId: string | null = null;
+      while (curr && curr !== sceneRef.current) {
+        if (curr.userData && curr.userData.itemId) {
+          foundId = curr.userData.itemId;
+          break;
+        }
+        curr = curr.parent;
       }
-      for (let y = 0; y < canvas.height; y += 20) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
+
+      if (foundId) {
+        setSelectedItemId(foundId);
+
+        if (interactionMode === 'drag') {
+          // Temporarily disable OrbitControls while dragging the 3D tool
+          if (controlsRef.current) controlsRef.current.enabled = false;
+          isDragging3DRef.current = true;
+
+          const intersectPoint = new THREE.Vector3();
+          raycasterRef.current.ray.intersectPlane(dragPlaneRef.current, intersectPoint);
+
+          const group = itemsGroupsMap.current.get(foundId);
+          if (group) {
+            dragOffsetRef.current.copy(group.position).sub(intersectPoint);
+          }
+        }
+      }
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging3DRef.current || !selectedItemId || !cameraRef.current) return;
+
+    const rect = rendererRef.current!.domElement.getBoundingClientRect();
+    mouseVecRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouseVecRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycasterRef.current.setFromCamera(mouseVecRef.current, cameraRef.current);
+    const intersectPoint = new THREE.Vector3();
+    const hit = raycasterRef.current.ray.intersectPlane(dragPlaneRef.current, intersectPoint);
+
+    if (hit) {
+      const targetPos = intersectPoint.add(dragOffsetRef.current);
+      // Clamp to workbench table boundaries
+      const clampedX = Math.max(-11.5, Math.min(11.5, targetPos.x));
+      const clampedZ = Math.max(-7.5, Math.min(7.5, targetPos.z));
+
+      // Update 3D group position immediately
+      const grp = itemsGroupsMap.current.get(selectedItemId);
+      if (grp) {
+        grp.position.x = clampedX;
+        grp.position.z = clampedZ;
       }
 
-      // Sine wave
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
+      // Sync React state
+      setPlacedItems((prev) =>
+        prev.map((item) =>
+          item.id === selectedItemId ? { ...item, x: clampedX, z: clampedZ } : item
+        )
+      );
+    }
+  };
 
-      const centerY = canvas.height / 2;
-      const amp = Math.min(canvas.height / 2 - 10, dcVoltage * 3);
+  const handlePointerUp = () => {
+    isDragging3DRef.current = false;
+    if (controlsRef.current) controlsRef.current.enabled = true;
+  };
 
-      for (let x = 0; x < canvas.width; x++) {
-        const y = centerY - Math.sin((x * 0.05) * (frequency / 30) + phase) * amp;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+  // Add 3D Tool to Scene
+  const handleAdd3DTool = (type: Interactive3DItem['type'], name: string, unit: string, val: number, color?: string) => {
+    const newItem: Interactive3DItem = {
+      id: `item_${Date.now()}`,
+      name,
+      type,
+      label: `${type.toUpperCase()}-${placedItems.length + 1}`,
+      x: (Math.random() - 0.5) * 8,
+      y: 0,
+      z: (Math.random() - 0.5) * 6,
+      rotationY: 0,
+      scale: 1.0,
+      value: val,
+      unit,
+      color,
     };
 
-    renderWave();
+    setPlacedItems([...placedItems, newItem]);
+    setSelectedItemId(newItem.id);
+    setShowAddMenu(false);
+  };
 
-    return () => cancelAnimationFrame(animId);
-  }, [dcVoltage, frequency]);
+  // Delete Selected 3D Object
+  const handleDeleteSelected3D = () => {
+    if (!selectedItemId) return;
+    setPlacedItems(placedItems.filter((i) => i.id !== selectedItemId));
+    setSelectedItemId(null);
+  };
+
+  // Duplicate Selected 3D Object
+  const handleDuplicateSelected3D = () => {
+    const item = placedItems.find((i) => i.id === selectedItemId);
+    if (!item) return;
+
+    const cloned: Interactive3DItem = {
+      ...item,
+      id: `item_${Date.now()}`,
+      label: `${item.label}_Copy`,
+      x: item.x + 1.5,
+      z: item.z + 1.5,
+    };
+
+    setPlacedItems([...placedItems, cloned]);
+    setSelectedItemId(cloned.id);
+  };
+
+  // Camera Presets
+  const setCameraPreset = (preset: 'isometric' | 'top' | 'front' | 'closeup' | 'reset') => {
+    if (!cameraRef.current || !controlsRef.current) return;
+    const cam = cameraRef.current;
+    const ctrl = controlsRef.current;
+
+    if (preset === 'isometric') {
+      cam.position.set(12, 12, 14);
+      ctrl.target.set(0, 1.5, 0);
+    } else if (preset === 'top') {
+      cam.position.set(0, 22, 0.1);
+      ctrl.target.set(0, 0, 0);
+    } else if (preset === 'front') {
+      cam.position.set(0, 4, 18);
+      ctrl.target.set(0, 2, 0);
+    } else if (preset === 'closeup') {
+      cam.position.set(0, 5, 8);
+      ctrl.target.set(0, 1, 0);
+    } else {
+      cam.position.set(0, 11, 18);
+      ctrl.target.set(0, 1.5, 0);
+    }
+    ctrl.update();
+  };
+
+  const selectedItem = placedItems.find((i) => i.id === selectedItemId);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 font-sans select-none">
       
-      {/* Top Controls & Lab Selection Header */}
+      {/* Top Header & Lab Mode Navigation */}
       <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         
         {/* Lab Switcher Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {[
-            { id: 'circuits', label: 'الكهرباء والدوائر', icon: Zap },
-            { id: 'electronics', label: 'الإلكترونيات', icon: Activity },
-            { id: 'arduino', label: 'الأردوينو C++', icon: Code },
-            { id: 'robotics', label: 'الروبوتات 3D', icon: Bot },
-            { id: 'mechanical', label: 'التصميم الميكانيكي', icon: Box },
-            { id: 'control', label: 'التحكم والـ PLC', icon: Shield },
-            { id: 'drones', label: 'الطائرات UAV', icon: Flame },
-            { id: 'innovation', label: 'التصنيع 3D', icon: Layers },
+            { id: 'circuits', label: 'طاولة الدوائر والقطع 3D', icon: Zap },
+            { id: 'robotics', label: 'الذراع الروبوتي 4-DOF', icon: Bot },
+            { id: 'drones', label: 'طائرة الدرون UAV', icon: Flame },
+            { id: 'mechanical', label: 'ميكانيكا التروس والمحركات', icon: Box },
+            { id: 'control', label: 'أنظمة التحكم والأتمتة', icon: Shield },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeLab === tab.id;
@@ -462,279 +887,424 @@ void loop() {
               <button
                 key={tab.id}
                 onClick={() => setActiveLab(tab.id as LabType)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-cyan-500 text-black shadow-md shadow-cyan-500/20'
-                    : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 font-extrabold'
+                    : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Simulation Actions */}
-        <div className="flex items-center gap-2">
+        {/* View Mode & Simulation Controls */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 p-1 rounded-xl text-xs font-bold">
+            <button
+              onClick={() => setViewMode('3d_sim')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                viewMode === '3d_sim'
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>المحاكاة ثلاثية الأبعاد 3D</span>
+            </button>
+            <button
+              onClick={() => setViewMode('drag_drop')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                viewMode === 'drag_drop'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>مختبر السحب والإفلات (2D Studio)</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setIsSimulating(!isSimulating)}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all ${
               isSimulating
-                ? 'bg-amber-500 text-black hover:bg-amber-400 shadow-amber-500/20'
-                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/25 hover:shadow-cyan-500/40'
+                ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/20'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/25'
             }`}
           >
             <Play className={`w-4 h-4 ${isSimulating ? 'animate-spin' : ''}`} />
-            <span>{isSimulating ? 'إيقاف المحاكاة' : 'تشغيل المحاكاة الواقعية'}</span>
-          </button>
-
-          {activeLab === 'arduino' && (
-            <button
-              onClick={() => setShowCodeEditor(!showCodeEditor)}
-              className="px-3 py-2 rounded-xl bg-slate-800 text-cyan-400 border border-slate-700 hover:bg-slate-700 text-xs font-bold flex items-center gap-1.5"
-            >
-              <Code className="w-4 h-4" />
-              <span>محرر C++</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
-              diagnosticsList.length > 0
-                ? 'bg-rose-500/15 border-rose-500 text-rose-400 animate-pulse'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span>فحص الأخطاء ({diagnosticsList.length})</span>
+            <span>{isSimulating ? 'إيقاف المحاكاة' : 'تشغيل المحاكاة'}</span>
           </button>
         </div>
       </div>
 
-      {/* Main 3D Canvas Viewport */}
-      <div className="relative w-full h-[540px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-[#0A192F]">
-        
-        {/* Mount Three.js canvas container */}
-        <div ref={mountRef} className="w-full h-full" />
-
-        {/* Overlay Telemetry HUD (Top Left) */}
-        <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md border border-cyan-500/30 rounded-xl p-3 text-xs space-y-1 font-mono text-cyan-300">
-          <div className="font-bold text-white flex items-center gap-1.5">
-            <Activity className="w-3.5 h-3.5 text-cyan-400" />
-            <span>محاكي ثلاثي الأبعاد: {activeLab.toUpperCase()}</span>
-          </div>
-          <div>الجهد DC: {dcVoltage} V</div>
-          <div>التيار I: {calculatedCurrent} mA</div>
-          <div>القدرة P: {calculatedPower} mW</div>
-        </div>
-
-        {/* Oscilloscope Waveform Viewport (Top Right) */}
-        <div className="absolute top-4 right-4 z-10 bg-black/70 backdrop-blur-md border border-slate-800 rounded-xl p-2 space-y-1 hidden sm:block">
-          <div className="text-[10px] font-mono text-slate-400 px-1">موجة الأوسيلوسكوب Oscilloscope</div>
-          <canvas ref={canvasOscilloscopeRef} width={220} height={100} className="rounded-lg block" />
-        </div>
-
-        {/* Three.js Ergonomic Collapsible Bottom Control Dock (Zero Viewport Occlusion Directive) */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-4xl">
-          <div className="bg-[#0D1B2A]/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
+      {/* Conditionally Render 2D Studio or Main 3D Viewport */}
+      {viewMode === 'drag_drop' ? (
+        <InteractiveLabWorkspace />
+      ) : (
+        /* 3D Viewport with Object Dragging, Gizmo Controls & Telemetry */
+        <div className="space-y-4">
+          <div className="relative w-full h-[600px] rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-[#0A192F]">
             
-            {/* Dock Header & Collapse Toggle */}
+            {/* 3D Canvas Mount */}
             <div
-              onClick={() => setShowControlsDock(!showControlsDock)}
-              className="px-4 py-2 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between cursor-pointer text-xs font-bold text-cyan-400 hover:text-white"
-            >
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4" />
-                <span>لوحة التحكم وتعديل القيم والهندسة</span>
+              ref={mountRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              className={`w-full h-full ${interactionMode === 'drag' ? 'cursor-grab active:cursor-grabbing' : 'cursor-all-scroll'}`}
+            />
+
+            {/* Top-Left: Mode Switcher (Drag Tools vs Orbit Camera) */}
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+              <div className="bg-[#0D1B2A]/90 backdrop-blur-md border border-cyan-500/40 rounded-2xl p-1.5 flex items-center gap-1 shadow-2xl">
+                <button
+                  onClick={() => setInteractionMode('drag')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    interactionMode === 'drag'
+                      ? 'bg-amber-500 text-slate-950 font-extrabold shadow-md'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="سحب وتحريك الأدوات واللوحات بحرية على الطاولة"
+                >
+                  <Move className="w-3.5 h-3.5" />
+                  <span>🖐️ سحب الأدوات 3D</span>
+                </button>
+                <button
+                  onClick={() => setInteractionMode('orbit')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    interactionMode === 'orbit'
+                      ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-md'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                  title="تدوير الكاميرا والتكبير حول الطاولة"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>🔄 تدوير الكاميرا</span>
+                </button>
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                <span>{showControlsDock ? 'إخفاء اللوحة' : 'عرض اللوحة'}</span>
-                {showControlsDock ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+
+              {/* Camera Angle Presets */}
+              <div className="bg-[#0D1B2A]/90 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 flex items-center gap-1 text-[11px] font-bold text-slate-300">
+                <span className="text-[10px] text-slate-400 font-mono px-1">المنظور:</span>
+                <button onClick={() => setCameraPreset('isometric')} className="px-2 py-1 rounded-lg hover:bg-slate-800 text-cyan-300">أيزومتري</button>
+                <button onClick={() => setCameraPreset('top')} className="px-2 py-1 rounded-lg hover:bg-slate-800">علوي</button>
+                <button onClick={() => setCameraPreset('front')} className="px-2 py-1 rounded-lg hover:bg-slate-800">أمامي</button>
+                <button onClick={() => setCameraPreset('closeup')} className="px-2 py-1 rounded-lg hover:bg-slate-800">قريب</button>
+                <button onClick={() => setCameraPreset('reset')} className="p-1 rounded-lg hover:bg-slate-800 text-amber-400" title="إعادة ضبط"><RotateCcw className="w-3 h-3" /></button>
               </div>
             </div>
 
-            {/* Dock Controls Body */}
-            {showControlsDock && (
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            {/* Top-Right: Add 3D Tool & Board Action Palette */}
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+              <button
+                onClick={() => setShowAddMenu(!showAddMenu)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ إضافة أداة / لوحة للمشهد 3D</span>
+              </button>
+
+              {/* Dropdown Menu of 3D Components */}
+              {showAddMenu && (
+                <div className="absolute top-12 right-0 w-64 bg-[#0D1B2A] border border-cyan-500/40 rounded-2xl p-2 shadow-2xl space-y-1 text-xs font-bold text-white z-50">
+                  <div className="px-2 py-1 text-[10px] text-slate-400 font-mono border-b border-slate-800">
+                    اختر المكون لإضافته لفضاء 3D:
+                  </div>
+                  {[
+                    { type: 'arduino', name: 'لوحة Arduino UNO', unit: 'V', val: 5 },
+                    { type: 'breadboard', name: 'لوحة تجارب Breadboard', unit: 'pins', val: 400 },
+                    { type: 'servo', name: 'محرك سيرفو SG90', unit: '°', val: 90 },
+                    { type: 'dc_motor', name: 'محرك DC Motor 12V', unit: 'V', val: 12 },
+                    { type: 'ultrasonic', name: 'حساس المسافة HC-SR04', unit: 'cm', val: 25 },
+                    { type: 'led', name: 'دايود ضوئي متوهج LED', unit: 'V', val: 2.1, color: '#ef4444' },
+                    { type: 'resistor', name: 'مقاومة كهربائية 220Ω', unit: 'Ω', val: 220 },
+                  ].map((comp) => (
+                    <button
+                      key={comp.name}
+                      onClick={() => handleAdd3DTool(comp.type as any, comp.name, comp.unit, comp.val, comp.color)}
+                      className="w-full text-right px-3 py-2 rounded-xl hover:bg-slate-800 hover:text-cyan-300 transition-colors flex items-center justify-between"
+                    >
+                      <span>{comp.name}</span>
+                      <span className="text-[10px] text-amber-400 font-mono">+ إضافة</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Three.js Ergonomic Collapsible Bottom Control Dock (Directives Compliant) */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-4xl">
+              <div className="bg-[#0D1B2A]/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
                 
-                {/* Specific controls by lab */}
-                {activeLab === 'robotics' ? (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">مفصل القاعدة Base: {jointBase}°</label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="180"
-                        value={jointBase}
-                        onChange={(e) => setJointBase(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">مفصل الكتف Shoulder: {jointShoulder}°</label>
-                      <input
-                        type="range"
-                        min="-60"
-                        max="90"
-                        value={jointShoulder}
-                        onChange={(e) => setJointShoulder(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">مفصل الكوع Elbow: {jointElbow}°</label>
-                      <input
-                        type="range"
-                        min="-90"
-                        max="90"
-                        value={jointElbow}
-                        onChange={(e) => setJointElbow(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                  </>
-                ) : activeLab === 'mechanical' ? (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">نسبة التروس Gear Ratio: 1:{gearRatio}</label>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="5.0"
-                        step="0.1"
-                        value={gearRatio}
-                        onChange={(e) => setGearRatio(parseFloat(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">سرعة المحرك RPM: {motorRpm}</label>
-                      <input
-                        type="range"
-                        min="100"
-                        max="3000"
-                        step="100"
-                        value={motorRpm}
-                        onChange={(e) => setMotorRpm(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">جهد المصدر Voltage: {dcVoltage} V</label>
-                      <input
-                        type="range"
-                        min="1"
-                        max="30"
-                        value={dcVoltage}
-                        onChange={(e) => setDcVoltage(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">المقاومة Resistor R: {resistorValue} Ω</label>
-                      <input
-                        type="range"
-                        min="10"
-                        max="2000"
-                        step="10"
-                        value={resistorValue}
-                        onChange={(e) => setResistorValue(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">التردد Frequency: {frequency} Hz</label>
-                      <input
-                        type="range"
-                        min="10"
-                        max="200"
-                        value={frequency}
-                        onChange={(e) => setFrequency(parseInt(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </div>
-                  </>
+                {/* Dock Header Bar */}
+                <div
+                  onClick={() => setShowControlsDock(!showControlsDock)}
+                  className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between cursor-pointer text-xs font-bold text-cyan-400 hover:text-white"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-amber-400" />
+                    <span>لوحة التحكم وتعديل وتحريك أدوات المختبر والمشاريع 3D</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <span>{showControlsDock ? 'إخفاء لوحة التحكم' : 'عرض لوحة التحكم'}</span>
+                    {showControlsDock ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </div>
+                </div>
+
+                {/* Dock Body */}
+                {showControlsDock && (
+                  <div className="p-4 space-y-4 max-h-56 overflow-y-auto no-scrollbar text-xs">
+                    
+                    {/* Specialized Project Controls */}
+                    {activeLab === 'robotics' && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">مفصل القاعدة Base: {jointBase}°</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="180"
+                            value={jointBase}
+                            onChange={(e) => setJointBase(parseInt(e.target.value))}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">مفصل الكتف Shoulder: {jointShoulder}°</label>
+                          <input
+                            type="range"
+                            min="-45"
+                            max="90"
+                            value={jointShoulder}
+                            onChange={(e) => setJointShoulder(parseInt(e.target.value))}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">مفصل الكوع Elbow: {jointElbow}°</label>
+                          <input
+                            type="range"
+                            min="-90"
+                            max="60"
+                            value={jointElbow}
+                            onChange={(e) => setJointElbow(parseInt(e.target.value))}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">موقع الروبوت X: {robotPosX.toFixed(1)}</label>
+                          <input
+                            type="range"
+                            min="-8"
+                            max="8"
+                            step="0.2"
+                            value={robotPosX}
+                            onChange={(e) => setRobotPosX(parseFloat(e.target.value))}
+                            className="w-full accent-amber-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {activeLab === 'drones' && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">ارتفاع الدرون Y: {dronePos.y.toFixed(1)}m</label>
+                          <input
+                            type="range"
+                            min="1.0"
+                            max="10.0"
+                            step="0.2"
+                            value={dronePos.y}
+                            onChange={(e) => setDronePos({ ...dronePos, y: parseFloat(e.target.value) })}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">موقع الدرون X: {dronePos.x.toFixed(1)}</label>
+                          <input
+                            type="range"
+                            min="-8"
+                            max="8"
+                            step="0.2"
+                            value={dronePos.x}
+                            onChange={(e) => setDronePos({ ...dronePos, x: parseFloat(e.target.value) })}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">زاوية الميلان Pitch: {dronePitch}°</label>
+                          <input
+                            type="range"
+                            min="-30"
+                            max="30"
+                            value={dronePitch}
+                            onChange={(e) => setDronePitch(parseInt(e.target.value))}
+                            className="w-full accent-amber-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">دوران Yaw: {droneYaw}°</label>
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            value={droneYaw}
+                            onChange={(e) => setDroneYaw(parseInt(e.target.value))}
+                            className="w-full accent-amber-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {activeLab === 'mechanical' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">نسبة التروس Gear Ratio: 1:{gearRatio}</label>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="4.0"
+                            step="0.1"
+                            value={gearRatio}
+                            onChange={(e) => setGearRatio(parseFloat(e.target.value))}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">سرعة المحرك RPM: {motorRpm}</label>
+                          <input
+                            type="range"
+                            min="100"
+                            max="3000"
+                            step="100"
+                            value={motorRpm}
+                            onChange={(e) => setMotorRpm(parseInt(e.target.value))}
+                            className="w-full accent-cyan-400"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-slate-300 font-bold block">موضع الترس الثاني X: {gear2PosX.toFixed(1)}</label>
+                          <input
+                            type="range"
+                            min="2.0"
+                            max="6.0"
+                            step="0.2"
+                            value={gear2PosX}
+                            onChange={(e) => setGear2PosX(parseFloat(e.target.value))}
+                            className="w-full accent-amber-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selected 3D Object Move, Position & Parameter Controls */}
+                    {selectedItem ? (
+                      <div className="bg-[#0A192F] p-3 rounded-xl border border-cyan-500/40 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                            <span className="font-extrabold text-white text-xs">
+                              الأداة المحددة حالياً: {selectedItem.name} ({selectedItem.label})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleDuplicateSelected3D}
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold flex items-center gap-1 border border-slate-700"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>نسخ ومضاعفة</span>
+                            </button>
+                            <button
+                              onClick={handleDeleteSelected3D}
+                              className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-300 font-bold flex items-center gap-1 border border-rose-500/30"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>حذف من المشهد</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Position & Angle Controls */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div>
+                            <label className="text-slate-300 font-bold block mb-1">الموقع الأفقي X: {selectedItem.x.toFixed(1)}</label>
+                            <input
+                              type="range"
+                              min="-10"
+                              max="10"
+                              step="0.2"
+                              value={selectedItem.x}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, x: val } : i)));
+                              }}
+                              className="w-full accent-cyan-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-slate-300 font-bold block mb-1">الموقع العميق Z: {selectedItem.z.toFixed(1)}</label>
+                            <input
+                              type="range"
+                              min="-6"
+                              max="6"
+                              step="0.2"
+                              value={selectedItem.z}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, z: val } : i)));
+                              }}
+                              className="w-full accent-cyan-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-slate-300 font-bold block mb-1">زاوية الدوران: {selectedItem.rotationY}°</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              step="5"
+                              value={selectedItem.rotationY}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, rotationY: val } : i)));
+                              }}
+                              className="w-full accent-amber-400"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-slate-300 font-bold block mb-1">القيمة ({selectedItem.unit}):</label>
+                            <input
+                              type="number"
+                              value={selectedItem.value}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, value: val } : i)));
+                              }}
+                              className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-2 text-slate-400 text-xs">
+                        💡 انقر على أي لوحة أو أداة في الفضاء 3D لتحديدها وسحبها وتعديل زاويتها وموقعها
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Arduino C++ Code Editor Side Panel */}
-      {showCodeEditor && (
-        <div className="bg-[#0D1B2A] border border-cyan-500/30 rounded-2xl p-5 space-y-3 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-              <Code className="w-5 h-5" />
-              <span>محرر كود Arduino C++ والفحص البرمجي Live Code Check</span>
             </div>
-            <button onClick={() => setShowCodeEditor(false)} className="text-xs text-slate-400 hover:text-white">✕ إغلاق</button>
           </div>
-
-          <textarea
-            rows={8}
-            value={arduinoCode}
-            onChange={(e) => setArduinoCode(e.target.value)}
-            className="w-full font-mono text-xs bg-slate-900 border border-slate-700 rounded-xl p-4 text-cyan-300 focus:outline-none focus:border-cyan-400"
-          />
-
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>الكود خالي من الأخطاء النحوية Syntactically Valid</span>
-            </span>
-
-            <button
-              onClick={() => setIsSimulating(true)}
-              className="px-4 py-2 rounded-xl bg-cyan-500 text-black font-bold hover:bg-cyan-400"
-            >
-              رفعه إلى متحكم الأردوينو 3D
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Error Detection & Diagnostics Modal / Panel */}
-      {showDiagnostics && (
-        <div className="bg-[#0D1B2A] border border-rose-500/40 rounded-2xl p-5 space-y-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
-              <AlertTriangle className="w-5 h-5" />
-              <span>تقرير اكتشاف الأخطاء والدليل الهندسية للفحص</span>
-            </div>
-            <button onClick={() => setShowDiagnostics(false)} className="text-xs text-slate-400 hover:text-white">✕ إغلاق</button>
-          </div>
-
-          {diagnosticsList.length === 0 ? (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5" />
-              <span>جميع التوصيلات والقيم الحسابية آمنة وصحيحة 100%!</span>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {diagnosticsList.map((err) => (
-                <div key={err.id} className="p-4 rounded-xl bg-slate-900 border border-rose-500/30 space-y-2 text-xs">
-                  <div className="flex items-center justify-between font-bold text-rose-300">
-                    <span>المنطقة: {err.location} ({err.componentName})</span>
-                    <span className="uppercase text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-400">
-                      {err.severity}
-                    </span>
-                  </div>
-                  <p className="text-slate-300"><strong className="text-white">السبب:</strong> {err.cause}</p>
-                  <p className="text-cyan-300 bg-cyan-500/10 p-2 rounded border border-cyan-500/20">
-                    🔧 <strong className="text-cyan-400">طريقة الإصلاح:</strong> {err.fixGuide}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>

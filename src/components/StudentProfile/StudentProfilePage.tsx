@@ -196,7 +196,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
           <input
             name="redemptionCode"
             type="text"
-            placeholder="أدخل كود التفعيل مثل: DR-248G3C7X"
+            placeholder="أدخل كود التفعيل الخاص بك"
             className="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-sm tracking-wider placeholder-slate-500 focus:outline-none focus:border-amber-400"
             required
           />

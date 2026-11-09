@@ -264,9 +264,12 @@ const INITIAL_POSTS: CommunityPost[] = [
   }
 ];
 
+const nowIso = new Date().toISOString();
+const trialExpiresIso = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
+
 const INITIAL_USER: UserProfile = {
   id: 'usr_student_1',
-  name: 'مهندس الميكاترونكس المستقبلي',
+  name: 'طالب ميكاترونكس',
   email: 'student@mechatronics.dr-smart.edu',
   role: 'student',
   specialization: 'هندسة الميكاترونكس والروبوتات',
@@ -277,8 +280,106 @@ const INITIAL_USER: UserProfile = {
   createdProjectsCount: 1,
   certificates: [
     { title: 'شهادة إتمام دوائر الكهرباء والإلكترونيات ثلاثية الأبعاد', date: '2026-11-01', score: 95 }
-  ]
+  ],
+  createdAt: nowIso,
+  subscription: {
+    status: 'trial',
+    trialStartedAt: nowIso,
+    trialExpiresAt: trialExpiresIso,
+    priceYER: 4000,
+    durationDays: 365,
+  }
 };
+
+export function checkUserAccessStatus(user: UserProfile): {
+  isAccessAllowed: boolean;
+  statusType: 'owner' | 'active' | 'trial' | 'trial_expired' | 'expired';
+  remainingTrialHours: number;
+  remainingTrialMinutes: number;
+  remainingTrialSec: number;
+  formattedCountdown: string;
+} {
+  if (!user || user.role === 'owner') {
+    return {
+      isAccessAllowed: true,
+      statusType: 'owner',
+      remainingTrialHours: 999,
+      remainingTrialMinutes: 999,
+      remainingTrialSec: 99999,
+      formattedCountdown: 'مالك المنصة الإدارية',
+    };
+  }
+
+  if (user.subscription?.status === 'active') {
+    return {
+      isAccessAllowed: true,
+      statusType: 'active',
+      remainingTrialHours: 365 * 24,
+      remainingTrialMinutes: 365 * 24 * 60,
+      remainingTrialSec: 365 * 24 * 3600,
+      formattedCountdown: 'اشتراك سنوي نشط (365 يومًا)',
+    };
+  }
+
+  // Calculate 2-Day Trial Precision (48 Hours = 172,800 seconds starting at registration)
+  let trialExpiresAt = 0;
+  if (user.subscription?.trialExpiresAt) {
+    trialExpiresAt = new Date(user.subscription.trialExpiresAt).getTime();
+  } else if (user.createdAt) {
+    trialExpiresAt = new Date(user.createdAt).getTime() + 48 * 3600 * 1000;
+  } else {
+    trialExpiresAt = Date.now() + 48 * 3600 * 1000;
+  }
+
+  const diffMs = trialExpiresAt - Date.now();
+
+  if (diffMs > 0) {
+    const totalSec = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    return {
+      isAccessAllowed: true,
+      statusType: 'trial',
+      remainingTrialHours: hours,
+      remainingTrialMinutes: Math.floor(totalSec / 60),
+      remainingTrialSec: totalSec,
+      formattedCountdown: `تجربة مجانية متبقية: ${hours} ساعة و ${mins} دقيقة و ${secs} ثانية`,
+    };
+  }
+
+  return {
+    isAccessAllowed: false,
+    statusType: 'trial_expired',
+    remainingTrialHours: 0,
+    remainingTrialMinutes: 0,
+    remainingTrialSec: 0,
+    formattedCountdown: 'انتهت التجربة المجانية (48 ساعة)',
+  };
+}
+
+export async function syncServerSubscriptionStatus(user: UserProfile): Promise<UserProfile> {
+  try {
+    const res = await fetch('/api/subscriptions/check-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email,
+        role: user.role,
+        subscription: user.subscription,
+      }),
+    });
+    const data = await res.json();
+    if (data.success && data.subscription) {
+      return updateUserProfile({ subscription: data.subscription });
+    }
+  } catch (e) {
+    console.error('Error syncing server subscription:', e);
+  }
+  return user;
+}
+
+
 
 // Storage Utilities
 export const getStoredDoctors = (): Doctor[] => {
