@@ -409,6 +409,14 @@ geminiRouter.post('/explain-lesson', async (req: Request, res: Response) => {
       lessonContext,
     } = req.body || {};
 
+    // Progressive streaming detection via Accept header or stream flag
+    if (
+      (mode === 'full_explanation' || !mode) &&
+      (req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true')
+    ) {
+      return handleExplainLessonStreamResponse(req, res);
+    }
+
     const levelMap: Record<string, string> = {
       beginner: 'مستوى مبتدئ: لغة عربية سهلة ومبسطة جداً، تفكيك المفاهيم المعقدة، تشبيهات عملية مبسطة، وتجنب الرموز الرياضية المعقدة دون تمهيد.',
       intermediate: 'مستوى متوسط: مناسب لطلاب البكالوريوس في هندسة الميكاترونكس، توازن بين الشرح النظري والقوانين الرياضية مع توضيح الوحدات والرموز.',
@@ -632,10 +640,139 @@ function buildExplainLessonPayload(params: {
 }
 
 // ==========================================
-// API: «اشرح لي الدرس» - البث التدريجي المباشر (SSE Streaming) لمنع 504 Gateway Timeout
+// API: «اشرح لي الدرس» - البث التدريجي المباشر عبر ReadableStream لمنع انتظار معالجة الملف بالكامل
 // ==========================================
-geminiRouter.post('/explain-lesson-stream', async (req: Request, res: Response) => {
-  // 1. Immediately establish SSE connection headers
+
+/**
+ * Builds a standard WHATWG ReadableStream<Uint8Array> from Gemini generative stream
+ * Emits SSE frames (data: {...}\n\n) progressively as tokens arrive in real-time
+ */
+function createGeminiSseReadableStream(params: {
+  contents: any;
+  config?: any;
+  metadata?: any;
+}): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const ai = getGeminiClient();
+  const modelCascade = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      // 1. Send immediate start event frame (<50ms) to satisfy reverse proxies and prevent 504
+      controller.enqueue(
+        encoder.encode(
+          `data: ${JSON.stringify({ type: 'start', stage: 'reading', message: 'تم فتح دفق البيانات (ReadableStream) وبدء معالجة وبث الشرح مباشرة...' })}\n\n`
+        )
+      );
+
+      let streamSucceeded = false;
+      let lastError: any = null;
+
+      for (let attempt = 0; attempt < modelCascade.length; attempt++) {
+        const currentModel = modelCascade[attempt];
+        try {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'status', stage: 'streaming', message: `جاري توليد وبث الشرح تدريجياً عبر النموذج (${currentModel})...` })}\n\n`
+            )
+          );
+
+          const configPayload = { ...params.config };
+          if (currentModel === 'gemini-3.8-flash') {
+            configPayload.thinkingConfig = { thinkingLevel: 'LOW' };
+          }
+
+          const streamResult = await ai.models.generateContentStream({
+            model: currentModel,
+            contents: params.contents,
+            config: configPayload,
+          });
+
+          let accumulatedText = '';
+          for await (const chunk of streamResult) {
+            const text = chunk.text || '';
+            if (text) {
+              accumulatedText += text;
+              // Stream each chunk directly to user as generated
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`)
+              );
+            }
+          }
+
+          // Parse completed JSON or provide resilient structured fallback
+          let parsedData: any;
+          try {
+            parsedData = parseJsonSafely(accumulatedText);
+          } catch (_parseErr) {
+            console.warn('[ReadableStream Parse Notice] Falling back to structured wrapper for streaming text');
+            parsedData = {
+              lessonTitle: params.metadata?.fileName || 'درس ميكاترونكس',
+              studentLevel: params.metadata?.studentLevel || 'intermediate',
+              sourceType: params.metadata?.sourceType || 'text',
+              objectives: ['فهم موضوع الدرس واستيعاب المفاهيم الهندسية'],
+              coreIdea: accumulatedText.slice(0, 300),
+              sourceAnalysis: {
+                detectedType: 'محتوى هندسي / درس ميكاترونكس',
+                sourceQuality: 'clear',
+                scientificErrorsFound: [],
+                visualElements: [],
+                timelineParts: [],
+              },
+              concepts: [
+                {
+                  title: 'شرح الدرس الأكاديمي',
+                  explanation: accumulatedText,
+                  engineeringNotes: 'تم بث المخرجات تدريجياً عبر ReadableStream.',
+                },
+              ],
+              terminology: [],
+              equations: [],
+              solutionSteps: [],
+              practicalApplication: 'تطبيقات عملية في أنظمة الميكاترونكس والروبوتات.',
+              diagramsExplanation: '',
+              mechatronicsConnection: 'ربط مباشر بمجالات التحكم والروبوتات والمتحكمات.',
+              summary: ['تم استكمال الشرح التدريجي بنجاح.'],
+              quizQuestions: [],
+              quickOptions: ['شرح أبسط', 'شرح أعمق', 'مثال محلول', 'اختبرني'],
+            };
+          }
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'done', data: parsedData, meta: params.metadata })}\n\n`
+            )
+          );
+
+          streamSucceeded = true;
+          break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[ReadableStream Cascade Error] Model ${currentModel} failed:`, err?.message);
+          if (attempt < modelCascade.length - 1) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        }
+      }
+
+      if (!streamSucceeded) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: 'error', error: lastError?.message || 'تعذر استكمال بث محتوى الشرح.' })}\n\n`
+          )
+        );
+      }
+
+      controller.close();
+    },
+  });
+}
+
+/**
+ * Express handler piping ReadableStream directly to the HTTP response
+ */
+async function handleExplainLessonStreamResponse(req: Request, res: Response) {
+  // Establish SSE connection headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -643,10 +780,18 @@ geminiRouter.post('/explain-lesson-stream', async (req: Request, res: Response) 
     'X-Accel-Buffering': 'no',
   });
 
-  // 2. Immediately send handshake byte frame (<50ms) to prevent Vercel 504 edge timeout
-  res.write(`data: ${JSON.stringify({ type: 'start', stage: 'reading', message: 'تم استلام المحتوى وبدء الاتصال المباشر بنموذج الذكاء الاصطناعي...' })}\n\n`);
+  const { sourceType, content, fileName, fileMimeType, studentLevel = 'intermediate' } = req.body || {};
+  const metadata = { sourceType, studentLevel, fileName };
 
-  // 3. Keepalive heartbeat every 5 seconds to ensure reverse proxies don't terminate idle sockets
+  const { contentsPayload } = buildExplainLessonPayload({
+    sourceType,
+    content,
+    fileName,
+    fileMimeType,
+    studentLevel,
+  });
+
+  // Keepalive heartbeat
   const keepAliveTimer = setInterval(() => {
     try {
       res.write(': keepalive\n\n');
@@ -654,81 +799,28 @@ geminiRouter.post('/explain-lesson-stream', async (req: Request, res: Response) 
   }, 5000);
 
   try {
-    const { sourceType, content, fileName, fileMimeType, studentLevel = 'intermediate' } = req.body || {};
-
-    const { contentsPayload } = buildExplainLessonPayload({
-      sourceType,
-      content,
-      fileName,
-      fileMimeType,
-      studentLevel,
-    });
-
-    res.write(`data: ${JSON.stringify({ type: 'status', stage: 'analyzing', message: 'جاري تحليل الدرس والمفاهيم واستخراج القوانين وبث الشرح تدريجياً...' })}\n\n`);
-
-    let accumulatedText = '';
-
-    const fullRawResult = await generateGeminiContentStreamWithRetry({
+    const readable = createGeminiSseReadableStream({
       contents: contentsPayload,
       config: { responseMimeType: 'application/json' },
-      onChunk: (chunkText) => {
-        accumulatedText += chunkText;
-        res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
-      },
-      onStatus: (statusMsg) => {
-        res.write(`data: ${JSON.stringify({ type: 'status', stage: 'streaming', message: statusMsg })}\n\n`);
-      },
+      metadata,
     });
 
-    clearInterval(keepAliveTimer);
-
-    // Parse the completed JSON payload safely
-    let parsedData: any;
-    try {
-      parsedData = parseJsonSafely(fullRawResult || accumulatedText);
-    } catch (_parseErr) {
-      console.warn('[Stream Parse Notice] Falling back to structured wrapper for streaming text');
-      parsedData = {
-        lessonTitle: fileName || 'درس ميكاترونكس',
-        studentLevel,
-        sourceType: sourceType || 'text',
-        objectives: ['فهم موضوع الدرس واستيعاب المفاهيم الهندسية'],
-        coreIdea: (accumulatedText || '').slice(0, 300),
-        sourceAnalysis: {
-          detectedType: 'محتوى هندسي / درس ميكاترونكس',
-          sourceQuality: 'clear',
-          scientificErrorsFound: [],
-          visualElements: [],
-          timelineParts: [],
-        },
-        concepts: [
-          {
-            title: 'شرح الدرس الأكاديمي',
-            explanation: accumulatedText,
-            engineeringNotes: 'تم استخراج وتوليد الشرح بنجاح عبر البث المباشر.',
-          },
-        ],
-        terminology: [],
-        equations: [],
-        solutionSteps: [],
-        practicalApplication: 'تطبيقات عملية في أنظمة الميكاترونكس والروبوتات.',
-        diagramsExplanation: '',
-        mechatronicsConnection: 'ربط مباشر بمجالات التحكم والروبوتات والمتحكمات.',
-        summary: ['تم استكمال الشرح التدريجي بنجاح.'],
-        quizQuestions: [],
-        quickOptions: ['شرح أبسط', 'شرح أعمق', 'مثال محلول', 'اختبرني'],
-      };
+    const reader = readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
     }
-
-    res.write(`data: ${JSON.stringify({ type: 'done', data: parsedData, meta: { sourceType, studentLevel, fileName } })}\n\n`);
-    res.end();
   } catch (error: any) {
-    clearInterval(keepAliveTimer);
     console.error('[Stream API Fatal Error]:', error);
-    res.write(`data: ${JSON.stringify({ type: 'error', error: error?.message || 'حدث خطأ أثناء بث شرح الدرس.' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error?.message || 'حدث خطأ أثناء تدفق البيانات.' })}\n\n`);
+  } finally {
+    clearInterval(keepAliveTimer);
     res.end();
   }
-});
+}
+
+geminiRouter.post('/explain-lesson-stream', handleExplainLessonStreamResponse);
 
 // ==========================================
 // API: «لخّص لي» (Summarize Service)

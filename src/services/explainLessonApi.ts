@@ -94,6 +94,7 @@ export async function requestLessonExplanationStream(
         fileName: params.fileName,
         fileMimeType: params.fileMimeType,
         studentLevel: params.studentLevel,
+        stream: true,
       }),
     });
   } catch (_netErr: any) {
