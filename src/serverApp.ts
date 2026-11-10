@@ -1,5 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { GoogleGenAI } from '@google/genai';
+import { streamText } from 'ai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import dotenv from 'dotenv';
 import { SEEDED_ACTIVATION_CODES } from './data/activationCodesSeed.ts';
 
@@ -640,72 +642,127 @@ function buildExplainLessonPayload(params: {
 }
 
 // ==========================================
-// API: «اشرح لي الدرس» - البث التدريجي المباشر عبر ReadableStream لمنع انتظار معالجة الملف بالكامل
+// VERCEL AI SDK `streamText` & WHATWG ReadableStream Engine
 // ==========================================
 
 /**
- * Builds a standard WHATWG ReadableStream<Uint8Array> from Gemini generative stream
- * Emits SSE frames (data: {...}\n\n) progressively as tokens arrive in real-time
+ * Uses Vercel AI SDK's `streamText` function from the `ai` package
+ * to stream output progressively in chunks via WHATWG ReadableStream<Uint8Array>
  */
-function createGeminiSseReadableStream(params: {
-  contents: any;
-  config?: any;
+function createVercelAiSdkStream(params: {
+  systemPrompt: string;
+  prompt: string;
+  contentsPayload: any;
+  isBase64?: boolean;
   metadata?: any;
+  streamType: 'explain' | 'summarize';
 }): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  const ai = getGeminiClient();
-  const modelCascade = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
-      // 1. Send immediate start event frame (<50ms) to satisfy reverse proxies and prevent 504
+      // 1. Send immediate start event frame (<50ms) to defeat Vercel 504 timeouts
       controller.enqueue(
         encoder.encode(
-          `data: ${JSON.stringify({ type: 'start', stage: 'reading', message: 'تم فتح دفق البيانات (ReadableStream) وبدء معالجة وبث الشرح مباشرة...' })}\n\n`
+          `data: ${JSON.stringify({
+            type: 'start',
+            stage: 'reading',
+            message: `تم فتح دفق Vercel AI SDK (streamText) وبدء معالجة وبث ${params.streamType === 'explain' ? 'الشرح' : 'التلخيص'} مباشرة...`,
+          })}\n\n`
         )
       );
 
+      let accumulatedText = '';
       let streamSucceeded = false;
-      let lastError: any = null;
 
-      for (let attempt = 0; attempt < modelCascade.length; attempt++) {
-        const currentModel = modelCascade[attempt];
+      // Primary engine: Vercel AI SDK's streamText
+      if (!params.isBase64 && apiKey) {
         try {
+          const google = createGoogleGenerativeAI({ apiKey });
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: 'status', stage: 'streaming', message: `جاري توليد وبث الشرح تدريجياً عبر النموذج (${currentModel})...` })}\n\n`
+              `data: ${JSON.stringify({
+                type: 'status',
+                stage: 'streaming',
+                message: 'جاري البث الحي لمخرجات النموذج عبر Vercel AI SDK (streamText)...',
+              })}\n\n`
             )
           );
 
-          const configPayload = { ...params.config };
-          if (currentModel === 'gemini-3.8-flash') {
-            configPayload.thinkingConfig = { thinkingLevel: 'LOW' };
-          }
-
-          const streamResult = await ai.models.generateContentStream({
-            model: currentModel,
-            contents: params.contents,
-            config: configPayload,
+          const result = streamText({
+            model: google('gemini-2.0-flash'),
+            system: params.systemPrompt,
+            prompt: params.prompt,
           });
 
-          let accumulatedText = '';
-          for await (const chunk of streamResult) {
-            const text = chunk.text || '';
-            if (text) {
-              accumulatedText += text;
-              // Stream each chunk directly to user as generated
+          for await (const textPart of result.textStream) {
+            if (textPart) {
+              accumulatedText += textPart;
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text: textPart })}\n\n`)
               );
             }
           }
 
-          // Parse completed JSON or provide resilient structured fallback
-          let parsedData: any;
-          try {
-            parsedData = parseJsonSafely(accumulatedText);
-          } catch (_parseErr) {
-            console.warn('[ReadableStream Parse Notice] Falling back to structured wrapper for streaming text');
+          streamSucceeded = true;
+        } catch (sdkErr: any) {
+          console.warn('[Vercel AI SDK streamText Error, falling back to native stream]:', sdkErr?.message);
+        }
+      }
+
+      // Secondary / Multimodal Cascade via @google/genai generateContentStream
+      if (!streamSucceeded) {
+        try {
+          const ai = getGeminiClient();
+          const cascadeModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+
+          for (const modelName of cascadeModels) {
+            try {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: 'status',
+                    stage: 'streaming',
+                    message: `جاري توليد وبث النتائج تدريجياً عبر (${modelName})...`,
+                  })}\n\n`
+                )
+              );
+
+              const streamResult = await ai.models.generateContentStream({
+                model: modelName,
+                contents: params.contentsPayload,
+                config: { responseMimeType: 'application/json' },
+              });
+
+              for await (const chunk of streamResult) {
+                const text = chunk.text || '';
+                if (text) {
+                  accumulatedText += text;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`)
+                  );
+                }
+              }
+
+              streamSucceeded = true;
+              break;
+            } catch (innerErr: any) {
+              console.warn(`[Stream Model Cascade] ${modelName} error:`, innerErr?.message);
+            }
+          }
+        } catch (genaiErr: any) {
+          console.error('[Fallback Stream Error]:', genaiErr);
+        }
+      }
+
+      // Finalize JSON payload
+      if (streamSucceeded && accumulatedText) {
+        let parsedData: any;
+        try {
+          parsedData = parseJsonSafely(accumulatedText);
+        } catch (_parseErr) {
+          if (params.streamType === 'explain') {
             parsedData = {
               lessonTitle: params.metadata?.fileName || 'درس ميكاترونكس',
               studentLevel: params.metadata?.studentLevel || 'intermediate',
@@ -723,7 +780,7 @@ function createGeminiSseReadableStream(params: {
                 {
                   title: 'شرح الدرس الأكاديمي',
                   explanation: accumulatedText,
-                  engineeringNotes: 'تم بث المخرجات تدريجياً عبر ReadableStream.',
+                  engineeringNotes: 'تم بث المخرجات تدريجياً عبر Vercel AI SDK streamText.',
                 },
               ],
               terminology: [],
@@ -736,29 +793,32 @@ function createGeminiSseReadableStream(params: {
               quizQuestions: [],
               quickOptions: ['شرح أبسط', 'شرح أعمق', 'مثال محلول', 'اختبرني'],
             };
-          }
-
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: 'done', data: parsedData, meta: params.metadata })}\n\n`
-            )
-          );
-
-          streamSucceeded = true;
-          break;
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`[ReadableStream Cascade Error] Model ${currentModel} failed:`, err?.message);
-          if (attempt < modelCascade.length - 1) {
-            await new Promise((r) => setTimeout(r, 1000));
+          } else {
+            parsedData = {
+              title: params.metadata?.fileName || 'ملخص المحاضرة',
+              summaryType: params.metadata?.summaryType || 'medium',
+              generalIdea: accumulatedText.slice(0, 300),
+              keyPoints: [accumulatedText.slice(0, 150)],
+              conceptsAndDefinitions: [],
+              equations: [],
+              examples: [],
+              importantNotes: ['تم تلخيص المحتوى تدريجياً عبر Vercel AI SDK streamText.'],
+              conclusion: 'تم استكمال التلخيص المباشر بنجاح.',
+              diagramsSummary: [],
+              chaptersOrSections: [],
+            };
           }
         }
-      }
 
-      if (!streamSucceeded) {
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ type: 'error', error: lastError?.message || 'تعذر استكمال بث محتوى الشرح.' })}\n\n`
+            `data: ${JSON.stringify({ type: 'done', data: parsedData, meta: params.metadata })}\n\n`
+          )
+        );
+      } else {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: 'error', error: 'تعذر استكمال بث المحتوى من نموذج الذكاء الاصطناعي.' })}\n\n`
           )
         );
       }
@@ -769,10 +829,9 @@ function createGeminiSseReadableStream(params: {
 }
 
 /**
- * Express handler piping ReadableStream directly to the HTTP response
+ * Express handler piping Explain Lesson stream to the HTTP response
  */
 async function handleExplainLessonStreamResponse(req: Request, res: Response) {
-  // Establish SSE connection headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -783,7 +842,7 @@ async function handleExplainLessonStreamResponse(req: Request, res: Response) {
   const { sourceType, content, fileName, fileMimeType, studentLevel = 'intermediate' } = req.body || {};
   const metadata = { sourceType, studentLevel, fileName };
 
-  const { contentsPayload } = buildExplainLessonPayload({
+  const { contentsPayload, systemPrompt } = buildExplainLessonPayload({
     sourceType,
     content,
     fileName,
@@ -791,7 +850,14 @@ async function handleExplainLessonStreamResponse(req: Request, res: Response) {
     studentLevel,
   });
 
-  // Keepalive heartbeat
+  const textToAnalyze = typeof content === 'string' && !content.startsWith('data:')
+    ? content
+    : `درس ميكاترونكس: ${fileName || ''}`;
+
+  const isBase64 =
+    typeof content === 'string' &&
+    (content.startsWith('data:') || (content.length > 500 && (sourceType === 'image' || sourceType === 'video' || sourceType === 'pdf')));
+
   const keepAliveTimer = setInterval(() => {
     try {
       res.write(': keepalive\n\n');
@@ -799,10 +865,13 @@ async function handleExplainLessonStreamResponse(req: Request, res: Response) {
   }, 5000);
 
   try {
-    const readable = createGeminiSseReadableStream({
-      contents: contentsPayload,
-      config: { responseMimeType: 'application/json' },
+    const readable = createVercelAiSdkStream({
+      systemPrompt,
+      prompt: textToAnalyze,
+      contentsPayload,
+      isBase64,
       metadata,
+      streamType: 'explain',
     });
 
     const reader = readable.getReader();
@@ -812,7 +881,7 @@ async function handleExplainLessonStreamResponse(req: Request, res: Response) {
       res.write(value);
     }
   } catch (error: any) {
-    console.error('[Stream API Fatal Error]:', error);
+    console.error('[Explain Lesson Stream Fatal Error]:', error);
     res.write(`data: ${JSON.stringify({ type: 'error', error: error?.message || 'حدث خطأ أثناء تدفق البيانات.' })}\n\n`);
   } finally {
     clearInterval(keepAliveTimer);
@@ -822,13 +891,178 @@ async function handleExplainLessonStreamResponse(req: Request, res: Response) {
 
 geminiRouter.post('/explain-lesson-stream', handleExplainLessonStreamResponse);
 
+/**
+ * Helper to construct prompt and contents payload for «لخّص لي»
+ */
+function buildSummarizePayload(params: {
+  summaryType?: string;
+  content?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  chapterSelection?: string;
+}) {
+  const {
+    summaryType = 'medium',
+    content,
+    fileName = 'محاضرة ميكاترونكس',
+    fileMimeType,
+    chapterSelection = 'all',
+  } = params;
+
+  const typeGuide: Record<string, string> = {
+    quick: 'ملخص سريع: قصير وموجز جداً للمراجعة السريعة في 3 دقائق، يركز فقط على أهم 5 خلاصات والقوانين الجوهرية دون تفاصيل ثانوية.',
+    medium: 'ملخص متوسط: متوازن وواضح يحتوي على أهم الأفكار والقوانين والتعريفات والأمثلة التطبيقية دون حشو.',
+    comprehensive: 'ملخص شامل: تفصيلي ومكتمل، يحافظ على كافة المعلومات الهندسية والأرقام والاشتقاقات المهمة مع التخلص من الكلام الإنشائي والتكرار.',
+    study: 'ملخص للمذاكرة والاختبار: يركز تحديداً على النقاط المرشحة للاختبارات، القوانين وطريقة التعويض، والتعريفات التي يجب حفظها وفهمها.',
+    cheatsheet: 'ورقة مراجعة (Cheat Sheet): جدول وقوائم مكثفة جداً وسريعة القراءة للمراجعة في ليلة الاختبار (القوانين، الرموز، الوحدات، أهم الملاحظات).',
+  };
+
+  const systemPrompt = `أنت الخبير الأكاديمي المتخصص في خدمة «لخّص لي» لطلاب هندسة الميكاترونكس.
+نوع التلخيص المطلوب: ${typeGuide[summaryType] || typeGuide.medium}
+اختيار الفصل أو الجزء: ${chapterSelection === 'all' ? 'كامل الملف' : chapterSelection}
+
+قواعد الأمانة والدقة الهندسية:
+1. قاعدة الحقيقة والمصدر: لا تخترع معلومات أو أرقام أو قوانين غير موجودة في الملف.
+2. التبسيط الذكي: لغة عربية فصحى سهلة مع الحفاظ الكامل على المفاهيم الجوهرية.
+3. المعادلات والقوانين: اعرض القانون وفسّر كل رمز ووحدته (SI).
+
+يجب إرجاع النتيجة بتنسيق JSON حصراً كالتالي:
+{
+  "title": "عنوان المحاضرة",
+  "summaryType": "${summaryType}",
+  "generalIdea": "شرح مختصر ومكثف جداً عن موضوع المحاضرة وفكرتها العامة",
+  "keyPoints": ["النقطة الجوهرية الأولى", "النقطة الجوهرية الثانية"],
+  "conceptsAndDefinitions": [
+    { "termArabic": "المصطلح", "termEnglish": "Term", "definition": "التعريف" }
+  ],
+  "equations": [
+    {
+      "formula": "V = I * R",
+      "name": "قانون أوم",
+      "symbolMeanings": [
+        { "symbol": "V", "meaning": "الجهد", "unit": "V" }
+      ],
+      "usageContext": "لحساب الجهد أو التيار"
+    }
+  ],
+  "examples": [],
+  "importantNotes": ["ملاحظة هامة للمذاكرة"],
+  "conclusion": "خلاصة مكثفة بأهم ما يجب أن يتذكره الطالب",
+  "diagramsSummary": [],
+  "chaptersOrSections": []
+}`;
+
+  let contentsPayload: any;
+  let textToAnalyze = '';
+
+  const isBase64 =
+    typeof content === 'string' &&
+    (content.startsWith('data:') || (content.length > 500 && (fileMimeType?.startsWith('image/') || fileMimeType?.startsWith('application/pdf'))));
+
+  if (isBase64) {
+    let mime = fileMimeType || 'application/pdf';
+    let cleanData = content;
+
+    if (content.startsWith('data:')) {
+      const matches = content.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mime = matches[1] || mime;
+        cleanData = matches[2];
+      }
+    }
+
+    contentsPayload = {
+      parts: [
+        {
+          inlineData: {
+            mimeType: mime,
+            data: cleanData,
+          },
+        },
+        { text: systemPrompt },
+      ],
+    };
+  } else {
+    textToAnalyze = typeof content === 'string' && content.trim()
+      ? `محتوى الملف / المحاضرة (${fileName}):\n${content}`
+      : `المحتوى: ${fileName}`;
+
+    contentsPayload = {
+      parts: [
+        { text: systemPrompt },
+        { text: textToAnalyze },
+      ],
+    };
+  }
+
+  return { contentsPayload, systemPrompt, textToAnalyze, isBase64 };
+}
+
+/**
+ * Express handler piping Summarize stream to the HTTP response
+ */
+async function handleSummarizeStreamResponse(req: Request, res: Response) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  const {
+    summaryType = 'medium',
+    content,
+    fileName = 'محاضرة ميكاترونكس',
+    fileMimeType,
+    chapterSelection = 'all',
+  } = req.body || {};
+  const metadata = { summaryType, fileName, chapterSelection };
+
+  const { contentsPayload, systemPrompt, textToAnalyze, isBase64 } = buildSummarizePayload({
+    summaryType,
+    content,
+    fileName,
+    fileMimeType,
+    chapterSelection,
+  });
+
+  const keepAliveTimer = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch (_err) {}
+  }, 5000);
+
+  try {
+    const readable = createVercelAiSdkStream({
+      systemPrompt,
+      prompt: textToAnalyze || `قم بتلخيص المحاضرة الهندسية: ${fileName}`,
+      contentsPayload,
+      isBase64,
+      metadata,
+      streamType: 'summarize',
+    });
+
+    const reader = readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
+    }
+  } catch (error: any) {
+    console.error('[Summarize Stream Error]:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error?.message || 'حدث خطأ أثناء بث التلخيص.' })}\n\n`);
+  } finally {
+    clearInterval(keepAliveTimer);
+    res.end();
+  }
+}
+
+geminiRouter.post('/summarize-stream', handleSummarizeStreamResponse);
+
 // ==========================================
 // API: «لخّص لي» (Summarize Service)
 // ==========================================
 geminiRouter.post('/summarize', async (req: Request, res: Response) => {
-  const ip = (req as any).clientIp || '127.0.0.1';
-  const estimatedTokens = (req as any).estimatedTokens || 1000;
-
   try {
     const {
       summaryType = 'medium',
@@ -840,13 +1074,13 @@ geminiRouter.post('/summarize', async (req: Request, res: Response) => {
       chapterSelection = 'all',
     } = req.body || {};
 
-    const typeGuide: Record<string, string> = {
-      quick: 'ملخص سريع: قصير وموجز جداً للمراجعة السريعة في 3 دقائق، يركز فقط على أهم 5 خلاصات والقوانين الجوهرية دون تفاصيل ثانوية.',
-      medium: 'ملخص متوسط: متوازن وواضح يحتوي على أهم الأفكار والقوانين والتعريفات والأمثلة التطبيقية دون حشو.',
-      comprehensive: 'ملخص شامل: تفصيلي ومكتمل، يحافظ على كافة المعلومات الهندسية والأرقام والاشتقاقات المهمة مع التخلص من الكلام الإنشائي والتكرار.',
-      study: 'ملخص للمذاكرة والاختبار: يركز تحديداً على النقاط المرشحة للاختبارات، القوانين وطريقة التعويض، والتعريفات التي يجب حفظها وفهمها.',
-      cheatsheet: 'ورقة مراجعة (Cheat Sheet): جدول وقوائم مكثفة جداً وسريعة القراءة للمراجعة في ليلة الاختبار (القوانين، الرموز، الوحدات، أهم الملاحظات).',
-    };
+    // Progressive streaming detection via Accept header or stream flag
+    if (
+      (mode === 'summarize' || !mode) &&
+      (req.headers.accept?.includes('text/event-stream') || req.body?.stream === true || req.query?.stream === 'true')
+    ) {
+      return handleSummarizeStreamResponse(req, res);
+    }
 
     if (mode === 'to_questions') {
       const prompt = `بناءً على محتوى هذا الملخص والمحاضرة فقط دون اختراع معلومات خارجية:
@@ -896,94 +1130,20 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
       return res.json({ success: true, resultText: text });
     }
 
-    const systemPrompt = `أنت الخبير الأكاديمي المتخصص في خدمة «لخّص لي» لطلاب هندسة الميكاترونكس.
-نوع التلخيص المطلوب: ${typeGuide[summaryType] || typeGuide.medium}
-اختيار الفصل أو الجزء: ${chapterSelection === 'all' ? 'كامل الملف' : chapterSelection}
-
-قواعد الأمانة والدقة الهندسية:
-1. قاعدة الحقيقة والمصدر: لا تخترع معلومات أو أرقام أو قوانين غير موجودة في الملف.
-2. التبسيط الذكي: لغة عربية فصحى سهلة مع الحفاظ الكامل على المفاهيم الجوهرية.
-3. المعادلات والقوانين: اعرض القانون وفسّر كل رمز ووحدته (SI).
-
-يجب إرجاع النتيجة بتنسيق JSON حصراً كالتالي:
-{
-  "title": "عنوان المحاضرة",
-  "summaryType": "${summaryType}",
-  "generalIdea": "شرح مختصر ومكثف جداً عن موضوع المحاضرة وفكرتها العامة",
-  "keyPoints": ["النقطة الجوهرية الأولى", "النقطة الجوهرية الثانية"],
-  "conceptsAndDefinitions": [
-    { "termArabic": "المصطلح", "termEnglish": "Term", "definition": "التعريف" }
-  ],
-  "equations": [
-    {
-      "formula": "V = I * R",
-      "name": "قانون أوم",
-      "symbolMeanings": [
-        { "symbol": "V", "meaning": "الجهد", "unit": "V" }
-      ],
-      "usageContext": "لحساب الجهد أو التيار"
-    }
-  ],
-  "examples": [],
-  "importantNotes": ["ملاحظة هامة للمذاكرة"],
-  "conclusion": "خلاصة مكثفة بأهم ما يجب أن يتذكره الطالب",
-  "diagramsSummary": [],
-  "chaptersOrSections": []
-}`;
-
-    let contentsPayload: any;
-
-    const isBase64 =
-      typeof content === 'string' &&
-      (content.startsWith('data:') || (content.length > 500 && (fileMimeType?.startsWith('image/') || fileMimeType?.startsWith('application/pdf'))));
-
-    if (isBase64) {
-      let mime = fileMimeType || 'application/pdf';
-      let cleanData = content;
-
-      if (content.startsWith('data:')) {
-        const matches = content.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          mime = matches[1] || mime;
-          cleanData = matches[2];
-        }
-      }
-
-      contentsPayload = {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mime,
-              data: cleanData,
-            },
-          },
-          { text: systemPrompt },
-        ],
-      };
-    } else {
-      const textToAnalyze = typeof content === 'string' && content.trim()
-        ? `محتوى الملف / المحاضرة (${fileName}):\n${content}`
-        : `المحتوى: ${fileName}`;
-
-      contentsPayload = {
-        parts: [
-          { text: systemPrompt },
-          { text: textToAnalyze },
-        ],
-      };
-    }
+    const { contentsPayload } = buildSummarizePayload({
+      summaryType,
+      content,
+      fileName,
+      fileMimeType,
+      chapterSelection,
+    });
 
     const rawResult = await generateGeminiContentWithRetry({
       contents: contentsPayload,
       config: { responseMimeType: 'application/json' },
     });
 
-    const cleanJson = (rawResult || '{}')
-      .replace(/^```json\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-
-    const parsedData = JSON.parse(cleanJson);
+    const parsedData = parseJsonSafely(rawResult);
 
     return res.json({
       success: true,
@@ -1277,6 +1437,15 @@ subscriptionsRouter.post('/check-access', (req: Request, res: Response) => {
   }
 
   const nowMs = Date.now();
+  if (userSub && userSub.status === 'trial') {
+    const currentExp = userSub.trialExpiresAt ? new Date(userSub.trialExpiresAt).getTime() : 0;
+    if (currentExp - nowMs < 12 * 3600 * 1000) {
+      userSub.trialStartedAt = new Date().toISOString();
+      userSub.trialExpiresAt = new Date(nowMs + 24 * 3600 * 1000).toISOString();
+      userSubscriptionsStore.set(cleanEmail, userSub);
+    }
+  }
+
   const trialExpMs = userSub?.trialExpiresAt ? new Date(userSub.trialExpiresAt).getTime() : nowMs + 24 * 3600 * 1000;
   const diffMs = trialExpMs - nowMs;
 

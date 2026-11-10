@@ -13,6 +13,7 @@ import {
 } from '../../types';
 import {
   requestLectureSummary,
+  requestLectureSummaryStream,
   requestSummaryTransformation,
   getStoredSummaries,
   saveSummaryToStorage,
@@ -81,6 +82,8 @@ export const SummarizePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [progressIndex, setProgressIndex] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
+  const [streamStatusMessage, setStreamStatusMessage] = useState<string>('');
+  const [streamChunkText, setStreamChunkText] = useState<string>('');
 
   // Result & Saved Summaries State
   const [summaryData, setSummaryData] = useState<LectureSummaryData | null>(null);
@@ -131,7 +134,7 @@ export const SummarizePage: React.FC = () => {
     if (file) handleFileProcess(file);
   };
 
-  // Run Summarization
+  // Run Summarization with Vercel AI SDK progressive streaming
   const handleGenerateSummary = async () => {
     let contentToAnalyze = '';
     let fileName = '';
@@ -157,14 +160,40 @@ export const SummarizePage: React.FC = () => {
     setTransformedResult(null);
     setSearchQuery('');
     setIsCurrentSaved(false);
+    setStreamChunkText('');
+    setStreamStatusMessage('جاري الاتصال المباشر بنموذج الذكاء الاصطناعي عبر Vercel AI SDK streamText...');
 
     try {
-      const data = await requestLectureSummary({
-        summaryType: selectedType,
-        content: contentToAnalyze,
-        fileName,
-        fileMimeType: uploadedFile?.type,
-      });
+      const data = await requestLectureSummaryStream(
+        {
+          summaryType: selectedType,
+          content: contentToAnalyze,
+          fileName,
+          fileMimeType: uploadedFile?.type,
+        },
+        {
+          onStart: () => {
+            setStreamStatusMessage('تم استلام المحتوى وبدء بث التلخيص مباشرة...');
+          },
+          onStatus: (_stage, message) => {
+            setStreamStatusMessage(message);
+          },
+          onChunk: (accumulated) => {
+            setStreamChunkText(accumulated);
+          },
+          onComplete: (completedData) => {
+            setSummaryData({
+              ...completedData,
+              id: `sum_${Date.now()}`,
+              fileName,
+              createdAt: new Date().toISOString(),
+            });
+          },
+          onError: (err) => {
+            setErrorMsg(err.message || 'حدث خطأ أثناء بث التلخيص.');
+          },
+        }
+      );
 
       setSummaryData({
         ...data,
@@ -624,6 +653,25 @@ ${summaryData.conclusion}
               </div>
             ))}
           </div>
+
+          {/* Real-time Streaming Output Preview HUD */}
+          {streamChunkText && (
+            <div className="mt-4 p-4 rounded-2xl bg-[#070e18] border border-amber-500/30 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 font-bold text-amber-400">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>📡 {streamStatusMessage || 'جاري استقبال البث المباشر للتلخيص عبر Vercel AI SDK (streamText)...'}</span>
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {streamChunkText.length} حرف تم استلامها
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap select-text">
+                {streamChunkText.slice(-600)}
+                <span className="inline-block w-2 h-4 bg-amber-400 animate-pulse ml-1 align-middle" />
+              </div>
+            </div>
+          )}
         </section>
       )}
 

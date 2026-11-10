@@ -52,6 +52,126 @@ async function parseSafeJsonResponse<T>(response: Response, defaultErrorMsg: str
   return json;
 }
 
+export interface SummarizeStreamCallbacks {
+  onStart?: () => void;
+  onStatus?: (stage: string, message: string) => void;
+  onChunk?: (accumulatedText: string, chunk: string) => void;
+  onComplete?: (data: LectureSummaryData) => void;
+  onError?: (error: Error) => void;
+}
+
+/**
+ * Requests progressive SSE streaming summary from server-side Gemini API with Vercel AI SDK streamText.
+ * Keeps connection active and yields chunks live to completely eliminate 504 timeouts on Vercel.
+ */
+export async function requestLectureSummaryStream(
+  params: SummarizeParams,
+  callbacks?: SummarizeStreamCallbacks
+): Promise<LectureSummaryData> {
+  callbacks?.onStart?.();
+  callbacks?.onStatus?.('reading', 'جاري إرسال المحتوى وبدء البث عبر Vercel AI SDK streamText...');
+
+  let response: Response;
+  try {
+    response = await fetch('/api/gemini/summarize-stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        summaryType: params.summaryType,
+        content: params.content,
+        fileName: params.fileName,
+        fileMimeType: params.fileMimeType,
+        chapterSelection: params.chapterSelection || 'all',
+        stream: true,
+      }),
+    });
+  } catch (_netErr: any) {
+    return await requestLectureSummary(params);
+  }
+
+  if (!response.ok) {
+    return await parseSafeJsonResponse<any>(response, 'تعذر بدء بث التلخيص من الخادم.').then(
+      (r) => r.data as LectureSummaryData
+    );
+  }
+
+  if (!response.body) {
+    return await requestLectureSummary(params);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let accumulatedText = '';
+  let finalData: LectureSummaryData | null = null;
+  let sseBuffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      sseBuffer += decoder.decode(value, { stream: true });
+      const lines = sseBuffer.split('\n');
+      sseBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) {
+          continue; // heartbeat
+        }
+
+        if (trimmed.startsWith('data:')) {
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'start') {
+              callbacks?.onStatus?.(event.stage || 'reading', event.message || 'بدأ بث التلخيص...');
+            } else if (event.type === 'status') {
+              callbacks?.onStatus?.(event.stage || 'analyzing', event.message || 'جاري إعداد الملخص...');
+            } else if (event.type === 'chunk') {
+              accumulatedText += event.text || '';
+              callbacks?.onChunk?.(accumulatedText, event.text || '');
+            } else if (event.type === 'done') {
+              finalData = event.data as LectureSummaryData;
+              callbacks?.onComplete?.(finalData);
+            } else if (event.type === 'error') {
+              throw new Error(event.error || 'حدث خطأ أثناء بث التلخيص.');
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message?.includes('حدث خطأ') || jsonStr.includes('"error"')) {
+              throw parseErr;
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    callbacks?.onError?.(err);
+    throw err;
+  }
+
+  if (!finalData) {
+    if (accumulatedText.length > 50) {
+      try {
+        const clean = accumulatedText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+        return JSON.parse(clean) as LectureSummaryData;
+      } catch (_e) {
+        return await requestLectureSummary(params);
+      }
+    } else {
+      return await requestLectureSummary(params);
+    }
+  }
+
+  return finalData;
+}
+
 /**
  * Call backend to generate structured lecture summary
  */

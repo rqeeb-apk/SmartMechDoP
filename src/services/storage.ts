@@ -496,25 +496,59 @@ export const savePost = (post: CommunityPost): CommunityPost[] => {
 export const getStoredUser = (): UserProfile => {
   const data = localStorage.getItem('dr_smart_user');
   if (!data) {
-    localStorage.setItem('dr_smart_user', JSON.stringify(INITIAL_USER));
-    return INITIAL_USER;
+    const freshUser: UserProfile = {
+      ...INITIAL_USER,
+      subscription: {
+        status: 'trial',
+        trialStartedAt: new Date().toISOString(),
+        trialExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        priceYER: 4000,
+        durationDays: 365,
+      },
+    };
+    localStorage.setItem('dr_smart_user', JSON.stringify(freshUser));
+    return freshUser;
   }
   try {
-    const user = JSON.parse(data) as UserProfile;
-    // Align trial to 24-hour maximum if in trial status
-    if (user.subscription?.status === 'trial' && user.subscription.trialStartedAt) {
-      const startTime = new Date(user.subscription.trialStartedAt).getTime();
-      const max24hExpiry = new Date(startTime + 24 * 3600 * 1000).toISOString();
-      const currentExpiryTime = new Date(user.subscription.trialExpiresAt || 0).getTime();
-      if (!user.subscription.trialExpiresAt || currentExpiryTime > startTime + 24 * 3600 * 1000) {
-        user.subscription.trialExpiresAt = max24hExpiry;
+    const user: UserProfile = JSON.parse(data);
+    // Ensure active trial provides a full fresh 24 hours from current visit
+    if (user.subscription?.status === 'trial') {
+      const now = Date.now();
+      const currentExpiry = new Date(user.subscription.trialExpiresAt || 0).getTime();
+      // If remaining time is less than 12 hours or expired, grant a fresh 24-hour window
+      if (!user.subscription.trialExpiresAt || currentExpiry - now < 12 * 3600 * 1000) {
+        user.subscription.trialStartedAt = new Date().toISOString();
+        user.subscription.trialExpiresAt = new Date(now + 24 * 3600 * 1000).toISOString();
         localStorage.setItem('dr_smart_user', JSON.stringify(user));
       }
     }
     return user;
   } catch {
-    return INITIAL_USER;
+    const fallbackUser: UserProfile = {
+      ...INITIAL_USER,
+      subscription: {
+        status: 'trial',
+        trialStartedAt: new Date().toISOString(),
+        trialExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        priceYER: 4000,
+        durationDays: 365,
+      },
+    };
+    return fallbackUser;
   }
+};
+
+export const renewFreeTrial = (): UserProfile => {
+  const now = Date.now();
+  return updateUserProfile({
+    subscription: {
+      status: 'trial',
+      trialStartedAt: new Date(now).toISOString(),
+      trialExpiresAt: new Date(now + 24 * 3600 * 1000).toISOString(),
+      priceYER: 4000,
+      durationDays: 365,
+    },
+  });
 };
 
 export const updateUserProfile = (profile: Partial<UserProfile>): UserProfile => {
