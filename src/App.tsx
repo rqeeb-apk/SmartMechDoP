@@ -19,7 +19,7 @@ import { OwnerDashboardPage } from './components/OwnerDashboard/OwnerDashboardPa
 import { OwnerLoginModal } from './components/OwnerDashboard/OwnerLoginModal';
 import { getStoredUser, updateUserProfile, checkUserAccessStatus, syncServerSubscriptionStatus } from './services/storage';
 import { UserProfile, LabType, EngineeringBook } from './types';
-import { Cpu, Heart, ShieldAlert, KeyRound, Clock } from 'lucide-react';
+import { Cpu, Heart, ShieldAlert, KeyRound, Clock, ArrowRight, Home } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -73,19 +73,8 @@ export default function App() {
   // Check student access status & 2-Day Trial precision
   const accessInfo = checkUserAccessStatus(user);
 
-
-  // Check if student has registered / logged in
-  const isUserAuthed = user.role === 'owner' || (user.email !== 'student@mechatronics.dr-smart.edu' && localStorage.getItem('dr_smart_user_authed') === 'true');
-
+  // Smooth unhindered tab switching (48-hour free trial active for all students)
   const handleNavTabChange = (targetTab: string) => {
-    if (targetTab === 'home') {
-      setCurrentTab('home');
-      return;
-    }
-    if (!isUserAuthed) {
-      setIsAuthModalOpen(true);
-      return;
-    }
     setCurrentTab(targetTab);
   };
 
@@ -101,19 +90,11 @@ export default function App() {
   };
 
   const handleSelectLab = (labId: string) => {
-    if (!isUserAuthed) {
-      setIsAuthModalOpen(true);
-      return;
-    }
     setSelectedLabType(labId as LabType);
     setCurrentTab('lab_3d');
   };
 
   const handleTakeBookToDoctorHall = (book: EngineeringBook) => {
-    if (!isUserAuthed) {
-      setIsAuthModalOpen(true);
-      return;
-    }
     setCurrentTab('doctor_hall');
   };
 
@@ -159,6 +140,37 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
+        {/* Universal Subpage Navigation & Exit Header */}
+        {currentTab !== 'home' && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 bg-[#0D1B2A]/90 border border-slate-800 rounded-2xl px-4 py-3 backdrop-blur-md shadow-xl">
+            <button
+              onClick={() => setCurrentTab('home')}
+              className="flex items-center gap-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-4 py-2 rounded-xl transition-all shadow-md active:scale-95 group"
+            >
+              <ArrowRight className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span>العودة للرئيسية (خروج) 🏠</span>
+            </button>
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>
+                {currentTab === 'explain_lesson' && 'خدمة «اشرح لي الدرس»'}
+                {currentTab === 'summarize' && 'خدمة «لخّص لي»'}
+                {currentTab === 'doctor_hall' && 'قاعة الدكتور الذكي'}
+                {currentTab === 'lab_3d' && 'طاولة التوصيل والتركيب (المختبر 3D)'}
+                {currentTab === 'library' && 'المكتبة الهندسية'}
+                {currentTab === 'videos' && 'مركز الفيديوهات الهندسية'}
+                {currentTab === 'assistant' && 'المساعد الذكي'}
+                {currentTab === 'calculators' && 'الحاسبات الهندسية'}
+                {currentTab === 'projects' && 'مركز المشاريع الهندسية'}
+                {currentTab === 'quizzes' && 'مركز الاختبارات'}
+                {currentTab === 'community' && 'مجتمع المهندسين'}
+                {currentTab === 'profile' && 'الملف الشخصي للطالب'}
+                {currentTab === 'owner' && 'لوحة الإدارة المركزية'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {currentTab === 'home' && (
           <HomePage setCurrentTab={setCurrentTab} onSelectLab={handleSelectLab} />
         )}
@@ -192,6 +204,17 @@ export default function App() {
         {currentTab === 'owner' && <OwnerDashboardPage />}
       </main>
 
+      {/* Floating Quick Exit Button for Mobile */}
+      {currentTab !== 'home' && (
+        <button
+          onClick={() => setCurrentTab('home')}
+          className="fixed bottom-6 left-6 z-40 lg:hidden flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs px-4 py-3 rounded-full shadow-2xl shadow-amber-500/50 border border-amber-300 active:scale-90 transition-all"
+        >
+          <ArrowRight className="w-4 h-4" />
+          <span>خروج للرئيسية 🏠</span>
+        </button>
+      )}
+
       {/* Student Registration / Login Modal */}
       <StudentAuthModal
         isOpen={isAuthModalOpen}
@@ -205,6 +228,7 @@ export default function App() {
         isOpen={!accessInfo.isAccessAllowed && user.role !== 'owner'}
         user={user}
         onSuccess={handleAuthSuccess}
+        onGoHome={() => setCurrentTab('home')}
       />
 
       {/* Stealth Owner Auth Modal (Triggered ONLY via secret #admin hash or 20 silent logo taps) */}

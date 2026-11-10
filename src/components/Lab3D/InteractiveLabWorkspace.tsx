@@ -701,13 +701,28 @@ export const InteractiveLabWorkspace: React.FC = () => {
     }
   };
 
-  // Mouse / Pointer Move on Canvas
-  const handleMouseMoveCanvas = (e: React.MouseEvent) => {
+  // Global release listener for both mouse and touch
+  useEffect(() => {
+    const handleGlobalRelease = () => {
+      setDraggingCompId(null);
+    };
+    window.addEventListener('mouseup', handleGlobalRelease);
+    window.addEventListener('touchend', handleGlobalRelease);
+    window.addEventListener('touchcancel', handleGlobalRelease);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalRelease);
+      window.removeEventListener('touchend', handleGlobalRelease);
+      window.removeEventListener('touchcancel', handleGlobalRelease);
+    };
+  }, []);
+
+  // Universal Move on Canvas (Mouse or Touch)
+  const handleMoveCanvas = (clientX: number, clientY: number) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
 
-    const canvasX = (e.clientX - rect.left) / zoomLevel;
-    const canvasY = (e.clientY - rect.top) / zoomLevel;
+    const canvasX = (clientX - rect.left) / zoomLevel;
+    const canvasY = (clientY - rect.top) / zoomLevel;
     setCursorPos({ x: canvasX, y: canvasY });
 
     if (!draggingCompId) return;
@@ -728,9 +743,8 @@ export const InteractiveLabWorkspace: React.FC = () => {
     );
   };
 
-  // Mouse Down on Component for Dragging
-  const handleMouseDownComp = (e: React.MouseEvent, compId: string) => {
-    e.stopPropagation();
+  // Universal Start Drag for Component (Mouse or Touch)
+  const handleStartDragComp = (clientX: number, clientY: number, compId: string) => {
     setSelectedCompId(compId);
     setSelectedWireId(null);
     setDraggingCompId(compId);
@@ -739,14 +753,30 @@ export const InteractiveLabWorkspace: React.FC = () => {
     if (comp && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
       setDragOffset({
-        x: (e.clientX - rect.left) / zoomLevel - comp.x,
-        y: (e.clientY - rect.top) / zoomLevel - comp.y,
+        x: (clientX - rect.left) / zoomLevel - comp.x,
+        y: (clientY - rect.top) / zoomLevel - comp.y,
       });
     }
   };
 
-  const handleMouseUpCanvas = () => {
+  const handleEndDrag = () => {
     setDraggingCompId(null);
+  };
+
+  // Nudge selected component in direction (crucial for mobile precision & accessibility)
+  const handleNudgeComponent = (dx: number, dy: number) => {
+    if (!selectedCompId) return;
+    setComponents((prev) =>
+      prev.map((c) =>
+        c.id === selectedCompId
+          ? {
+              ...c,
+              x: Math.max(10, Math.min(1800, c.x + dx)),
+              y: Math.max(10, Math.min(1100, c.y + dy)),
+            }
+          : c
+      )
+    );
   };
 
   // Deletions
@@ -1040,12 +1070,12 @@ export const InteractiveLabWorkspace: React.FC = () => {
           </div>
 
           {/* Drag & Drop Hint */}
-          <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[10px] text-slate-300 flex items-center gap-2">
+          <div className="p-2 rounded-xl bg-slate-900/60 border border-amber-500/30 text-[10px] text-slate-300 flex items-center gap-2">
             <Move className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>اسحب أي قطعة بالفأرة وأفلتها مباشرة على مساحة العمل أو انقر (+ سحب).</span>
+            <span>انقر أو اسحب أي قطعة لوضعها على الطاولة، ثم حرّكها بإصبعك أو بالفأرة بحرية.</span>
           </div>
 
-          {/* Realistic Component Cards List with HTML5 Drag & Drop */}
+          {/* Realistic Component Cards List with Touch & Drag Support */}
           <div className="space-y-2.5 max-h-[580px] overflow-y-auto no-scrollbar pr-1 flex-1">
             {MECHATRONICS_LIBRARY.filter(
               (item) => activeCategory === 'all' || item.category === activeCategory
@@ -1056,7 +1086,7 @@ export const InteractiveLabWorkspace: React.FC = () => {
                 onDragStart={(e) => handleDragStartSidebar(e, item)}
                 onClick={() => addComponentToCanvas(item)}
                 className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-400 cursor-grab active:cursor-grabbing transition-all hover:scale-[1.02] flex items-center justify-between group shadow-sm hover:shadow-cyan-500/15"
-                title="اسحب العنصر إلى الطاولة أو انقر لإضافته"
+                title="انقر لوضع العنصر على الطاولة أو اسحبه بالفأرة"
               >
                 <div className="flex items-center gap-3">
                   {/* Realistic 3D Photorealistic Thumbnail */}
@@ -1081,9 +1111,9 @@ export const InteractiveLabWorkspace: React.FC = () => {
                     e.stopPropagation();
                     addComponentToCanvas(item);
                   }}
-                  className="px-2 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-extrabold group-hover:bg-cyan-500 group-hover:text-slate-950 transition-colors shrink-0"
+                  className="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-500/40 text-[10px] font-black transition-colors shrink-0 shadow-sm"
                 >
-                  + سحب
+                  + إضافة للطاولة
                 </button>
               </div>
             ))}
@@ -1175,15 +1205,22 @@ export const InteractiveLabWorkspace: React.FC = () => {
             onDragOver={handleDragOverCanvas}
             onDragLeave={handleDragLeaveCanvas}
             onDrop={handleDropCanvas}
-            onMouseMove={handleMouseMoveCanvas}
-            onMouseUp={handleMouseUpCanvas}
-            onMouseLeave={handleMouseUpCanvas}
+            onMouseMove={(e) => handleMoveCanvas(e.clientX, e.clientY)}
+            onMouseUp={handleEndDrag}
+            onMouseLeave={handleEndDrag}
+            onTouchMove={(e) => {
+              if (e.touches && e.touches.length > 0) {
+                handleMoveCanvas(e.touches[0].clientX, e.touches[0].clientY);
+              }
+            }}
+            onTouchEnd={handleEndDrag}
+            onTouchCancel={handleEndDrag}
             onClick={() => {
               // Click on empty space cancels wiring or wire selection
               if (wiringStart) setWiringStart(null);
               setSelectedWireId(null);
             }}
-            className={`relative w-full h-[600px] rounded-2xl bg-[#091527] border-2 transition-colors overflow-hidden shadow-2xl cursor-default select-none ${
+            className={`relative w-full h-[600px] rounded-2xl bg-[#091527] border-2 transition-colors overflow-hidden shadow-2xl cursor-default select-none touch-none ${
               isDragOverCanvas
                 ? 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)] bg-[#0c1f38]'
                 : 'border-slate-800'
@@ -1370,7 +1407,16 @@ export const InteractiveLabWorkspace: React.FC = () => {
                 return (
                   <div
                     key={comp.id}
-                    onMouseDown={(e) => handleMouseDownComp(e, comp.id)}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      handleStartDragComp(e.clientX, e.clientY, comp.id);
+                    }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      if (e.touches && e.touches.length > 0) {
+                        handleStartDragComp(e.touches[0].clientX, e.touches[0].clientY, comp.id);
+                      }
+                    }}
                     style={{
                       left: `${comp.x}px`,
                       top: `${comp.y}px`,
@@ -1378,7 +1424,7 @@ export const InteractiveLabWorkspace: React.FC = () => {
                       transformOrigin: 'center center',
                       zIndex: isDraggingThis ? 40 : isSelected ? 30 : 20,
                     }}
-                    className={`absolute transition-shadow select-none group cursor-grab active:cursor-grabbing ${
+                    className={`absolute transition-shadow select-none group cursor-grab active:cursor-grabbing touch-none ${
                       isDraggingThis
                         ? 'scale-105 shadow-[0_20px_35px_rgba(0,0,0,0.6)] ring-4 ring-amber-400'
                         : isSelected
@@ -1584,8 +1630,45 @@ export const InteractiveLabWorkspace: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Quick Action Buttons */}
-                <div className="flex items-center gap-2">
+                {/* Quick Action Buttons & Precision Directional Movement */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Directional Nudge Pad for Mobile & Precision */}
+                  <div className="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-xl border border-slate-700">
+                    <span className="text-[10px] text-slate-400 font-bold ml-1">تحريك:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgeComponent(0, -25)}
+                      className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-cyan-500 active:text-slate-950 text-white font-bold flex items-center justify-center text-xs transition-colors"
+                      title="تحريك لأعلى"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgeComponent(0, 25)}
+                      className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-cyan-500 active:text-slate-950 text-white font-bold flex items-center justify-center text-xs transition-colors"
+                      title="تحريك لأسفل"
+                    >
+                      ▼
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgeComponent(-25, 0)}
+                      className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-cyan-500 active:text-slate-950 text-white font-bold flex items-center justify-center text-xs transition-colors"
+                      title="تحريك يميناً"
+                    >
+                      ►
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgeComponent(25, 0)}
+                      className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-cyan-500 active:text-slate-950 text-white font-bold flex items-center justify-center text-xs transition-colors"
+                      title="تحريك يساراً"
+                    >
+                      ◄
+                    </button>
+                  </div>
+
                   <button
                     onClick={() => handleRotateComponent(selectedComp.id, 90)}
                     className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700"
@@ -1608,6 +1691,13 @@ export const InteractiveLabWorkspace: React.FC = () => {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>حذف</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedCompId(null)}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold"
+                  >
+                    إلغاء التحديد ✕
                   </button>
                 </div>
               </div>

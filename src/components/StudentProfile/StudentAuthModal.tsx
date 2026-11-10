@@ -436,6 +436,19 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
             </button>
           </form>
         )}
+
+        {/* Dismiss / Continue with Free Trial Button */}
+        {allowClose && onClose && (
+          <div className="mt-4 pt-3 border-t border-slate-800 text-center">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-slate-400 hover:text-amber-400 text-xs font-semibold underline underline-offset-4 transition-colors"
+            >
+              تخطي والاستمرار بالتجربة المجانية (48 ساعة) دون تسجيل ✕
+            </button>
+          </div>
+        )}
         </div>
       </div>
     </div>

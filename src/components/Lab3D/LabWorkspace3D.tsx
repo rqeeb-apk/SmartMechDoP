@@ -955,7 +955,7 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
-              className={`w-full h-full ${interactionMode === 'drag' ? 'cursor-grab active:cursor-grabbing' : 'cursor-all-scroll'}`}
+              className={`w-full h-full touch-none ${interactionMode === 'drag' ? 'cursor-grab active:cursor-grabbing' : 'cursor-all-scroll'}`}
             />
 
             {/* Top-Left: Mode Switcher (Drag Tools vs Orbit Camera) */}

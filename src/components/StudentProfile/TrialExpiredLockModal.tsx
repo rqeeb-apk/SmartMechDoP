@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Key, Sparkles, CheckCircle2, AlertTriangle, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Lock, Key, Sparkles, CheckCircle2, AlertTriangle, ShieldCheck, HelpCircle, X, Home } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { updateUserProfile, OFFICIAL_LOGO_URL } from '../../services/storage';
 
@@ -7,12 +7,16 @@ interface TrialExpiredLockModalProps {
   isOpen: boolean;
   user: UserProfile;
   onSuccess: (updatedUser: UserProfile) => void;
+  onClose?: () => void;
+  onGoHome?: () => void;
 }
 
 export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
   isOpen,
   user,
   onSuccess,
+  onClose,
+  onGoHome,
 }) => {
   const [activationCode, setActivationCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,6 +72,21 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
         {/* Glow Effects */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Close Button if onClose or onGoHome provided */}
+        {(onClose || onGoHome) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onClose) onClose();
+              if (onGoHome) onGoHome();
+            }}
+            className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors z-20"
+            title="إغلاق والعودة للرئيسية"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Lock Emblem Badge */}
         <div className="w-20 h-20 mx-auto rounded-3xl p-1 bg-gradient-to-tr from-amber-400 via-orange-500 to-amber-600 shadow-xl shadow-amber-500/30 flex items-center justify-center mb-5">
@@ -127,6 +146,18 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
             )}
           </button>
         </form>
+
+        {/* Exit & Go Home Option */}
+        {onGoHome && (
+          <button
+            type="button"
+            onClick={onGoHome}
+            className="w-full mt-3 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-700"
+          >
+            <Home className="w-4 h-4 text-cyan-400" />
+            <span>العودة للصفحة الرئيسية وتصفح المحتوى المفتوح</span>
+          </button>
+        )}
 
         <p className="text-[11px] text-slate-500 mt-4">
           للحصول على كود تفعيل، يرجى التواصل مع موزع المنصة المعتمد أو إدارة المنصة.
