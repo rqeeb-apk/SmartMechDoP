@@ -1,4 +1,5 @@
 import { LessonExplanationData, StudentLevel, LessonSourceType } from '../types';
+import { getStoredUser } from './storage';
 
 export interface ExplainLessonParams {
   sourceType: LessonSourceType;
@@ -69,6 +70,23 @@ export interface LessonStreamCallbacks {
   onError?: (error: Error) => void;
 }
 
+function getStudentHeaders(extraHeaders: Record<string, string> = {}) {
+  try {
+    const user = getStoredUser();
+    const studentId = user?.email || user?.id || 'student';
+    return {
+      'Content-Type': 'application/json',
+      'x-student-id': studentId,
+      ...extraHeaders,
+    };
+  } catch {
+    return {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    };
+  }
+}
+
 /**
  * Requests progressive SSE streaming explanation from server-side Gemini API.
  * Keeps connection active and yields chunks live to completely prevent 504 Gateway Timeouts.
@@ -84,10 +102,9 @@ export async function requestLessonExplanationStream(
   try {
     response = await fetch('/api/gemini/explain-lesson-stream', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: getStudentHeaders({
         'Accept': 'text/event-stream',
-      },
+      }),
       body: JSON.stringify({
         sourceType: params.sourceType,
         content: params.content,
@@ -193,7 +210,7 @@ export async function requestLessonExplanation(
 
   const response = await fetch('/api/gemini/explain-lesson', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getStudentHeaders(),
     body: JSON.stringify({
       sourceType: params.sourceType,
       content: params.content,
@@ -221,7 +238,7 @@ export async function askLessonFollowupQuestion(params: FollowupParams): Promise
 }> {
   const response = await fetch('/api/gemini/explain-lesson', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getStudentHeaders(),
     body: JSON.stringify({
       mode: 'followup_question',
       lessonContext: params.lessonContext,
@@ -243,7 +260,7 @@ export async function askLessonFollowupQuestion(params: FollowupParams): Promise
 export async function requestLessonAlternative(params: AlternativeParams): Promise<string> {
   const response = await fetch('/api/gemini/explain-lesson', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getStudentHeaders(),
     body: JSON.stringify({
       mode: params.mode,
       lessonContext: params.lessonContext,

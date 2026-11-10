@@ -1,4 +1,5 @@
 import { LectureSummaryData, SummaryType, SavedSummaryItem } from '../types';
+import { getStoredUser } from './storage';
 
 export interface SummarizeParams {
   summaryType: SummaryType;
@@ -9,6 +10,23 @@ export interface SummarizeParams {
 }
 
 const SUMMARIES_STORAGE_KEY = 'dr_smart_saved_summaries';
+
+function getStudentHeaders(extraHeaders: Record<string, string> = {}) {
+  try {
+    const user = getStoredUser();
+    const studentId = user?.email || user?.id || 'student';
+    return {
+      'Content-Type': 'application/json',
+      'x-student-id': studentId,
+      ...extraHeaders,
+    };
+  } catch {
+    return {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    };
+  }
+}
 
 /**
  * Robust JSON response parser handling plain-text / HTML Vercel errors gracefully
@@ -75,10 +93,9 @@ export async function requestLectureSummaryStream(
   try {
     response = await fetch('/api/gemini/summarize-stream', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: getStudentHeaders({
         'Accept': 'text/event-stream',
-      },
+      }),
       body: JSON.stringify({
         summaryType: params.summaryType,
         content: params.content,
@@ -183,7 +200,7 @@ export async function requestLectureSummary(
 
   const response = await fetch('/api/gemini/summarize', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getStudentHeaders(),
     body: JSON.stringify({
       summaryType: params.summaryType,
       content: params.content,
@@ -211,7 +228,7 @@ export async function requestSummaryTransformation(
 ): Promise<string> {
   const response = await fetch('/api/gemini/summarize', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getStudentHeaders(),
     body: JSON.stringify({
       mode,
       summaryContext,

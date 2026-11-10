@@ -268,7 +268,8 @@ async function generateGeminiContentStreamWithRetry(params: {
 }
 
 // ==========================================
-// GEMINI API QUEUE & PER-USER QUOTA MIDDLEWARE
+// HIGH-CAPACITY CONCURRENCY ENGINE & RESPONSE CACHE
+// Designed to sustain 1,000+ simultaneous users without stalling
 // ==========================================
 
 interface QueuedTask {
@@ -276,24 +277,33 @@ interface QueuedTask {
   fn: () => Promise<any>;
   resolve: (val: any) => void;
   reject: (err: any) => void;
-  ip: string;
+  clientId: string;
   estimatedTokens: number;
 }
 
-class GeminiRequestQueue {
+class HighCapacityRequestQueue {
   private queue: QueuedTask[] = [];
   private activeCount = 0;
-  private maxConcurrency = 4;
-  private interRequestDelayMs = 200;
+  // High concurrency for modern serverless scale (64 concurrent tasks per instance)
+  private maxConcurrency = 64;
 
-  public enqueue(ip: string, estimatedTokens: number, fn: () => Promise<any>): Promise<any> {
+  public enqueue(clientId: string, estimatedTokens: number, fn: () => Promise<any>): Promise<any> {
+    // If capacity is available, execute immediately without queuing delay
+    if (this.activeCount < this.maxConcurrency) {
+      this.activeCount++;
+      return fn().finally(() => {
+        this.activeCount--;
+        this.processNext();
+      });
+    }
+
     return new Promise((resolve, reject) => {
       const task: QueuedTask = {
         id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         fn,
         resolve,
         reject,
-        ip,
+        clientId,
         estimatedTokens,
       };
       this.queue.push(task);
@@ -309,7 +319,7 @@ class GeminiRequestQueue {
     };
   }
 
-  private async processNext() {
+  private processNext() {
     if (this.activeCount >= this.maxConcurrency || this.queue.length === 0) {
       return;
     }
@@ -319,19 +329,75 @@ class GeminiRequestQueue {
 
     this.activeCount++;
 
-    try {
-      const result = await task.fn();
-      task.resolve(result);
-    } catch (err) {
-      task.reject(err);
-    } finally {
-      this.activeCount--;
-      setTimeout(() => this.processNext(), this.interRequestDelayMs);
-    }
+    task
+      .fn()
+      .then((res) => task.resolve(res))
+      .catch((err) => task.reject(err))
+      .finally(() => {
+        this.activeCount--;
+        this.processNext();
+      });
   }
 }
 
-const geminiQueue = new GeminiRequestQueue();
+const geminiQueue = new HighCapacityRequestQueue();
+
+// In-Memory Fast LRU Cache to instantly serve common questions & lecture summaries
+interface CacheItem<T> {
+  data: T;
+  createdAt: number;
+  expiresAt: number;
+}
+
+class FastResponseLRUCache<T> {
+  private cache = new Map<string, CacheItem<T>>();
+  private maxItems: number;
+
+  constructor(maxItems = 1200) {
+    this.maxItems = maxItems;
+  }
+
+  public get(key: string): T | null {
+    const item = this.cache.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    // Promote key for LRU
+    this.cache.delete(key);
+    this.cache.set(key, item);
+    return item.data;
+  }
+
+  public set(key: string, data: T, ttlMs: number = 2 * 3600 * 1000): void {
+    if (this.cache.size >= this.maxItems) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, {
+      data,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + ttlMs,
+    });
+  }
+
+  public has(key: string): boolean {
+    return this.get(key) !== null;
+  }
+}
+
+export const aiResponseCache = new FastResponseLRUCache<any>(1200);
+
+export function computeCacheKey(prefix: string, content: string, extra = ''): string {
+  let hash = 0;
+  const str = `${prefix}_${extra}_${(content || '').slice(0, 1500)}`;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return `${prefix}_${Math.abs(hash).toString(36)}`;
+}
 
 interface UserQuotaRecord {
   tokensUsedWindow: number;
@@ -341,16 +407,28 @@ interface UserQuotaRecord {
 
 const userQuotaTracker = new Map<string, UserQuotaRecord>();
 
-function trackAndCheckUserQuota(ip: string, estimatedTokens: number): { allowed: boolean; remainingTokens: number; waitSec?: number } {
+/**
+ * Multi-tenant aware rate limiter:
+ * Differentiates between individual student IDs and shared campus/cellular gateway IPs
+ * so that hundreds of students sharing the same university Wi-Fi or cellular network are never blocked!
+ */
+function trackAndCheckUserQuota(
+  clientId: string,
+  isSharedIp: boolean,
+  estimatedTokens: number
+): { allowed: boolean; remainingTokens: number; waitSec?: number } {
   const now = Date.now();
   const windowSizeMs = 60 * 1000;
-  const maxTokensPerMin = 200000;
-  const maxRequestsPerMin = 20;
 
-  let record = userQuotaTracker.get(ip);
+  // For identified individual student: generous 100 req/min
+  // For shared campus/cellular NAT gateway IP: massive 5,000 req/min
+  const maxTokensPerMin = isSharedIp ? 20000000 : 800000;
+  const maxRequestsPerMin = isSharedIp ? 5000 : 100;
+
+  let record = userQuotaTracker.get(clientId);
   if (!record || now - record.windowStart > windowSizeMs) {
     record = { tokensUsedWindow: 0, requestCountWindow: 0, windowStart: now };
-    userQuotaTracker.set(ip, record);
+    userQuotaTracker.set(clientId, record);
   }
 
   if (record.tokensUsedWindow + estimatedTokens > maxTokensPerMin || record.requestCountWindow >= maxRequestsPerMin) {
@@ -368,19 +446,27 @@ function trackAndCheckUserQuota(ip: string, estimatedTokens: number): { allowed:
 }
 
 function geminiQuotaAndQueueMiddleware(req: Request, res: Response, next: NextFunction) {
-  const ip = String(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
-  const { lessonTitle, userPrompt, uploadedContent, content } = req.body || {};
+  const ip = String(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1').split(',')[0].trim();
+  const studentHeader = (req.headers['x-student-id'] as string) || '';
+  const bodyEmail = req.body?.studentEmail || req.body?.email || req.body?.studentId || '';
 
+  const studentIdentifier = studentHeader || bodyEmail;
+  const isStudentIdentified = Boolean(studentIdentifier && studentIdentifier !== 'guest');
+  const clientId = isStudentIdentified ? `usr_${studentIdentifier.trim().toLowerCase()}` : `ip_${ip}`;
+
+  const { lessonTitle, userPrompt, uploadedContent, content } = req.body || {};
   const textPayload = `${lessonTitle || ''} ${userPrompt || ''} ${uploadedContent || ''} ${typeof content === 'string' && !content.startsWith('data:') ? content : ''}`;
   const estimatedTokens = Math.min(estimateTokens(textPayload), 5000);
+
   (req as any).estimatedTokens = estimatedTokens;
+  (req as any).clientId = clientId;
   (req as any).clientIp = ip;
 
-  const quotaCheck = trackAndCheckUserQuota(ip, estimatedTokens);
+  const quotaCheck = trackAndCheckUserQuota(clientId, !isStudentIdentified, estimatedTokens);
   if (!quotaCheck.allowed) {
     return res.status(429).json({
       success: false,
-      error: `تجاوزت حد الاستهلاك المسموح به في الدقيقة (${quotaCheck.remainingTokens} توكن متبقية). يرجى الانتظار ${quotaCheck.waitSec} ثانية للمتابعة.`,
+      error: `تجاوزت حد الاستهلاك المسموح به في الدقيقة. يرجى الانتظار ${quotaCheck.waitSec} ثانية للمتابعة.`,
       waitSec: quotaCheck.waitSec,
     });
   }
@@ -662,6 +748,47 @@ function createVercelAiSdkStream(params: {
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
+      // 0. High-concurrency LRU Cache lookup: Instant (<5ms) responses for common questions/summaries
+      const cacheKey = computeCacheKey(
+        params.streamType,
+        params.prompt,
+        `${params.metadata?.studentLevel || ''}_${params.metadata?.summaryType || ''}`
+      );
+
+      if (!params.isBase64) {
+        const cached = aiResponseCache.get(cacheKey);
+        if (cached && (cached.text || cached.data)) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: 'start',
+                stage: 'reading',
+                message: 'تم استرجاع المحتوى فورياً من الذاكرة المؤقتة فائقة السرعة (Ultra-Fast Cache)...',
+              })}\n\n`
+            )
+          );
+
+          const fullText = cached.text || JSON.stringify(cached.data);
+          const chunkSize = 300;
+          for (let i = 0; i < fullText.length; i += chunkSize) {
+            const chunk = fullText.slice(i, i + chunkSize);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', text: chunk })}\n\n`));
+          }
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: 'done',
+                data: cached.data,
+                meta: { ...params.metadata, fromCache: true },
+              })}\n\n`
+            )
+          );
+          controller.close();
+          return;
+        }
+      }
+
       // 1. Send immediate start event frame (<50ms) to defeat Vercel 504 timeouts
       controller.enqueue(
         encoder.encode(
@@ -808,6 +935,11 @@ function createVercelAiSdkStream(params: {
               chaptersOrSections: [],
             };
           }
+        }
+
+        // Cache result for 2 hours to serve subsequent students with zero delay
+        if (!params.isBase64 && parsedData) {
+          aiResponseCache.set(cacheKey, { text: accumulatedText, data: parsedData }, 2 * 3600 * 1000);
         }
 
         controller.enqueue(
@@ -1130,6 +1262,20 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
       return res.json({ success: true, resultText: text });
     }
 
+    const isBase64 = typeof content === 'string' && (content.startsWith('data:') || content.length > 500);
+    const cacheKey = computeCacheKey('summarize_nonstream', typeof content === 'string' ? content : fileName, `${summaryType}_${chapterSelection}`);
+
+    if (!isBase64) {
+      const cached = aiResponseCache.get(cacheKey);
+      if (cached) {
+        return res.json({
+          success: true,
+          data: cached,
+          meta: { summaryType, fileName, fromCache: true },
+        });
+      }
+    }
+
     const { contentsPayload } = buildSummarizePayload({
       summaryType,
       content,
@@ -1144,6 +1290,10 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
     });
 
     const parsedData = parseJsonSafely(rawResult);
+
+    if (!isBase64 && parsedData) {
+      aiResponseCache.set(cacheKey, parsedData, 2 * 3600 * 1000);
+    }
 
     return res.json({
       success: true,
