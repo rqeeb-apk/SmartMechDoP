@@ -112,12 +112,11 @@ async function generateGeminiContentWithRetry(params: {
 }): Promise<string> {
   const ai = getGeminiClient();
   const modelCascade = [
-    params.primaryModel || 'gemini-2.5-flash',
+    params.primaryModel || 'gemini-3.1-flash-lite',
     params.fallbackModel || 'gemini-flash-latest',
     'gemini-3.8-flash',
-    'gemini-3.1-flash-lite',
   ];
-  const maxAttempts = params.maxAttempts || 4;
+  const maxAttempts = params.maxAttempts || 3;
 
   let attempt = 0;
 
@@ -125,11 +124,17 @@ async function generateGeminiContentWithRetry(params: {
     const currentModel = modelCascade[Math.min(attempt, modelCascade.length - 1)];
     attempt++;
     try {
-      console.log(`[AI Engine] Attempt ${attempt}/${maxAttempts} using model: ${currentModel}`);
+      console.log(`[AI Engine Fast] Attempt ${attempt}/${maxAttempts} using model: ${currentModel}`);
+      
+      const configPayload = { ...params.config };
+      if (currentModel === 'gemini-3.8-flash') {
+        configPayload.thinkingConfig = { thinkingLevel: 'LOW' };
+      }
+
       const response = await ai.models.generateContent({
         model: currentModel,
         contents: params.contents,
-        config: params.config,
+        config: configPayload,
       });
       return response.text || '';
     } catch (err: any) {
@@ -338,10 +343,7 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
 سؤال الطالب:
 "${followupQuestion || 'اشرح هذه النقطة أكثر'}"`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
-
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       const isOut = text.includes('[تنبيه: هذا السؤال يقع خارج سياق الدرس المرفوع]');
       return res.json({ success: true, answer: text, isOutOfLessonContext: isOut });
     }
@@ -353,9 +355,7 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
 
 قدم الشرح بأسلوب مبسط وممتع وباللغة العربية الفصيحة السهلة.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, answer: text });
     }
 
@@ -366,9 +366,7 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
 
 اشرح النظريات الفيزيائية الكامنة، اشتقاق العلاقات، التأثيرات الجانبية، والتفاصيل الهندسية الدقيقة.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, answer: text });
     }
 
@@ -379,9 +377,7 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
 
 اعرض المسألة بوضوح، المعطيات بالوحدات، القانون المستخدم، خطوات التعويض الرياضي خطوة بخطوة، والنتيجة النهائية مع الوحدة الفيزيائية الصحيحة.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, answer: text });
     }
 
@@ -494,11 +490,9 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
       };
     }
 
-    const rawResult = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-      return await generateGeminiContentWithRetry({
-        contents: contentsPayload,
-        config: { responseMimeType: 'application/json' },
-      });
+    const rawResult = await generateGeminiContentWithRetry({
+      contents: contentsPayload,
+      config: { responseMimeType: 'application/json' },
     });
 
     const cleanJson = (rawResult || '{}')
@@ -555,9 +549,7 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
 
 حوّل هذا الملخص إلى 8 أسئلة مراجعة وتدريب ذكية مع الإجابة النموذجية الكاملة والدقيقة لكل سؤال مستخرجة حصراً من المحاضرة.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, resultText: text });
     }
 
@@ -572,9 +564,7 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
 3. وضح متى وكيف يستخدم القانون، وأي شروط خاصة.
 لا تخترع قوانين غير موجودة في المحتوى.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, resultText: text });
     }
 
@@ -585,9 +575,7 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
 
 لكل مصطلح: المصطلح بالعربية مع الإنجليزي المقابل، والتعريف العلمي المبسط.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, resultText: text });
     }
 
@@ -598,9 +586,7 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
 
 فكك الأفكار الصعبة، اشرح السبب الفيزيائي، واستخدم تشبيهات هندسية سهلة الفهم لطلاب الميكاترونكس.`;
 
-      const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-        return await generateGeminiContentWithRetry({ contents: prompt });
-      });
+      const text = await generateGeminiContentWithRetry({ contents: prompt });
       return res.json({ success: true, resultText: text });
     }
 
@@ -681,11 +667,9 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
       };
     }
 
-    const rawResult = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
-      return await generateGeminiContentWithRetry({
-        contents: contentsPayload,
-        config: { responseMimeType: 'application/json' },
-      });
+    const rawResult = await generateGeminiContentWithRetry({
+      contents: contentsPayload,
+      config: { responseMimeType: 'application/json' },
     });
 
     const cleanJson = (rawResult || '{}')

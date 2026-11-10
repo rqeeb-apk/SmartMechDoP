@@ -197,7 +197,7 @@ export async function readFileAsBase64OrText(file: File): Promise<{
 }> {
   // If image, compress via Canvas to guarantee ultra-crisp formulas while staying well under Vercel's 4.5MB limit
   if (file.type.startsWith('image/')) {
-    const compressed = await compressImageForOCR(file, 1600, 0.85);
+    const compressed = await compressImageForOCR(file, 1200, 0.80);
     return {
       content: compressed.content,
       isBase64: true,
