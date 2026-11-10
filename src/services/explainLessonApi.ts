@@ -61,6 +61,126 @@ async function parseSafeJsonResponse<T>(response: Response, defaultErrorMsg: str
   return json;
 }
 
+export interface LessonStreamCallbacks {
+  onStart?: () => void;
+  onStatus?: (stage: string, message: string) => void;
+  onChunk?: (accumulatedText: string, chunk: string) => void;
+  onComplete?: (data: LessonExplanationData) => void;
+  onError?: (error: Error) => void;
+}
+
+/**
+ * Requests progressive SSE streaming explanation from server-side Gemini API.
+ * Keeps connection active and yields chunks live to completely prevent 504 Gateway Timeouts.
+ */
+export async function requestLessonExplanationStream(
+  params: ExplainLessonParams,
+  callbacks?: LessonStreamCallbacks
+): Promise<LessonExplanationData> {
+  callbacks?.onStart?.();
+  callbacks?.onStatus?.('reading', 'جاري إرسال البيانات وبدء الاتصال المباشر بنموذج الذكاء الاصطناعي...');
+
+  let response: Response;
+  try {
+    response = await fetch('/api/gemini/explain-lesson-stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        sourceType: params.sourceType,
+        content: params.content,
+        fileName: params.fileName,
+        fileMimeType: params.fileMimeType,
+        studentLevel: params.studentLevel,
+      }),
+    });
+  } catch (_netErr: any) {
+    // Fallback directly to normal route if streaming endpoint fetch failed at network level
+    return await requestLessonExplanation(params);
+  }
+
+  if (!response.ok) {
+    return await parseSafeJsonResponse<any>(response, 'تعذر بدء بث الشرح من الخادم.').then(
+      (r) => r.data as LessonExplanationData
+    );
+  }
+
+  if (!response.body) {
+    return await requestLessonExplanation(params);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let accumulatedText = '';
+  let finalData: LessonExplanationData | null = null;
+  let sseBuffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      sseBuffer += decoder.decode(value, { stream: true });
+      const lines = sseBuffer.split('\n');
+      sseBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) {
+          continue; // heartbeat
+        }
+
+        if (trimmed.startsWith('data:')) {
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'start') {
+              callbacks?.onStatus?.(event.stage || 'reading', event.message || 'بدأ بث الشرح...');
+            } else if (event.type === 'status') {
+              callbacks?.onStatus?.(event.stage || 'analyzing', event.message || 'جاري التحليل...');
+            } else if (event.type === 'chunk') {
+              accumulatedText += event.text || '';
+              callbacks?.onChunk?.(accumulatedText, event.text || '');
+            } else if (event.type === 'done') {
+              finalData = event.data as LessonExplanationData;
+              callbacks?.onComplete?.(finalData);
+            } else if (event.type === 'error') {
+              throw new Error(event.error || 'حدث خطأ أثناء بث الشرح.');
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message?.includes('حدث خطأ') || jsonStr.includes('"error"')) {
+              throw parseErr;
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    callbacks?.onError?.(err);
+    throw err;
+  }
+
+  if (!finalData) {
+    if (accumulatedText.length > 50) {
+      try {
+        const clean = accumulatedText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+        return JSON.parse(clean) as LessonExplanationData;
+      } catch (_e) {
+        return await requestLessonExplanation(params);
+      }
+    } else {
+      return await requestLessonExplanation(params);
+    }
+  }
+
+  return finalData;
+}
+
 /**
  * Requests complete 14-step academic explanation from server-side Gemini API
  */

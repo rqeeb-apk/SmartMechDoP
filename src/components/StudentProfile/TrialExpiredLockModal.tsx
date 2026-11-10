@@ -96,7 +96,7 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
         </div>
 
         <h2 className="text-xl md:text-2xl font-black text-white mb-2">
-          انتهت فترة التجربة المجانية (48 ساعة)
+          انتهت فترة التجربة المجانية (24 ساعة)
         </h2>
 
         <p className="text-xs md:text-sm text-slate-300 leading-relaxed mb-6 font-medium">

@@ -150,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {user.subscription?.status === 'active' ? (
                   <span>✅ اشتراك سنوي مفعل (365 يوم)</span>
                 ) : (
-                  <span>⏳ تجربة مجانية 48 ساعة</span>
+                  <span>⏳ تجربة مجانية 24 ساعة</span>
                 )}
               </div>
             )}

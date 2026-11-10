@@ -51,7 +51,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     try {
       const now = new Date();
       const nowIso = now.toISOString();
-      const trialExpiresIso = new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+      const trialExpiresIso = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
       const generatedEmail = `student_${Date.now()}@mechatronics.dr-smart.edu`;
 
       let subData: any = {
@@ -102,7 +102,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
       setSuccessMsg(
         subData.status === 'active'
           ? '🎉 تم إنشاء حسابك وتفعيل الاشتراك السنوي الشامل (365 يوماً) بنجاح!'
-          : '🎉 تم إنشاء حسابك ومنحك تجربة مجانية كاملة لمدة 48 ساعة!'
+          : '🎉 تم إنشاء حسابك ومنحك تجربة مجانية كاملة لمدة 24 ساعة!'
       );
 
       setTimeout(() => {
@@ -218,7 +218,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                 <h2 className="text-base sm:text-lg font-bold text-white truncate">بوابة دخول المنصة التعليمية للطلاب</h2>
               </div>
               <p className="text-[11px] sm:text-xs text-amber-300/90 font-medium mt-0.5 leading-snug">
-                منصة دكتور الميكاترونكس الذكي · تجربة مجانية 48 ساعة أو تفعيل كود الاشتراك السنوي
+                منصة دكتور الميكاترونكس الذكي · تجربة مجانية 24 ساعة أو تفعيل كود الاشتراك السنوي
               </p>
             </div>
           </div>
@@ -361,7 +361,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                 className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 font-mono font-bold text-sm tracking-wider placeholder-slate-600 focus:outline-none focus:border-amber-400"
               />
               <p className="text-[11px] text-slate-400">
-                ملاحظة: في حال عدم إدخال كود التفعيل، ستحصل تلقائياً على تجربة مجانية لمدة 48 ساعة.
+                ملاحظة: في حال عدم إدخال كود التفعيل، ستحصل تلقائياً على تجربة مجانية لمدة 24 ساعة.
               </p>
             </div>
 
@@ -445,7 +445,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
               onClick={onClose}
               className="text-slate-400 hover:text-amber-400 text-xs font-semibold underline underline-offset-4 transition-colors"
             >
-              تخطي والاستمرار بالتجربة المجانية (48 ساعة) دون تسجيل ✕
+              تخطي والاستمرار بالتجربة المجانية (24 ساعة) دون تسجيل ✕
             </button>
           </div>
         )}

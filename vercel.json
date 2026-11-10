@@ -10,6 +10,10 @@
     "api/*.ts": {
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/**": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "rewrites": [

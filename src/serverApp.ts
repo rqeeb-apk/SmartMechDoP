@@ -101,6 +101,27 @@ function parseRetryDelayMs(err: any): number {
 }
 
 /**
+ * Robust JSON parser handling markdown code blocks, preambles, and malformed markers
+ */
+function parseJsonSafely(raw: string): any {
+  if (!raw) return {};
+  let cleaned = raw.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (_e) {
+    const startIdx = cleaned.indexOf('{');
+    const endIdx = cleaned.lastIndexOf('}');
+    if (startIdx !== -1 && endIdx > startIdx) {
+      const sliced = cleaned.slice(startIdx, endIdx + 1);
+      return JSON.parse(sliced);
+    }
+    throw _e;
+  }
+}
+
+/**
  * Robust Gemini Content Generator with Exponential Backoff + Jitter & Model Fallback
  */
 async function generateGeminiContentWithRetry(params: {
@@ -175,6 +196,73 @@ async function generateGeminiContentWithRetry(params: {
   }
 
   throw new Error('تعذر إكمال طلب الشرح بعد عدة محاولات. يرجى إعادة المحاولة لاحقاً.');
+}
+
+/**
+ * Robust Gemini Streaming Content Generator with SSE support and zero-delay model cascade
+ */
+async function generateGeminiContentStreamWithRetry(params: {
+  contents: any;
+  config?: any;
+  primaryModel?: string;
+  fallbackModel?: string;
+  maxAttempts?: number;
+  onChunk: (text: string) => void;
+  onStatus?: (message: string) => void;
+}): Promise<string> {
+  const ai = getGeminiClient();
+  const modelCascade = [
+    params.primaryModel || 'gemini-3.1-flash-lite',
+    params.fallbackModel || 'gemini-flash-latest',
+    'gemini-3.8-flash',
+  ];
+  const maxAttempts = params.maxAttempts || 3;
+  let attempt = 0;
+
+  while (attempt < maxAttempts) {
+    const currentModel = modelCascade[Math.min(attempt, modelCascade.length - 1)];
+    attempt++;
+    try {
+      console.log(`[AI Streaming Engine] Attempt ${attempt}/${maxAttempts} with model: ${currentModel}`);
+      if (params.onStatus) {
+        params.onStatus(`جاري بث الشرح مباشرة عبر النموذج السريع (${currentModel})...`);
+      }
+
+      const configPayload = { ...params.config };
+      if (currentModel === 'gemini-3.8-flash') {
+        configPayload.thinkingConfig = { thinkingLevel: 'LOW' };
+      }
+
+      const streamResult = await ai.models.generateContentStream({
+        model: currentModel,
+        contents: params.contents,
+        config: configPayload,
+      });
+
+      let fullText = '';
+      for await (const chunk of streamResult) {
+        const text = chunk.text || '';
+        if (text) {
+          fullText += text;
+          params.onChunk(text);
+        }
+      }
+
+      return fullText;
+    } catch (err: any) {
+      const errMsg = String(err?.message || JSON.stringify(err || {}));
+      console.warn(`[AI Stream Error] Attempt ${attempt} failed with ${currentModel}:`, errMsg.slice(0, 150));
+
+      if (attempt >= maxAttempts) {
+        throw new Error(err?.message || 'تعذر استكمال بث الشرح بعد عدة محاولات.');
+      }
+
+      const backoffDelay = 1000 * attempt + Math.floor(Math.random() * 500);
+      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+    }
+  }
+
+  throw new Error('فشلت جميع محاولات بث الشرح من خادم الذكاء الاصطناعي.');
 }
 
 // ==========================================
@@ -382,7 +470,57 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
     }
 
     // Default: 'full_explanation' - Complete 14-Step Grounded Engine
-    const systemPrompt = `أنت المدرس الأكاديمي المتخصص في منصة «دكتور الميكاترونكس الذكي» لخدمة «اشرح لي الدرس».
+    const { contentsPayload } = buildExplainLessonPayload({
+      sourceType,
+      content,
+      fileName,
+      fileMimeType,
+      studentLevel,
+    });
+
+    const rawResult = await generateGeminiContentWithRetry({
+      contents: contentsPayload,
+      config: { responseMimeType: 'application/json' },
+    });
+
+    const parsedData = parseJsonSafely(rawResult);
+
+    return res.json({
+      success: true,
+      data: parsedData,
+      meta: { sourceType, studentLevel, fileName },
+    });
+  } catch (error: any) {
+    console.error('Explain Lesson API Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'حدث خطأ أثناء تحليل وشرح الدرس.',
+    });
+  }
+});
+
+/**
+ * Helper to construct grounded prompt and payload for «اشرح لي الدرس»
+ */
+function buildExplainLessonPayload(params: {
+  sourceType?: string;
+  content?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  studentLevel?: string;
+}) {
+  const { sourceType, content, fileName, fileMimeType, studentLevel = 'intermediate' } = params;
+
+  const levelMap: Record<string, string> = {
+    beginner: 'مستوى مبتدئ: لغة عربية سهلة ومبسطة جداً، تفكيك المفاهيم المعقدة، تشبيهات عملية مبسطة، وتجنب الرموز الرياضية المعقدة دون تمهيد.',
+    intermediate: 'مستوى متوسط: مناسب لطلاب البكالوريوس في هندسة الميكاترونكس، توازن بين الشرح النظري والقوانين الرياضية مع توضيح الوحدات والرموز.',
+    advanced: 'مستوى متقدم: تفصيل رياضي وهندسي عميق، اشتقاقات القوانين، دوال التحويل، الاستجابة الترددية والزمنية، واستكشاف المشكلات.',
+    specialized: 'مستوى هندسي متخصص: معايير التصميم الصناعي (ISO/IEEE)، اختيار المكونات الدقيقة، التوافق الكهرومغناطيسي، والتحكم المتقدم.',
+  };
+
+  const studentLevelInstruction = levelMap[studentLevel] || levelMap.intermediate;
+
+  const systemPrompt = `أنت المدرس الأكاديمي المتخصص في منصة «دكتور الميكاترونكس الذكي» لخدمة «اشرح لي الدرس».
 مستوى الشرح المطلوب: ${studentLevelInstruction}
 
 قواعد الدقة والأمانة العلمية الصارمة:
@@ -448,71 +586,147 @@ ${typeof lessonContext === 'string' ? lessonContext : JSON.stringify(lessonConte
   "quickOptions": ["شرح أبسط", "شرح أعمق", "مثال محلول", "اختبرني", "أعد الشرح من البداية"]
 }`;
 
-    let contentsPayload: any;
+  let contentsPayload: any;
 
-    const isBase64 =
-      typeof content === 'string' &&
-      (content.startsWith('data:') || (content.length > 500 && (sourceType === 'image' || sourceType === 'video' || sourceType === 'pdf')));
+  const isBase64 =
+    typeof content === 'string' &&
+    (content.startsWith('data:') || (content.length > 500 && (sourceType === 'image' || sourceType === 'video' || sourceType === 'pdf')));
 
-    if (isBase64) {
-      let mime = fileMimeType || 'image/jpeg';
-      let cleanData = content;
+  if (isBase64) {
+    let mime = fileMimeType || 'image/jpeg';
+    let cleanData = content;
 
-      if (content.startsWith('data:')) {
-        const matches = content.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          mime = matches[1] || mime;
-          cleanData = matches[2];
-        }
+    if (content.startsWith('data:')) {
+      const matches = content.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mime = matches[1] || mime;
+        cleanData = matches[2];
       }
+    }
 
-      contentsPayload = {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mime,
-              data: cleanData,
-            },
+    contentsPayload = {
+      parts: [
+        {
+          inlineData: {
+            mimeType: mime,
+            data: cleanData,
           },
-          { text: systemPrompt },
-        ],
-      };
-    } else {
-      const textToAnalyze = typeof content === 'string' && content.trim()
-        ? `المحتوى المرفوع من الطالب (${fileName || 'نص / مستند'}):\n${content}`
-        : `المحتوى: ${fileName || 'درس ميكاترونكس'}`;
+        },
+        { text: systemPrompt },
+      ],
+    };
+  } else {
+    const textToAnalyze = typeof content === 'string' && content.trim()
+      ? `المحتوى المرفوع من الطالب (${fileName || 'نص / مستند'}):\n${content}`
+      : `المحتوى: ${fileName || 'درس ميكاترونكس'}`;
 
-      contentsPayload = {
-        parts: [
-          { text: systemPrompt },
-          { text: textToAnalyze },
+    contentsPayload = {
+      parts: [
+        { text: systemPrompt },
+        { text: textToAnalyze },
+      ],
+    };
+  }
+
+  return { contentsPayload, systemPrompt };
+}
+
+// ==========================================
+// API: «اشرح لي الدرس» - البث التدريجي المباشر (SSE Streaming) لمنع 504 Gateway Timeout
+// ==========================================
+geminiRouter.post('/explain-lesson-stream', async (req: Request, res: Response) => {
+  // 1. Immediately establish SSE connection headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  // 2. Immediately send handshake byte frame (<50ms) to prevent Vercel 504 edge timeout
+  res.write(`data: ${JSON.stringify({ type: 'start', stage: 'reading', message: 'تم استلام المحتوى وبدء الاتصال المباشر بنموذج الذكاء الاصطناعي...' })}\n\n`);
+
+  // 3. Keepalive heartbeat every 5 seconds to ensure reverse proxies don't terminate idle sockets
+  const keepAliveTimer = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch (_err) {}
+  }, 5000);
+
+  try {
+    const { sourceType, content, fileName, fileMimeType, studentLevel = 'intermediate' } = req.body || {};
+
+    const { contentsPayload } = buildExplainLessonPayload({
+      sourceType,
+      content,
+      fileName,
+      fileMimeType,
+      studentLevel,
+    });
+
+    res.write(`data: ${JSON.stringify({ type: 'status', stage: 'analyzing', message: 'جاري تحليل الدرس والمفاهيم واستخراج القوانين وبث الشرح تدريجياً...' })}\n\n`);
+
+    let accumulatedText = '';
+
+    const fullRawResult = await generateGeminiContentStreamWithRetry({
+      contents: contentsPayload,
+      config: { responseMimeType: 'application/json' },
+      onChunk: (chunkText) => {
+        accumulatedText += chunkText;
+        res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
+      },
+      onStatus: (statusMsg) => {
+        res.write(`data: ${JSON.stringify({ type: 'status', stage: 'streaming', message: statusMsg })}\n\n`);
+      },
+    });
+
+    clearInterval(keepAliveTimer);
+
+    // Parse the completed JSON payload safely
+    let parsedData: any;
+    try {
+      parsedData = parseJsonSafely(fullRawResult || accumulatedText);
+    } catch (_parseErr) {
+      console.warn('[Stream Parse Notice] Falling back to structured wrapper for streaming text');
+      parsedData = {
+        lessonTitle: fileName || 'درس ميكاترونكس',
+        studentLevel,
+        sourceType: sourceType || 'text',
+        objectives: ['فهم موضوع الدرس واستيعاب المفاهيم الهندسية'],
+        coreIdea: (accumulatedText || '').slice(0, 300),
+        sourceAnalysis: {
+          detectedType: 'محتوى هندسي / درس ميكاترونكس',
+          sourceQuality: 'clear',
+          scientificErrorsFound: [],
+          visualElements: [],
+          timelineParts: [],
+        },
+        concepts: [
+          {
+            title: 'شرح الدرس الأكاديمي',
+            explanation: accumulatedText,
+            engineeringNotes: 'تم استخراج وتوليد الشرح بنجاح عبر البث المباشر.',
+          },
         ],
+        terminology: [],
+        equations: [],
+        solutionSteps: [],
+        practicalApplication: 'تطبيقات عملية في أنظمة الميكاترونكس والروبوتات.',
+        diagramsExplanation: '',
+        mechatronicsConnection: 'ربط مباشر بمجالات التحكم والروبوتات والمتحكمات.',
+        summary: ['تم استكمال الشرح التدريجي بنجاح.'],
+        quizQuestions: [],
+        quickOptions: ['شرح أبسط', 'شرح أعمق', 'مثال محلول', 'اختبرني'],
       };
     }
 
-    const rawResult = await generateGeminiContentWithRetry({
-      contents: contentsPayload,
-      config: { responseMimeType: 'application/json' },
-    });
-
-    const cleanJson = (rawResult || '{}')
-      .replace(/^```json\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-
-    const parsedData = JSON.parse(cleanJson);
-
-    return res.json({
-      success: true,
-      data: parsedData,
-      meta: { sourceType, studentLevel, fileName },
-    });
+    res.write(`data: ${JSON.stringify({ type: 'done', data: parsedData, meta: { sourceType, studentLevel, fileName } })}\n\n`);
+    res.end();
   } catch (error: any) {
-    console.error('Explain Lesson API Error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'حدث خطأ أثناء تحليل وشرح الدرس.',
-    });
+    clearInterval(keepAliveTimer);
+    console.error('[Stream API Fatal Error]:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error?.message || 'حدث خطأ أثناء بث شرح الدرس.' })}\n\n`);
+    res.end();
   }
 });
 
@@ -850,9 +1064,10 @@ geminiRouter.post('/arduino-gen', async (req: Request, res: Response) => {
   }
 });
 
-// Mount geminiRouter on both /api/gemini and /gemini
+// Mount geminiRouter on /api/gemini, /gemini, and /api
 app.use('/api/gemini', geminiRouter);
 app.use('/gemini', geminiRouter);
+app.use('/api', geminiRouter);
 
 // ==========================================
 // SUBSCRIPTIONS & OWNER STORE
@@ -938,7 +1153,7 @@ subscriptionsRouter.post('/check-access', (req: Request, res: Response) => {
   if (!userSub && subscription) {
     const now = new Date();
     const nowIso = now.toISOString();
-    const trialExp = subscription.trialExpiresAt || new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+    const trialExp = subscription.trialExpiresAt || new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
 
     userSub = {
       email: cleanEmail || 'student@mechatronics.dr-smart.edu',
@@ -970,7 +1185,7 @@ subscriptionsRouter.post('/check-access', (req: Request, res: Response) => {
   }
 
   const nowMs = Date.now();
-  const trialExpMs = userSub?.trialExpiresAt ? new Date(userSub.trialExpiresAt).getTime() : nowMs + 48 * 3600 * 1000;
+  const trialExpMs = userSub?.trialExpiresAt ? new Date(userSub.trialExpiresAt).getTime() : nowMs + 24 * 3600 * 1000;
   const diffMs = trialExpMs - nowMs;
 
   if (diffMs > 0) {
@@ -998,7 +1213,7 @@ subscriptionsRouter.post('/check-access', (req: Request, res: Response) => {
     statusType: 'trial_expired',
     remainingSec: 0,
     subscription: userSub,
-    formattedCountdown: 'انتهت التجربة المجانية (48 ساعة)',
+    formattedCountdown: 'انتهت التجربة المجانية (24 ساعة)',
   });
 });
 

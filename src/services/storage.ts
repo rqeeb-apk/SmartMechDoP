@@ -265,7 +265,7 @@ const INITIAL_POSTS: CommunityPost[] = [
 ];
 
 const nowIso = new Date().toISOString();
-const trialExpiresIso = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
+const trialExpiresIso = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
 const INITIAL_USER: UserProfile = {
   id: 'usr_student_1',
@@ -321,14 +321,14 @@ export function checkUserAccessStatus(user: UserProfile): {
     };
   }
 
-  // Calculate 2-Day Trial Precision (48 Hours = 172,800 seconds starting at registration)
+  // Calculate 1-Day Trial Precision (24 Hours = 86,400 seconds starting at registration)
   let trialExpiresAt = 0;
   if (user.subscription?.trialExpiresAt) {
     trialExpiresAt = new Date(user.subscription.trialExpiresAt).getTime();
   } else if (user.createdAt) {
-    trialExpiresAt = new Date(user.createdAt).getTime() + 48 * 3600 * 1000;
+    trialExpiresAt = new Date(user.createdAt).getTime() + 24 * 3600 * 1000;
   } else {
-    trialExpiresAt = Date.now() + 48 * 3600 * 1000;
+    trialExpiresAt = Date.now() + 24 * 3600 * 1000;
   }
 
   const diffMs = trialExpiresAt - Date.now();
@@ -354,7 +354,7 @@ export function checkUserAccessStatus(user: UserProfile): {
     remainingTrialHours: 0,
     remainingTrialMinutes: 0,
     remainingTrialSec: 0,
-    formattedCountdown: 'انتهت التجربة المجانية (48 ساعة)',
+    formattedCountdown: 'انتهت التجربة المجانية (24 ساعة)',
   };
 }
 
@@ -499,7 +499,22 @@ export const getStoredUser = (): UserProfile => {
     localStorage.setItem('dr_smart_user', JSON.stringify(INITIAL_USER));
     return INITIAL_USER;
   }
-  return JSON.parse(data);
+  try {
+    const user = JSON.parse(data) as UserProfile;
+    // Align trial to 24-hour maximum if in trial status
+    if (user.subscription?.status === 'trial' && user.subscription.trialStartedAt) {
+      const startTime = new Date(user.subscription.trialStartedAt).getTime();
+      const max24hExpiry = new Date(startTime + 24 * 3600 * 1000).toISOString();
+      const currentExpiryTime = new Date(user.subscription.trialExpiresAt || 0).getTime();
+      if (!user.subscription.trialExpiresAt || currentExpiryTime > startTime + 24 * 3600 * 1000) {
+        user.subscription.trialExpiresAt = max24hExpiry;
+        localStorage.setItem('dr_smart_user', JSON.stringify(user));
+      }
+    }
+    return user;
+  } catch {
+    return INITIAL_USER;
+  }
 };
 
 export const updateUserProfile = (profile: Partial<UserProfile>): UserProfile => {

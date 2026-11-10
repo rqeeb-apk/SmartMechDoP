@@ -70,10 +70,10 @@ export default function App() {
     return () => clearInterval(timer);
   }, [user]);
 
-  // Check student access status & 2-Day Trial precision
+  // Check student access status & 24-Hour Free Trial precision
   const accessInfo = checkUserAccessStatus(user);
 
-  // Smooth unhindered tab switching (48-hour free trial active for all students)
+  // Smooth unhindered tab switching (24-hour free trial active for all students)
   const handleNavTabChange = (targetTab: string) => {
     setCurrentTab(targetTab);
   };

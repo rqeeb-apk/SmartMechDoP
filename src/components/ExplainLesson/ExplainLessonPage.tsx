@@ -14,6 +14,7 @@ import {
 } from '../../types';
 import {
   requestLessonExplanation,
+  requestLessonExplanationStream,
   askLessonFollowupQuestion,
   requestLessonAlternative,
   readFileAsBase64OrText
@@ -42,6 +43,8 @@ export const ExplainLessonPage: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progressStageIndex, setProgressStageIndex] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [streamStatusMessage, setStreamStatusMessage] = useState<string>('');
+  const [streamChunkText, setStreamChunkText] = useState<string>('');
 
   // Result Lesson Data (Preserved during session)
   const [lessonData, setLessonData] = useState<LessonExplanationData | null>(null);
@@ -150,15 +153,42 @@ export const ExplainLessonPage: React.FC = () => {
     setSelectedQuizAnswers({});
     setRevealedQuizResults(false);
     setFollowupHistory([]);
+    setStreamChunkText('');
+    setStreamStatusMessage('جاري بدء الاتصال المباشر بنموذج الذكاء الاصطناعي...');
 
     try {
-      const data = await requestLessonExplanation({
-        sourceType: activeSourceType,
-        content: contentToAnalyze,
-        fileName,
-        fileMimeType: uploadedFile?.type,
-        studentLevel,
-      });
+      const data = await requestLessonExplanationStream(
+        {
+          sourceType: activeSourceType,
+          content: contentToAnalyze,
+          fileName,
+          fileMimeType: uploadedFile?.type,
+          studentLevel,
+        },
+        {
+          onStart: () => {
+            setStreamStatusMessage('تم استلام المحتوى وبدء البث المباشر...');
+            setProgressStageIndex(0);
+          },
+          onStatus: (stage, message) => {
+            setStreamStatusMessage(message);
+            if (stage === 'reading') setProgressStageIndex(0);
+            else if (stage === 'analyzing') setProgressStageIndex(1);
+            else if (stage === 'streaming') setProgressStageIndex(2);
+          },
+          onChunk: (accumulated) => {
+            setStreamChunkText(accumulated);
+            setProgressStageIndex(4);
+          },
+          onComplete: (completedData) => {
+            setLessonData(completedData);
+            confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+          },
+          onError: (err) => {
+            setErrorMsg(err.message || 'حدث خطأ أثناء بث شرح الدرس.');
+          },
+        }
+      );
 
       setLessonData(data);
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
@@ -527,16 +557,18 @@ export const ExplainLessonPage: React.FC = () => {
       </section>
 
       {/* =========================================================================
-          ZONE 3: Progressive Analysis Status HUD (During Generation)
+          ZONE 3: Progressive Analysis Status HUD & Real-time Streaming Stream
           ========================================================================= */}
       {isAnalyzing && (
-        <section className="bg-[#0D1B2A] border-2 border-cyan-500/40 rounded-3xl p-6 shadow-2xl space-y-4 animate-pulse">
+        <section className="bg-[#0D1B2A] border-2 border-cyan-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
             <span className="flex items-center gap-2">
               <Bot className="w-4 h-4 text-amber-400" />
-              <span>مدرس الميكاترونكس الذكي يقوم بفحص وتدقيق المحتوى بدقة علمية...</span>
+              <span>{streamStatusMessage || 'مدرس الميكاترونكس الذكي يقوم بفحص وتدقيق المحتوى وبث الشرح مباشرة...'}</span>
             </span>
-            <span className="font-mono">{progressStageIndex + 1} / 5</span>
+            <span className="font-mono bg-cyan-950/80 px-2 py-0.5 rounded-lg border border-cyan-500/30 text-amber-300">
+              مرحلة {progressStageIndex + 1} / 5
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
@@ -545,7 +577,7 @@ export const ExplainLessonPage: React.FC = () => {
                 key={step.id}
                 className={`p-3 rounded-xl border text-center text-xs font-bold transition-all ${
                   idx <= progressStageIndex
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md shadow-cyan-500/10'
                     : 'bg-slate-900/60 border-slate-800 text-slate-500'
                 }`}
               >
@@ -554,6 +586,25 @@ export const ExplainLessonPage: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Real-time Streaming Output Preview HUD */}
+          {streamChunkText && (
+            <div className="mt-4 p-4 rounded-2xl bg-[#070e18] border border-cyan-500/30 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 font-bold text-amber-400">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>📡 جاري استقبال البث المباشر للشرح (استجابة فورية بدون انتظار)...</span>
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {streamChunkText.length} حرف تم استلامها
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap select-text">
+                {streamChunkText.slice(-600)}
+                <span className="inline-block w-2 h-4 bg-cyan-400 animate-pulse ml-1 align-middle" />
+              </div>
+            </div>
+          )}
         </section>
       )}
 
