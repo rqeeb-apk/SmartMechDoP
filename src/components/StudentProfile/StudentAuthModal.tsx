@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, Mail, User, Key, CheckCircle2, AlertTriangle, Sparkles, Cpu, BookOpen, GraduationCap } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, User, Key, CheckCircle2, AlertTriangle, Sparkles, Cpu, BookOpen, GraduationCap, X } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { updateUserProfile, OFFICIAL_LOGO_URL } from '../../services/storage';
 
@@ -180,28 +180,48 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-[#0F213E] border border-amber-500/40 rounded-3xl p-6 md:p-8 shadow-2xl text-slate-100 overflow-hidden my-8">
-        
-        {/* Ambient Glow Effects */}
-        <div className="absolute -top-24 -left-24 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-56 h-56 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black/85 backdrop-blur-md animate-fade-in"
+      onClick={() => { if (allowClose && onClose) onClose(); }}
+    >
+      <div className="min-h-full w-full flex items-center justify-center p-3 sm:p-6 text-center">
+        <div 
+          className="relative w-full max-w-lg bg-[#0F213E] border border-amber-500/40 rounded-3xl p-5 sm:p-7 shadow-2xl text-slate-100 text-right overflow-hidden my-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          
+          {/* Ambient Glow Effects */}
+          <div className="absolute -top-24 -left-24 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-56 h-56 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Modal Header */}
-        <div className="flex items-center gap-4 mb-6 border-b border-amber-500/20 pb-4">
-          <div className="w-14 h-14 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md shrink-0">
-            <img src={OFFICIAL_LOGO_URL} alt="Logo" className="w-full h-full object-cover rounded-xl" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <GraduationCap className="w-6 h-6 text-amber-400" />
-              <h2 className="text-xl font-bold text-white">بوابة دخول المنصة التعليمية للطلاب</h2>
+          {/* Close Button when allowed */}
+          {allowClose && onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-full transition-colors z-20"
+              title="إغلاق"
+              aria-label="إغلاق"
+            >
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          )}
+
+          {/* Modal Header */}
+          <div className="flex items-center gap-3.5 mb-5 border-b border-amber-500/20 pb-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md shrink-0">
+              <img src={OFFICIAL_LOGO_URL} alt="Logo" className="w-full h-full object-cover rounded-xl" />
             </div>
-            <p className="text-xs text-amber-300/90 font-medium mt-0.5">
-              منصة دكتور الميكاترونكس الذكي · تجربة مجانية 48 ساعة أو تفعيل كود الاشتراك السنوي
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 shrink-0" />
+                <h2 className="text-base sm:text-lg font-bold text-white truncate">بوابة دخول المنصة التعليمية للطلاب</h2>
+              </div>
+              <p className="text-[11px] sm:text-xs text-amber-300/90 font-medium mt-0.5 leading-snug">
+                منصة دكتور الميكاترونكس الذكي · تجربة مجانية 48 ساعة أو تفعيل كود الاشتراك السنوي
+              </p>
+            </div>
           </div>
-        </div>
 
         {/* Mode Switcher Tabs */}
         <div className="flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 mb-6 text-xs font-bold">
@@ -416,6 +436,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
             </button>
           </form>
         )}
+        </div>
       </div>
     </div>
   );

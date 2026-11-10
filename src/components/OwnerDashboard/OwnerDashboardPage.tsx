@@ -196,12 +196,21 @@ export const OwnerDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Indicator */}
+        {/* Status Indicator & Exit Button */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>خادم الجلسات: مصادق</span>
           </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem('owner_token');
+              window.location.reload();
+            }}
+            className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition-colors"
+          >
+            تسجيل الخروج والعودة للمنصة
+          </button>
         </div>
       </div>
 

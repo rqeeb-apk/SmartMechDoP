@@ -61,8 +61,9 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-fade-in">
-      <div className="relative w-full max-w-lg bg-[#0F213E] border-2 border-amber-500/50 rounded-3xl p-6 md:p-8 shadow-2xl text-slate-100 overflow-hidden text-center">
+    <div className="fixed inset-0 z-[100] overflow-y-auto overflow-x-hidden bg-black/90 backdrop-blur-xl animate-fade-in">
+      <div className="min-h-full w-full flex items-center justify-center p-3 sm:p-6 text-center">
+        <div className="relative w-full max-w-lg bg-[#0F213E] border-2 border-amber-500/50 rounded-3xl p-5 sm:p-8 shadow-2xl text-slate-100 overflow-hidden text-center my-auto">
         
         {/* Glow Effects */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -130,6 +131,7 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
         <p className="text-[11px] text-slate-500 mt-4">
           للحصول على كود تفعيل، يرجى التواصل مع موزع المنصة المعتمد أو إدارة المنصة.
         </p>
+        </div>
       </div>
     </div>
   );

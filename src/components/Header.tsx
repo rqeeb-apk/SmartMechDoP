@@ -26,7 +26,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuthModal,
 }) => {
   const [logoClicks, setLogoClicks] = useState<number>(0);
-  const [showClickToast, setShowClickToast] = useState<boolean>(false);
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState<boolean>(false);
   const clickTimerRef = useRef<any>(null);
 
@@ -44,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'community', label: 'مجتمع المهندسين', icon: Users },
   ];
 
-  // 20-click tap counter handler with 3s reset timer
+  // 20-click tap counter handler with 3s reset timer (100% silent, zero public UI/hints)
   const handleLogoClick = () => {
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current);
@@ -52,18 +51,15 @@ export const Header: React.FC<HeaderProps> = ({
 
     const nextCount = logoClicks + 1;
     setLogoClicks(nextCount);
-    setShowClickToast(true);
 
     if (nextCount >= 20) {
       setLogoClicks(0);
-      setShowClickToast(false);
       setIsOwnerModalOpen(true);
       return;
     }
 
     clickTimerRef.current = setTimeout(() => {
       setLogoClicks(0);
-      setShowClickToast(false);
     }, 3000);
 
     // Default home click behavior if regular click
@@ -85,12 +81,12 @@ export const Header: React.FC<HeaderProps> = ({
       <header className="sticky top-0 z-50 w-full bg-[#0A192F]/95 backdrop-blur-md border-b border-amber-500/20 text-slate-100 px-4 lg:px-8 py-2.5 transition-colors">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-6">
           
-          {/* Zone 1: Brand Logo & Wordmark with 20-Click Trigger */}
+          {/* Zone 1: Brand Logo & Wordmark */}
           <div className="relative">
             <button
               onClick={handleLogoClick}
               className="flex items-center gap-3 text-right hover:opacity-95 transition-opacity shrink-0 group focus:outline-none"
-              title="انقر 20 نقرة متتالية لتفعيل لوحة المالك"
+              title="دكتور الميكاترونكس الذكي"
             >
               {/* Logo Frame matching emblem */}
               <div className="relative w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform overflow-hidden">
@@ -110,13 +106,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               </div>
             </button>
-
-            {/* Tap counter toast badge */}
-            {showClickToast && logoClicks > 2 && (
-              <div className="absolute top-12 right-0 z-50 bg-amber-500/90 text-slate-950 font-bold font-mono text-[11px] px-2.5 py-1 rounded-full shadow-lg border border-amber-300 animate-bounce">
-                نقرات المالك: {logoClicks}/20
-              </div>
-            )}
           </div>
 
           {/* Zone 2: Navigation Links */}

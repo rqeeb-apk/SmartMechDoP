@@ -16,6 +16,7 @@ import { StudentProfilePage } from './components/StudentProfile/StudentProfilePa
 import { StudentAuthModal } from './components/StudentProfile/StudentAuthModal';
 import { TrialExpiredLockModal } from './components/StudentProfile/TrialExpiredLockModal';
 import { OwnerDashboardPage } from './components/OwnerDashboard/OwnerDashboardPage';
+import { OwnerLoginModal } from './components/OwnerDashboard/OwnerLoginModal';
 import { getStoredUser, updateUserProfile, checkUserAccessStatus, syncServerSubscriptionStatus } from './services/storage';
 import { UserProfile, LabType, EngineeringBook } from './types';
 import { Cpu, Heart, ShieldAlert, KeyRound, Clock } from 'lucide-react';
@@ -26,6 +27,7 @@ export default function App() {
   const [selectedLabType, setSelectedLabType] = useState<LabType>('circuits');
   const [isDark, setIsDark] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isSecretOwnerModalOpen, setIsSecretOwnerModalOpen] = useState<boolean>(false);
   const [, setTick] = useState<number>(0);
 
   useEffect(() => {
@@ -35,6 +37,19 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
+
+  // Stealth hash listener for platform owner (#admin or #owner-portal)
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#admin' || hash === '#owner' || hash === '#owner-portal') {
+        setIsSecretOwnerModalOpen(true);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   // Sync user subscription state with server-side middleware on startup
   useEffect(() => {
@@ -192,6 +207,26 @@ export default function App() {
         onSuccess={handleAuthSuccess}
       />
 
+      {/* Stealth Owner Auth Modal (Triggered ONLY via secret #admin hash or 20 silent logo taps) */}
+      <OwnerLoginModal
+        isOpen={isSecretOwnerModalOpen}
+        onClose={() => {
+          setIsSecretOwnerModalOpen(false);
+          if (window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }}
+        onSuccess={() => {
+          const updated = updateUserProfile({ role: 'owner' });
+          setUser(updated);
+          setCurrentTab('owner');
+          setIsSecretOwnerModalOpen(false);
+          if (window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }}
+      />
+
       {/* Footer */}
       <footer className="w-full bg-[#0D1B2A] border-t border-slate-800/80 py-6 px-4 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -219,9 +254,6 @@ export default function App() {
             <button onClick={() => setCurrentTab('doctor_hall')} className="hover:text-cyan-400 transition-colors">قاعة الدكتور</button>
             <button onClick={() => setCurrentTab('lab_3d')} className="hover:text-cyan-400 transition-colors">المختبر 3D</button>
             <button onClick={() => setCurrentTab('library')} className="hover:text-cyan-400 transition-colors">المكتبة</button>
-            <button onClick={toggleRole} className="hover:text-amber-400 font-mono transition-colors">
-              {user.role === 'owner' ? '[وضع المالك]' : '[وضع الطالب]'}
-            </button>
           </div>
         </div>
       </footer>

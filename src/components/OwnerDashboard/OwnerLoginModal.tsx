@@ -86,36 +86,37 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg bg-[#0F213E] border border-amber-500/40 rounded-3xl p-6 lg:p-8 shadow-2xl text-slate-100 overflow-hidden">
-        
-        {/* Glow Effects */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black/85 backdrop-blur-md animate-fade-in">
+      <div className="min-h-full w-full flex items-center justify-center p-3 sm:p-6 text-center">
+        <div className="relative w-full max-w-lg bg-[#0F213E] border border-amber-500/40 rounded-3xl p-5 sm:p-8 shadow-2xl text-slate-100 text-right overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
+          
+          {/* Glow Effects */}
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white bg-slate-800/60 rounded-full transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white bg-slate-800/60 rounded-full transition-colors z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-        {/* Header Badge */}
-        <div className="flex items-center gap-3 mb-6 border-b border-amber-500/20 pb-4">
-          <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md">
-            <img src={OFFICIAL_LOGO_URL} alt="Logo" className="w-full h-full object-cover rounded-xl" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-amber-400" />
-              <h3 className="text-lg font-bold text-white">مصادقة مالك المنصة (3-Stage Auth)</h3>
+          {/* Header Badge */}
+          <div className="flex items-center gap-3 mb-6 border-b border-amber-500/20 pb-4">
+            <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md shrink-0">
+              <img src={OFFICIAL_LOGO_URL} alt="Logo" className="w-full h-full object-cover rounded-xl" />
             </div>
-            <p className="text-xs text-amber-300/80 font-mono">
-              تفعيل النظام عبر 20 نقرة متتالية على الشعار
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-bold text-white">مصادقة مالك المنصة</h3>
+              </div>
+              <p className="text-xs text-amber-300/80 font-mono">
+                بوابة الإدارة المركزية والتحكم الشامل · دكتور الميكاترونكس
+              </p>
+            </div>
           </div>
-        </div>
 
         {/* Progress Tracker Steps */}
         <div className="flex items-center justify-between mb-6 px-2">
@@ -276,6 +277,7 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
           <span>DR. SMART MECHATRONICS</span>
           <span>•</span>
           <span>PROTECTED OWNER CONSOLE v2.5</span>
+        </div>
         </div>
       </div>
     </div>
