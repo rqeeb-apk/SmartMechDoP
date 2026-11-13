@@ -301,34 +301,34 @@ export const ExplainLessonPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-16 font-sans select-none text-slate-100">
+    <div className="space-y-8 pb-16 font-sans select-none text-[#0F172A] dark:text-slate-100">
       
       {/* =========================================================================
           ZONE 1: Header & Service Banner
           ========================================================================= */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0F1D33] via-[#0A1628] to-[#16233B] border-2 border-cyan-500/30 p-6 sm:p-8 shadow-2xl">
-        <div className="absolute top-0 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none" />
+      <section className="champagne-card relative overflow-hidden rounded-3xl p-6 sm:p-8 shadow-xl dark:bg-gradient-to-br dark:from-[#0F1D33] dark:via-[#0A1628] dark:to-[#16233B] dark:border-2 dark:border-cyan-500/30">
+        <div className="absolute top-0 left-0 w-80 h-80 bg-sky-400/10 dark:bg-cyan-500/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-amber-400/10 dark:bg-amber-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2 text-right">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-xs font-bold">
-              <Sparkles className="w-4 h-4 text-amber-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E0F2FE] dark:bg-cyan-500/15 border border-[#0EA5E9]/30 dark:border-cyan-400/40 text-[#0284C7] dark:text-cyan-300 text-xs font-bold">
+              <Sparkles className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
               <span>مدرس الميكاترونكس الأكاديمي الذكي</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-              اشرح لي <span className="gold-gradient-text">الدرس</span>
+            <h1 className="text-2xl sm:text-4xl font-black text-[#0F172A] dark:text-white tracking-tight">
+              اشرح لي <span className="text-[#0EA5E9] dark:gold-gradient-text">الدرس</span>
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-300 font-medium">
+            <p className="text-sm sm:text-base text-[#475569] dark:text-slate-300 font-medium">
               ارفع نصاً أو صورة أو فيديو أو ملفاً وسأشرح المحتوى خطوة بخطوة بدقة هندسية مطلقة ومطابقة للمصدر.
             </p>
           </div>
 
           {/* Student Level Selector */}
-          <div className="bg-[#091527] border border-slate-700/80 rounded-2xl p-2.5 space-y-1.5 shrink-0 w-full md:w-auto">
-            <span className="text-[11px] font-bold text-slate-400 block text-right px-1">
+          <div className="bg-white dark:bg-[#091527] border border-[rgba(212,175,55,0.35)] dark:border-slate-700/80 rounded-2xl p-2.5 space-y-1.5 shrink-0 w-full md:w-auto shadow-sm">
+            <span className="text-[11px] font-bold text-[#475569] dark:text-slate-400 block text-right px-1">
               اختر مستوى الشرح الأكاديمي:
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs font-bold">
@@ -343,8 +343,8 @@ export const ExplainLessonPage: React.FC = () => {
                   onClick={() => setStudentLevel(lvl.id as StudentLevel)}
                   className={`px-3 py-2 rounded-xl transition-all text-center ${
                     studentLevel === lvl.id
-                      ? 'bg-amber-500 text-slate-950 font-extrabold shadow-md'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800'
+                      ? 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-amber-500 dark:text-slate-950 font-extrabold shadow-md'
+                      : 'bg-[#F8FAFC] text-[#475569] hover:text-[#0F172A] hover:bg-[#E0F2FE]/60 dark:bg-slate-900/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800'
                   }`}
                 >
                   {lvl.label}
@@ -358,10 +358,10 @@ export const ExplainLessonPage: React.FC = () => {
       {/* =========================================================================
           ZONE 2: Multimodal Upload Studio (Text, Image, PDF, Document, Video)
           ========================================================================= */}
-      <section className="bg-[#0D1B2A] border border-cyan-500/30 rounded-3xl p-5 sm:p-7 space-y-6 shadow-xl">
+      <section className="champagne-card rounded-3xl p-5 sm:p-7 space-y-6 shadow-xl dark:border-cyan-500/30">
         
         {/* Source Mode Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 border-b border-slate-800">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800">
           {[
             { id: 'text', label: 'إضافة نص', icon: FileText },
             { id: 'image', label: 'رفع صورة (كتاب / رسم / مسألة)', icon: ImageIcon },
@@ -377,8 +377,8 @@ export const ExplainLessonPage: React.FC = () => {
                 onClick={() => setActiveSourceType(tab.id as LessonSourceType)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/25 scale-[1.02]'
-                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+                    ? 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 dark:text-slate-950 shadow-md scale-[1.02]'
+                    : 'bg-white text-[#475569] hover:text-[#0F172A] hover:bg-[#E0F2FE]/50 border border-[rgba(212,175,55,0.3)] dark:bg-slate-900 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 dark:border-slate-800'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -394,7 +394,7 @@ export const ExplainLessonPage: React.FC = () => {
           {/* 1. Text Mode */}
           {activeSourceType === 'text' && (
             <div className="space-y-3">
-              <label className="text-xs font-bold text-slate-300 block text-right">
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 block text-right">
                 اكتب أو انسخ محتوى الدرس، القانون، المسألة، أو الأفكار الهندسية:
               </label>
               <textarea
@@ -402,11 +402,11 @@ export const ExplainLessonPage: React.FC = () => {
                 onChange={(e) => setTextInput(e.target.value)}
                 placeholder="ألصق هنا نص الدرس أو شرح التجربة أو المسألة الحسابية بالتفصيل..."
                 rows={6}
-                className="w-full p-4 rounded-2xl bg-[#091527] border border-slate-700 text-slate-100 placeholder:text-slate-600 text-sm focus:border-cyan-400 outline-none leading-relaxed transition-colors"
+                className="w-full p-4 rounded-2xl bg-white dark:bg-[#091527] border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-slate-100 placeholder:text-[#94A3B8] dark:placeholder:text-slate-600 text-sm focus:border-[#0EA5E9] dark:focus:border-cyan-400 outline-none leading-relaxed transition-colors"
               />
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+              <div className="flex items-center justify-between text-[11px] text-[#64748B] dark:text-slate-500 font-mono">
                 <span>عدد الحروف: {textInput.length}</span>
-                <span className="text-cyan-400">سيتم الشرح بنسبة 100% بناءً على النص المدخل دون اختراع.</span>
+                <span className="text-[#0284C7] dark:text-cyan-400">سيتم الشرح بنسبة 100% بناءً على النص المدخل دون اختراع.</span>
               </div>
             </div>
           )}
@@ -424,8 +424,8 @@ export const ExplainLessonPage: React.FC = () => {
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-3 ${
                   isDragOver
-                    ? 'border-amber-400 bg-amber-500/10 scale-[1.01]'
-                    : 'border-slate-700 hover:border-cyan-400 bg-[#091527]/80'
+                    ? 'border-[#0EA5E9] bg-[#E0F2FE]/60 dark:border-amber-400 dark:bg-amber-500/10 scale-[1.01]'
+                    : 'border-[rgba(212,175,55,0.45)] hover:border-[#0EA5E9] bg-white/80 dark:border-slate-700 dark:hover:border-cyan-400 dark:bg-[#091527]/80'
                 }`}
               >
                 <input
@@ -444,7 +444,7 @@ export const ExplainLessonPage: React.FC = () => {
                   className="hidden"
                 />
 
-                <div className="w-16 h-16 rounded-2xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center shadow-lg border border-cyan-500/30">
+                <div className="sky-icon-box w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg">
                   {activeSourceType === 'image' && <ImageIcon className="w-8 h-8" />}
                   {activeSourceType === 'video' && <Video className="w-8 h-8" />}
                   {activeSourceType === 'pdf' && <FileType className="w-8 h-8" />}
@@ -452,10 +452,10 @@ export const ExplainLessonPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white">
-                    اسحب وأفلت الملف هنا، أو <span className="text-cyan-400 underline">استعرض جهازك</span>
+                  <p className="text-sm font-bold text-[#0F172A] dark:text-white">
+                    اسحب وأفلت الملف هنا، أو <span className="text-[#0EA5E9] dark:text-cyan-400 underline">استعرض جهازك</span>
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#475569] dark:text-slate-400">
                     {activeSourceType === 'image' && 'يدعم الصور عالية الدقة، صفحات الكتب، رسومات الدوائر، ومخططات Arduino'}
                     {activeSourceType === 'video' && 'يدعم ملفات الفيديو MP4 و WebM (سيتم تحليل الشرح الصوتي والمرئي والأجهزة)'}
                     {activeSourceType === 'pdf' && 'يدعم مذكرات ومقررات PDF واستخراج الدروس والصفحات'}
@@ -466,14 +466,14 @@ export const ExplainLessonPage: React.FC = () => {
 
               {/* Pre-Analysis Preview HUD */}
               {uploadedFile && (
-                <div className="p-4 rounded-2xl bg-[#091527] border border-cyan-500/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="champagne-subcard p-4 rounded-2xl dark:border-cyan-500/40 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-cyan-400 shrink-0">
+                    <div className="sky-icon-box w-12 h-12 rounded-xl flex items-center justify-center font-bold shrink-0">
                       📎
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-white">{uploadedFile.name}</h4>
-                      <p className="text-[11px] text-slate-400 font-mono">
+                      <h4 className="text-xs font-bold text-[#0F172A] dark:text-white">{uploadedFile.name}</h4>
+                      <p className="text-[11px] text-[#475569] dark:text-slate-400 font-mono">
                         الحجم: {(uploadedFile.size / 1024).toFixed(1)} KB | النوع: {uploadedFile.type || 'ملف'}
                       </p>
                     </div>
@@ -486,7 +486,7 @@ export const ExplainLessonPage: React.FC = () => {
                         setFileBase64('');
                         setFilePreviewUrl('');
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white text-xs font-bold transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-500 hover:text-white dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500 dark:hover:text-white text-xs font-bold transition-colors"
                     >
                       تغيير الملف
                     </button>
@@ -496,21 +496,21 @@ export const ExplainLessonPage: React.FC = () => {
 
               {/* Visual Media Preview (Image or Video) */}
               {filePreviewUrl && activeSourceType === 'image' && (
-                <div className="p-3 rounded-2xl bg-[#091527] border border-slate-800 overflow-hidden flex justify-center">
+                <div className="champagne-subcard p-3 rounded-2xl overflow-hidden flex justify-center">
                   <img
                     src={filePreviewUrl}
                     alt="معاينة الصورة المرفوعة"
-                    className="max-h-72 object-contain rounded-xl shadow-lg border border-slate-700"
+                    className="max-h-72 object-contain rounded-xl shadow-lg border border-[rgba(212,175,55,0.3)] dark:border-slate-700"
                   />
                 </div>
               )}
 
               {filePreviewUrl && activeSourceType === 'video' && (
-                <div className="p-3 rounded-2xl bg-[#091527] border border-slate-800 overflow-hidden flex justify-center">
+                <div className="champagne-subcard p-3 rounded-2xl overflow-hidden flex justify-center">
                   <video
                     src={filePreviewUrl}
                     controls
-                    className="max-h-72 w-full rounded-xl shadow-lg border border-slate-700"
+                    className="max-h-72 w-full rounded-xl shadow-lg border border-[rgba(212,175,55,0.3)] dark:border-slate-700"
                   />
                 </div>
               )}
@@ -521,8 +521,8 @@ export const ExplainLessonPage: React.FC = () => {
 
         {/* Error Alert */}
         {errorMsg && (
-          <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-bold flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 text-rose-400" />
+          <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/15 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-200 text-xs font-bold flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-rose-500 dark:text-rose-400" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -532,10 +532,10 @@ export const ExplainLessonPage: React.FC = () => {
           <button
             onClick={handleStartExplanation}
             disabled={isAnalyzing}
-            className={`px-8 py-4 rounded-2xl text-sm font-black flex items-center gap-3 shadow-2xl transition-all cursor-pointer ${
+            className={`px-8 py-4 rounded-2xl text-sm font-black flex items-center gap-3 shadow-xl transition-all cursor-pointer ${
               isAnalyzing
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 hover:scale-105 active:scale-95 shadow-amber-500/30'
+                ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed'
+                : 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-500 dark:via-orange-500 dark:to-amber-600 dark:text-slate-950 hover:scale-105 active:scale-95 shadow-sky-500/25 dark:shadow-amber-500/30'
             }`}
           >
             {isAnalyzing ? (
@@ -545,7 +545,7 @@ export const ExplainLessonPage: React.FC = () => {
               </>
             ) : (
               <>
-                <Sparkles className="w-5 h-5 fill-slate-950" />
+                <Sparkles className="w-5 h-5 fill-current" />
                 <span>ابدأ شرح الدرس الآن</span>
                 <ArrowLeft className="w-4 h-4" />
               </>
@@ -559,13 +559,13 @@ export const ExplainLessonPage: React.FC = () => {
           ZONE 3: Progressive Analysis Status HUD & Real-time Streaming Stream
           ========================================================================= */}
       {isAnalyzing && (
-        <section className="bg-[#0D1B2A] border-2 border-cyan-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
+        <section className="champagne-card border-2 border-[#0EA5E9]/40 dark:border-cyan-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between text-xs font-bold text-[#0284C7] dark:text-cyan-300">
             <span className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-amber-400" />
+              <Bot className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
               <span>{streamStatusMessage || 'مدرس الميكاترونكس الذكي يقوم بفحص وتدقيق المحتوى وبث الشرح مباشرة...'}</span>
             </span>
-            <span className="font-mono bg-cyan-950/80 px-2 py-0.5 rounded-lg border border-cyan-500/30 text-amber-300">
+            <span className="font-mono bg-[#E0F2FE] dark:bg-cyan-950/80 px-2 py-0.5 rounded-lg border border-[#0EA5E9]/30 dark:border-cyan-500/30 text-[#0284C7] dark:text-amber-300">
               مرحلة {progressStageIndex + 1} / 5
             </span>
           </div>
@@ -576,11 +576,11 @@ export const ExplainLessonPage: React.FC = () => {
                 key={step.id}
                 className={`p-3 rounded-xl border text-center text-xs font-bold transition-all ${
                   idx <= progressStageIndex
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md shadow-cyan-500/10'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-500'
+                    ? 'bg-[#E0F2FE] border-[#0EA5E9] text-[#0F172A] dark:bg-cyan-500/20 dark:border-cyan-400 dark:text-cyan-200 shadow-md shadow-sky-500/10 dark:shadow-cyan-500/10'
+                    : 'bg-white/70 border-[rgba(212,175,55,0.25)] text-[#64748B] dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-500'
                 }`}
               >
-                <div className="text-[10px] text-amber-400 font-mono mb-1">مرحلة {idx + 1}</div>
+                <div className="text-[10px] text-[#0284C7] dark:text-amber-400 font-mono mb-1">مرحلة {idx + 1}</div>
                 <div>{step.label}</div>
               </div>
             ))}
@@ -588,19 +588,19 @@ export const ExplainLessonPage: React.FC = () => {
 
           {/* Real-time Streaming Output Preview HUD */}
           {streamChunkText && (
-            <div className="mt-4 p-4 rounded-2xl bg-[#070e18] border border-cyan-500/30 space-y-2">
+            <div className="champagne-subcard mt-4 p-4 rounded-2xl dark:bg-[#070e18] dark:border-cyan-500/30 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-2 font-bold text-amber-400">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="flex items-center gap-2 font-bold text-[#0284C7] dark:text-amber-400">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping" />
                   <span>📡 جاري استقبال البث المباشر للشرح (استجابة فورية بدون انتظار)...</span>
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">
+                <span className="text-[11px] text-[#475569] dark:text-slate-400 font-mono">
                   {streamChunkText.length} حرف تم استلامها
                 </span>
               </div>
-              <div className="max-h-48 overflow-y-auto p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre-wrap select-text">
+              <div className="max-h-48 overflow-y-auto p-3 rounded-xl bg-[#F8FAFC] dark:bg-slate-950/80 border border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-xs text-[#0F172A] dark:text-slate-300 font-mono leading-relaxed whitespace-pre-wrap select-text">
                 {streamChunkText.slice(-600)}
-                <span className="inline-block w-2 h-4 bg-cyan-400 animate-pulse ml-1 align-middle" />
+                <span className="inline-block w-2 h-4 bg-[#0EA5E9] dark:bg-cyan-400 animate-pulse ml-1 align-middle" />
               </div>
             </div>
           )}
@@ -614,14 +614,14 @@ export const ExplainLessonPage: React.FC = () => {
         <div className="space-y-6">
           
           {/* Scientific Verification Banner */}
-          <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+          <div className="bg-emerald-50 dark:bg-gradient-to-r dark:from-emerald-950/70 dark:via-slate-900 dark:to-cyan-950/70 border border-emerald-300 dark:border-emerald-500/40 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-md">
             <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+              <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <div>
-                <span className="font-black text-white text-sm block">
+                <span className="font-black text-[#0F172A] dark:text-white text-sm block">
                   شرح مطابق بنسبة 100% للمحتوى المرفوع (خالٍ تماماً من التخمين)
                 </span>
-                <span className="text-[11px] text-slate-300">
+                <span className="text-[11px] text-[#475569] dark:text-slate-300">
                   المصدر المكتشف: {lessonData.sourceAnalysis.detectedType} | المستوى: {lessonData.studentLevel || studentLevel}
                 </span>
               </div>
@@ -635,7 +635,7 @@ export const ExplainLessonPage: React.FC = () => {
                     `${lessonData.lessonTitle}. ${lessonData.coreIdea}. ${lessonData.summary.join('. ')}`
                   )
                 }
-                className="px-3.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-cyan-500/15 dark:hover:bg-cyan-500 dark:hover:text-slate-950 dark:text-cyan-300 border border-[#0EA5E9] dark:border-cyan-500/30 text-xs font-bold transition-colors flex items-center gap-1.5"
               >
                 {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 <span>{isSpeaking ? 'إيقاف الاستماع' : 'استمع للشرح صوتياً'}</span>
@@ -645,8 +645,8 @@ export const ExplainLessonPage: React.FC = () => {
 
           {/* Unclear Warning Banner (If image or file had blurred/illegible parts) */}
           {lessonData.sourceAnalysis.unclearNotice && (
-            <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/50 text-amber-200 text-xs font-bold flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/50 text-amber-800 dark:text-amber-200 text-xs font-bold flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span>{lessonData.sourceAnalysis.unclearNotice}</span>
             </div>
           )}
@@ -654,55 +654,55 @@ export const ExplainLessonPage: React.FC = () => {
           {/* Scientific Errors Found in Source (Explicit correction with quote) */}
           {lessonData.sourceAnalysis.scientificErrorsFound &&
             lessonData.sourceAnalysis.scientificErrorsFound.length > 0 && (
-              <div className="p-5 rounded-2xl bg-rose-950/60 border-2 border-rose-500/60 space-y-3">
-                <div className="flex items-center gap-2 text-rose-300 font-extrabold text-sm">
+              <div className="p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-300 dark:border-rose-500/60 space-y-3">
+                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-extrabold text-sm">
                   <AlertTriangle className="w-5 h-5" />
                   <span>تنبيه علمي: تم اكتشاف خطأ في المحتوى المرفوع وتم تصحيحه بوضوح</span>
                 </div>
                 {lessonData.sourceAnalysis.scientificErrorsFound.map((err, i) => (
-                  <div key={i} className="p-3.5 rounded-xl bg-slate-900/90 border border-rose-500/30 space-y-1.5 text-xs">
-                    <div className="text-slate-300">
-                      <span className="font-bold text-rose-400">النص كما ورد في المصدر: </span>
-                      <span className="font-mono bg-black/40 px-2 py-0.5 rounded text-rose-300">
+                  <div key={i} className="champagne-subcard p-3.5 rounded-xl border-rose-200 dark:border-rose-500/30 space-y-1.5 text-xs">
+                    <div className="text-[#334155] dark:text-slate-300">
+                      <span className="font-bold text-rose-600 dark:text-rose-400">النص كما ورد في المصدر: </span>
+                      <span className="font-mono bg-rose-100 dark:bg-black/40 px-2 py-0.5 rounded text-rose-700 dark:text-rose-300">
                         {err.sourceText}
                       </span>
                     </div>
-                    <div className="text-emerald-300 font-bold">
+                    <div className="text-emerald-700 dark:text-emerald-300 font-bold">
                       <span>التصحيح العلمي الدقيق: </span>
                       <span>{err.correction}</span>
                     </div>
-                    <div className="text-slate-400 text-[11px]">{err.explanation}</div>
+                    <div className="text-[#475569] dark:text-slate-400 text-[11px]">{err.explanation}</div>
                   </div>
                 ))}
               </div>
             )}
 
           {/* Master 14-Step Ordered Presentation Container */}
-          <div className="bg-[#0D1B2A] border border-cyan-500/30 rounded-3xl p-6 sm:p-8 space-y-8 shadow-2xl">
+          <div className="champagne-card rounded-3xl p-6 sm:p-8 space-y-8 shadow-2xl dark:border-cyan-500/30">
             
             {/* 1. عنوان الدرس (Lesson Title) */}
-            <div className="border-b border-slate-800 pb-5">
-              <span className="text-[10px] font-mono font-bold text-amber-400 block mb-1">
+            <div className="border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-5">
+              <span className="text-[10px] font-mono font-bold text-[#0EA5E9] dark:text-amber-400 block mb-1">
                 الخطوة 1: عنوان الدرس
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-white">
+              <h2 className="text-2xl sm:text-3xl font-black text-[#0F172A] dark:text-white">
                 {lessonData.lessonTitle}
               </h2>
             </div>
 
             {/* 2. ما الذي سنتعلمه؟ (Learning Objectives) */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center gap-2 text-[#0284C7] dark:text-cyan-400 font-bold text-sm">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>الخطوة 2: ما الذي سنتعلمه في هذا الدرس؟ (الأهداف التعليمية)</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {lessonData.objectives.map((obj, i) => (
                   <div
                     key={i}
-                    className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-start gap-2.5 text-xs font-semibold text-slate-200"
+                    className="champagne-subcard p-3 rounded-xl flex items-start gap-2.5 text-xs font-semibold text-[#0F172A] dark:text-slate-200"
                   >
-                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-[#E0F2FE] dark:bg-cyan-500/20 text-[#0284C7] dark:text-cyan-400 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
                     <span>{obj}</span>
@@ -712,18 +712,18 @@ export const ExplainLessonPage: React.FC = () => {
             </div>
 
             {/* 3. الفكرة الأساسية للدرس (Core Idea) */}
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-cyan-500/10 border border-amber-500/30 space-y-2">
-              <span className="text-xs font-extrabold text-amber-400 block">
+            <div className="champagne-subcard p-5 rounded-2xl dark:bg-gradient-to-r dark:from-amber-500/10 dark:via-slate-900 dark:to-cyan-500/10 dark:border-amber-500/30 space-y-2">
+              <span className="text-xs font-extrabold text-[#0EA5E9] dark:text-amber-400 block">
                 الخطوة 3: الفكرة الأساسية للدرس (Core Concept)
               </span>
-              <p className="text-sm text-slate-100 leading-relaxed font-medium">
+              <p className="text-sm text-[#0F172A] dark:text-slate-100 leading-relaxed font-medium">
                 {lessonData.coreIdea}
               </p>
             </div>
 
             {/* 4. شرح المفاهيم واحداً واحداً (Step-by-step Concepts) */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2 text-[#0284C7] dark:text-cyan-400 font-bold text-sm border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-2">
                 <BookOpen className="w-4 h-4" />
                 <span>الخطوة 4: شرح المفاهيم الهندسية واحداً واحداً</span>
               </div>
@@ -731,19 +731,19 @@ export const ExplainLessonPage: React.FC = () => {
                 {lessonData.concepts.map((concept, idx) => (
                   <div
                     key={idx}
-                    className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 hover:border-cyan-500/40 transition-colors"
+                    className="champagne-subcard p-4 rounded-2xl space-y-2 hover:border-[#0EA5E9] dark:hover:border-cyan-500/40 transition-colors"
                   >
-                    <h3 className="text-sm font-black text-white flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-mono text-xs flex items-center justify-center">
+                    <h3 className="text-sm font-black text-[#0F172A] dark:text-white flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-[#E0F2FE] dark:bg-amber-500/20 text-[#0284C7] dark:text-amber-400 font-mono text-xs flex items-center justify-center">
                         {idx + 1}
                       </span>
                       <span>{concept.title}</span>
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 leading-relaxed">
                       {concept.explanation}
                     </p>
                     {concept.engineeringNotes && (
-                      <div className="pt-2 text-[11px] text-cyan-300 font-semibold border-t border-slate-800/80">
+                      <div className="pt-2 text-[11px] text-[#0284C7] dark:text-cyan-300 font-semibold border-t border-[rgba(212,175,55,0.2)] dark:border-slate-800/80">
                         💡 ملاحظة هندسية: {concept.engineeringNotes}
                       </div>
                     )}
@@ -755,20 +755,20 @@ export const ExplainLessonPage: React.FC = () => {
             {/* 5. شرح المصطلحات الهندسية بطريقة سهلة (Terminology Table) */}
             {lessonData.terminology && lessonData.terminology.length > 0 && (
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 text-[#0284C7] dark:text-cyan-400 font-bold text-sm border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-2">
                   <Cpu className="w-4 h-4" />
                   <span>الخطوة 5: شرح المصطلحات الهندسية بطريقة سهلة</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {lessonData.terminology.map((term, i) => (
-                    <div key={i} className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
+                    <div key={i} className="champagne-subcard p-3.5 rounded-xl space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white">{term.termArabic}</span>
-                        <span className="text-[10px] font-mono text-cyan-400 font-bold">
+                        <span className="text-xs font-bold text-[#0F172A] dark:text-white">{term.termArabic}</span>
+                        <span className="text-[10px] font-mono text-[#0284C7] dark:text-cyan-400 font-bold">
                           ({term.termEnglish})
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-normal">{term.simpleDefinition}</p>
+                      <p className="text-[11px] text-[#475569] dark:text-slate-300 leading-normal">{term.simpleDefinition}</p>
                     </div>
                   ))}
                 </div>
@@ -778,7 +778,7 @@ export const ExplainLessonPage: React.FC = () => {
             {/* 6 & 7. شرح المعادلات بالتفصيل وتعريف كل رمز ووحدته (Equations & Symbol SI Units) */}
             {lessonData.equations && lessonData.equations.length > 0 && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 text-[#0284C7] dark:text-cyan-400 font-bold text-sm border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-2">
                   <Calculator className="w-4 h-4" />
                   <span>الخطوة 6 و 7: شرح المعادلات وتعريف كل رمز ووحدته الفيزيائية</span>
                 </div>
@@ -787,18 +787,18 @@ export const ExplainLessonPage: React.FC = () => {
                   {lessonData.equations.map((eq, i) => (
                     <div
                       key={i}
-                      className="p-5 rounded-2xl bg-[#091527] border-2 border-cyan-500/30 space-y-4 shadow-lg"
+                      className="champagne-subcard p-5 rounded-2xl border-2 dark:border-cyan-500/30 space-y-4 shadow-md"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                        <span className="text-xs font-extrabold text-amber-400">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(212,175,55,0.2)] dark:border-slate-800 pb-3">
+                        <span className="text-xs font-extrabold text-[#0F172A] dark:text-amber-400">
                           {eq.name || `معادلة ${i + 1}`}
                         </span>
-                        <div className="px-4 py-1.5 rounded-xl bg-slate-900 border border-cyan-500/40 text-amber-300 font-mono font-bold text-sm sm:text-base">
+                        <div className="px-4 py-1.5 rounded-xl bg-[#E0F2FE] dark:bg-slate-900 border border-[#0EA5E9]/30 dark:border-cyan-500/40 text-[#0284C7] dark:text-amber-300 font-mono font-bold text-sm sm:text-base">
                           {eq.formula}
                         </div>
                       </div>
 
-                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 leading-relaxed">
                         {eq.description}
                       </p>
 
@@ -807,20 +807,20 @@ export const ExplainLessonPage: React.FC = () => {
                         <div className="overflow-x-auto no-scrollbar">
                           <table className="w-full text-right text-xs">
                             <thead>
-                              <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                              <tr className="border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-[#475569] dark:text-slate-400 font-bold">
                                 <th className="pb-2">الرمز</th>
                                 <th className="pb-2">المعنى الفيزيائي</th>
                                 <th className="pb-2">وحدة القياس (SI)</th>
                                 <th className="pb-2">القيمة في المصدر</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/60 font-mono">
+                            <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/60 font-mono">
                               {eq.symbols.map((sym, sIdx) => (
-                                <tr key={sIdx} className="text-slate-200">
-                                  <td className="py-2 text-cyan-400 font-bold">{sym.symbol}</td>
+                                <tr key={sIdx} className="text-[#0F172A] dark:text-slate-200">
+                                  <td className="py-2 text-[#0284C7] dark:text-cyan-400 font-bold">{sym.symbol}</td>
                                   <td className="py-2 font-sans">{sym.name}</td>
-                                  <td className="py-2 text-emerald-400">{sym.unit}</td>
-                                  <td className="py-2 text-amber-400">{sym.valueFromSource || '-'}</td>
+                                  <td className="py-2 text-emerald-700 dark:text-emerald-400">{sym.unit}</td>
+                                  <td className="py-2 text-amber-600 dark:text-amber-400">{sym.valueFromSource || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -836,7 +836,7 @@ export const ExplainLessonPage: React.FC = () => {
             {/* 8. شرح خطوات الحل بالتسلسل (Step-by-Step Solution) */}
             {lessonData.solutionSteps && lessonData.solutionSteps.length > 0 && (
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 text-[#0284C7] dark:text-cyan-400 font-bold text-sm border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-2">
                   <Zap className="w-4 h-4" />
                   <span>الخطوة 8: شرح خطوات الحل بالتسلسل</span>
                 </div>
@@ -844,16 +844,16 @@ export const ExplainLessonPage: React.FC = () => {
                   {lessonData.solutionSteps.map((step, idx) => (
                     <div
                       key={idx}
-                      className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3 text-xs"
+                      className="champagne-subcard p-3.5 rounded-xl flex items-start gap-3 text-xs"
                     >
-                      <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold flex items-center justify-center shrink-0">
+                      <span className="w-6 h-6 rounded-full bg-[#E0F2FE] dark:bg-cyan-500/20 text-[#0284C7] dark:text-cyan-300 font-mono font-bold flex items-center justify-center shrink-0">
                         {step.stepNumber || idx + 1}
                       </span>
                       <div className="space-y-1">
-                        <h4 className="font-bold text-white">{step.title}</h4>
-                        <p className="text-slate-300 leading-relaxed">{step.description}</p>
+                        <h4 className="font-bold text-[#0F172A] dark:text-white">{step.title}</h4>
+                        <p className="text-[#475569] dark:text-slate-300 leading-relaxed">{step.description}</p>
                         {step.calculation && (
-                          <div className="font-mono text-amber-400 font-bold bg-black/40 px-2.5 py-1 rounded-lg inline-block">
+                          <div className="font-mono text-[#0284C7] dark:text-amber-400 font-bold bg-[#E0F2FE] dark:bg-black/40 px-2.5 py-1 rounded-lg inline-block">
                             {step.calculation}
                           </div>
                         )}
@@ -865,22 +865,22 @@ export const ExplainLessonPage: React.FC = () => {
             )}
 
             {/* 9. تطبيق عملي على ما ورد في الدرس (Practical Application) */}
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-emerald-500/30 space-y-2">
-              <span className="text-xs font-bold text-emerald-400 block">
+            <div className="p-5 rounded-2xl bg-emerald-50/70 dark:bg-slate-900/90 border border-emerald-300 dark:border-emerald-500/30 space-y-2">
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block">
                 الخطوة 9: تطبيق عملي على ما ورد في الدرس
               </span>
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#0F172A] dark:text-slate-200 leading-relaxed">
                 {lessonData.practicalApplication}
               </p>
             </div>
 
             {/* 10. شرح الرسومات والمخططات الموجودة في المصدر (Diagrams Explanation) */}
             {lessonData.diagramsExplanation && (
-              <div className="p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 space-y-3">
-                <span className="text-xs font-bold text-cyan-400 block">
+              <div className="champagne-subcard p-5 rounded-2xl dark:border-cyan-500/30 space-y-3">
+                <span className="text-xs font-bold text-[#0284C7] dark:text-cyan-400 block">
                   الخطوة 10: شرح الرسومات والمخططات الموجودة في المصدر
                 </span>
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#0F172A] dark:text-slate-200 leading-relaxed">
                   {lessonData.diagramsExplanation}
                 </p>
 
@@ -889,10 +889,10 @@ export const ExplainLessonPage: React.FC = () => {
                   lessonData.sourceAnalysis.visualElements.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                       {lessonData.sourceAnalysis.visualElements.map((elem, idx) => (
-                        <div key={idx} className="p-3 rounded-xl bg-black/40 border border-slate-800 text-xs space-y-1">
-                          <span className="font-bold text-amber-400">{elem.element}</span>
-                          <p className="text-slate-300 text-[11px]">{elem.description}</p>
-                          <span className="text-[10px] text-cyan-400 block">مسار التوصيل: {elem.connection}</span>
+                        <div key={idx} className="p-3 rounded-xl bg-white dark:bg-black/40 border border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-xs space-y-1">
+                          <span className="font-bold text-[#0F172A] dark:text-amber-400">{elem.element}</span>
+                          <p className="text-[#475569] dark:text-slate-300 text-[11px]">{elem.description}</p>
+                          <span className="text-[10px] text-[#0284C7] dark:text-cyan-400 block">مسار التوصيل: {elem.connection}</span>
                         </div>
                       ))}
                     </div>
@@ -903,20 +903,20 @@ export const ExplainLessonPage: React.FC = () => {
             {/* Video Timeline Chapters (If Video Source) */}
             {lessonData.sourceAnalysis.timelineParts &&
               lessonData.sourceAnalysis.timelineParts.length > 0 && (
-                <div className="p-5 rounded-2xl bg-slate-900 border border-purple-500/40 space-y-3">
-                  <span className="text-xs font-bold text-purple-300 block flex items-center gap-2">
-                    <Video className="w-4 h-4 text-purple-400" />
+                <div className="p-5 rounded-2xl bg-purple-50/70 dark:bg-slate-900 border border-purple-300 dark:border-purple-500/40 space-y-3">
+                  <span className="text-xs font-bold text-purple-700 dark:text-purple-300 block flex items-center gap-2">
+                    <Video className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     <span>تقسيم وتوقيت أجزاء الفيديو التعليمي (Video Timeline Breakdown)</span>
                   </span>
                   <div className="space-y-2">
                     {lessonData.sourceAnalysis.timelineParts.map((part, pIdx) => (
-                      <div key={pIdx} className="p-3 rounded-xl bg-[#091527] border border-slate-800 text-xs flex items-start gap-3">
-                        <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px] font-bold shrink-0">
+                      <div key={pIdx} className="champagne-subcard p-3 rounded-xl text-xs flex items-start gap-3">
+                        <span className="px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-mono text-[10px] font-bold shrink-0">
                           {part.timeRange}
                         </span>
                         <div>
-                          <h4 className="font-bold text-white">{part.title}</h4>
-                          <p className="text-slate-300 text-[11px] leading-relaxed">{part.content}</p>
+                          <h4 className="font-bold text-[#0F172A] dark:text-white">{part.title}</h4>
+                          <p className="text-[#475569] dark:text-slate-300 text-[11px] leading-relaxed">{part.content}</p>
                         </div>
                       </div>
                     ))}
@@ -925,25 +925,25 @@ export const ExplainLessonPage: React.FC = () => {
               )}
 
             {/* 11. ربط المفهوم بتطبيقات الميكاترونكس (Mechatronics Connection) */}
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/60 to-slate-900 border border-blue-500/40 space-y-2">
-              <span className="text-xs font-bold text-blue-300 block flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-blue-400" />
+            <div className="p-5 rounded-2xl bg-[#E0F2FE]/60 dark:bg-gradient-to-r dark:from-blue-950/60 dark:to-slate-900 border border-[#0EA5E9]/30 dark:border-blue-500/40 space-y-2">
+              <span className="text-xs font-bold text-[#0284C7] dark:text-blue-300 block flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-[#0EA5E9] dark:text-blue-400" />
                 <span>الخطوة 11: ربط المفهوم بتطبيقات الميكاترونكس والروبوتات</span>
               </span>
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#0F172A] dark:text-slate-200 leading-relaxed">
                 {lessonData.mechatronicsConnection}
               </p>
             </div>
 
             {/* 12. تلخيص أهم النقاط (Summary) */}
-            <div className="p-5 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-2">
-              <span className="text-xs font-bold text-amber-400 block">
+            <div className="champagne-subcard p-5 rounded-2xl dark:border-amber-500/30 space-y-2">
+              <span className="text-xs font-bold text-[#0284C7] dark:text-amber-400 block">
                 الخطوة 12: تلخيص أهم النقاط
               </span>
-              <ul className="space-y-1.5 text-xs sm:text-sm text-slate-200">
+              <ul className="space-y-1.5 text-xs sm:text-sm text-[#334155] dark:text-slate-200">
                 {lessonData.summary.map((point, idx) => (
                   <li key={idx} className="flex items-start gap-2">
-                    <span className="text-amber-400 font-bold">•</span>
+                    <span className="text-[#0EA5E9] dark:text-amber-400 font-bold">•</span>
                     <span>{point}</span>
                   </li>
                 ))}
@@ -952,16 +952,16 @@ export const ExplainLessonPage: React.FC = () => {
 
             {/* 13. أسئلة قصيرة للتأكد من فهم الطالب (Interactive Quiz) */}
             {lessonData.quizQuestions && lessonData.quizQuestions.length > 0 && (
-              <div className="space-y-4 border-t border-slate-800 pt-6">
+              <div className="space-y-4 border-t border-[rgba(212,175,55,0.25)] dark:border-slate-800 pt-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-                    <Award className="w-4 h-4 text-amber-400" />
+                  <div className="flex items-center gap-2 text-[#0284C7] dark:text-cyan-400 font-bold text-sm">
+                    <Award className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
                     <span>الخطوة 13: أسئلة قصيرة للتأكد من فهمك للدرس</span>
                   </div>
                   {!revealedQuizResults && (
                     <button
                       onClick={() => setRevealedQuizResults(true)}
-                      className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400"
+                      className="px-3 py-1 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-amber-500 dark:text-slate-950 text-xs font-bold dark:hover:bg-amber-400"
                     >
                       تحقق من إجاباتي
                     </button>
@@ -972,9 +972,9 @@ export const ExplainLessonPage: React.FC = () => {
                   {lessonData.quizQuestions.map((q, qIdx) => (
                     <div
                       key={qIdx}
-                      className="p-4 rounded-2xl bg-[#091527] border border-slate-800 space-y-3"
+                      className="champagne-subcard p-4 rounded-2xl space-y-3"
                     >
-                      <h4 className="text-xs sm:text-sm font-bold text-white">
+                      <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-white">
                         {qIdx + 1}. {q.question}
                       </h4>
 
@@ -982,16 +982,16 @@ export const ExplainLessonPage: React.FC = () => {
                         {q.options.map((opt, oIdx) => {
                           const isSelected = selectedQuizAnswers[qIdx] === oIdx;
                           const isCorrect = q.correctIndex === oIdx;
-                          let btnStyle = 'bg-slate-900 border-slate-800 text-slate-300';
+                          let btnStyle = 'bg-white border-[rgba(212,175,55,0.3)] text-[#334155] dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300';
 
                           if (revealedQuizResults) {
                             if (isCorrect) {
-                              btnStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold';
+                              btnStyle = 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-500/20 dark:border-emerald-500 dark:text-emerald-300 font-bold';
                             } else if (isSelected && !isCorrect) {
-                              btnStyle = 'bg-rose-500/20 border-rose-500 text-rose-300';
+                              btnStyle = 'bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-500/20 dark:border-rose-500 dark:text-rose-300';
                             }
                           } else if (isSelected) {
-                            btnStyle = 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold';
+                            btnStyle = 'bg-[#E0F2FE] border-[#0EA5E9] text-[#0284C7] dark:bg-cyan-500/20 dark:border-cyan-400 dark:text-cyan-300 font-bold';
                           }
 
                           return (
@@ -1014,7 +1014,7 @@ export const ExplainLessonPage: React.FC = () => {
                       </div>
 
                       {revealedQuizResults && (
-                        <div className="p-2.5 rounded-xl bg-slate-900/80 text-[11px] text-cyan-300 border border-slate-800">
+                        <div className="p-2.5 rounded-xl bg-[#E0F2FE]/60 dark:bg-slate-900/80 text-[11px] text-[#0284C7] dark:text-cyan-300 border border-[#0EA5E9]/30 dark:border-slate-800">
                           💡 التفسير العلمي: {q.explanation}
                         </div>
                       )}
@@ -1025,29 +1025,29 @@ export const ExplainLessonPage: React.FC = () => {
             )}
 
             {/* 14. خيارات المتابعة السريعة (Quick Action Exploration) */}
-            <div className="border-t border-slate-800 pt-6 space-y-3">
-              <span className="text-xs font-bold text-slate-400 block text-right">
+            <div className="border-t border-[rgba(212,175,55,0.25)] dark:border-slate-800 pt-6 space-y-3">
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block text-right">
                 الخطوة 14: خيارات المتابعة والتنقل الذكي
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleAlternativeMode('simplify')}
                   disabled={isAlternativeLoading}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all hover:scale-105"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-[#E0F2FE] text-amber-700 border border-amber-400/50 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-amber-300 dark:border-amber-500/40 text-xs font-bold transition-all hover:scale-105"
                 >
                   ✨ «شرح أبسط»
                 </button>
                 <button
                   onClick={() => handleAlternativeMode('deepen')}
                   disabled={isAlternativeLoading}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all hover:scale-105"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-[#E0F2FE] text-[#0284C7] border border-[#0EA5E9]/40 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-cyan-300 dark:border-cyan-500/40 text-xs font-bold transition-all hover:scale-105"
                 >
                   🔬 «شرح أعمق»
                 </button>
                 <button
                   onClick={() => handleAlternativeMode('solved_example')}
                   disabled={isAlternativeLoading}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all hover:scale-105"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-400/40 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-emerald-300 dark:border-emerald-500/40 text-xs font-bold transition-all hover:scale-105"
                 >
                   📐 «مثال محلول»
                 </button>
@@ -1057,13 +1057,13 @@ export const ExplainLessonPage: React.FC = () => {
                     setRevealedQuizResults(false);
                     handleSendFollowup('اختبرني بـ 3 أسئلة هندسية جديدة حول هذا الدرس');
                   }}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-purple-300 border border-purple-500/40 text-xs font-bold transition-all hover:scale-105"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-400/40 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-purple-300 dark:border-purple-500/40 text-xs font-bold transition-all hover:scale-105"
                 >
                   🎯 «اختبرني»
                 </button>
                 <button
                   onClick={handleStartExplanation}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold transition-all"
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-[#F8FAFC] text-[#475569] border border-[rgba(212,175,55,0.35)] dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 dark:border-slate-700 text-xs font-bold transition-all"
                 >
                   🔄 «أعد الشرح من البداية»
                 </button>
@@ -1074,19 +1074,19 @@ export const ExplainLessonPage: React.FC = () => {
 
           {/* Alternative Result Card (If student clicked Simplify / Deepen / Solved Example) */}
           {alternativeResult && (
-            <div className="bg-[#0D1B2A] border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl animate-fadeIn">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base sm:text-lg font-black text-amber-400">
+            <div className="champagne-card border-2 border-[#0EA5E9]/40 dark:border-amber-500/40 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-3">
+                <h3 className="text-base sm:text-lg font-black text-[#0284C7] dark:text-amber-400">
                   {alternativeResult.title}
                 </h3>
                 <button
                   onClick={() => setAlternativeResult(null)}
-                  className="text-slate-400 hover:text-white text-xs font-bold"
+                  className="text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white text-xs font-bold"
                 >
                   إغلاق
                 </button>
               </div>
-              <div className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line font-medium">
+              <div className="text-xs sm:text-sm text-[#0F172A] dark:text-slate-200 leading-relaxed whitespace-pre-line font-medium">
                 {alternativeResult.content}
               </div>
             </div>
@@ -1095,15 +1095,15 @@ export const ExplainLessonPage: React.FC = () => {
           {/* =========================================================================
               ZONE 5: Interactive Grounded Q&A Assistant ("عدم فقدان المحتوى")
               ========================================================================= */}
-          <section className="bg-[#0D1B2A] border border-cyan-500/30 rounded-3xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <section className="champagne-card rounded-3xl p-6 space-y-4 shadow-2xl dark:border-cyan-500/30">
+            <div className="flex items-center justify-between border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Bot className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-extrabold text-white">
+                <Bot className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
+                <h3 className="text-sm font-extrabold text-[#0F172A] dark:text-white">
                   اسأل مدرس الدرس (محتوى الدرس محفوظ ومستمر طوال الجلسة)
                 </h3>
               </div>
-              <span className="text-[10px] text-cyan-400 font-mono">سياق الدرس نشط</span>
+              <span className="text-[10px] text-[#0284C7] dark:text-cyan-400 font-mono">سياق الدرس نشط</span>
             </div>
 
             {/* Quick Question Chips */}
@@ -1118,7 +1118,7 @@ export const ExplainLessonPage: React.FC = () => {
                   key={chip}
                   onClick={() => handleSendFollowup(chip)}
                   disabled={isFollowupLoading}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:border-cyan-400 whitespace-nowrap transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-white border border-[rgba(212,175,55,0.35)] text-[#475569] hover:text-[#0F172A] hover:border-[#0EA5E9] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white dark:hover:border-cyan-400 whitespace-nowrap transition-colors"
                 >
                   💬 {chip}
                 </button>
@@ -1127,7 +1127,7 @@ export const ExplainLessonPage: React.FC = () => {
 
             {/* Conversation Log */}
             {followupHistory.length > 0 && (
-              <div className="space-y-3 max-h-80 overflow-y-auto no-scrollbar p-3 rounded-2xl bg-[#091527] border border-slate-800">
+              <div className="space-y-3 max-h-80 overflow-y-auto no-scrollbar p-3 rounded-2xl bg-[#F8FAFC] dark:bg-[#091527] border border-[rgba(212,175,55,0.25)] dark:border-slate-800">
                 {followupHistory.map((msg) => (
                   <div
                     key={msg.id}
@@ -1136,12 +1136,12 @@ export const ExplainLessonPage: React.FC = () => {
                     <div
                       className={`max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                         msg.role === 'user'
-                          ? 'bg-amber-500 text-slate-950 font-bold rounded-br-none'
-                          : 'bg-slate-900 border border-slate-700 text-slate-100 rounded-bl-none'
+                          ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold rounded-br-none'
+                          : 'bg-white border border-[rgba(212,175,55,0.3)] text-[#0F172A] dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 rounded-bl-none'
                       }`}
                     >
                       {msg.isOutOfLessonContext && (
-                        <span className="text-[10px] font-bold text-amber-400 block mb-1">
+                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block mb-1">
                           ⚠️ تنبيه: السؤال يقع خارج سياق الدرس
                         </span>
                       )}
@@ -1153,7 +1153,7 @@ export const ExplainLessonPage: React.FC = () => {
                   </div>
                 ))}
                 {isFollowupLoading && (
-                  <div className="flex items-center gap-2 text-xs text-cyan-400 p-2 font-mono">
+                  <div className="flex items-center gap-2 text-xs text-[#0284C7] dark:text-cyan-400 p-2 font-mono">
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     <span>المدرس يفحص محتوى الدرس ويصيغ الإجابة...</span>
                   </div>
@@ -1172,12 +1172,12 @@ export const ExplainLessonPage: React.FC = () => {
                   if (e.key === 'Enter') handleSendFollowup();
                 }}
                 placeholder="اسأل أي استفسار أو اطلب توضيحاً لنقطة معينة في هذا الدرس..."
-                className="flex-1 px-4 py-3 rounded-2xl bg-[#091527] border border-slate-700 text-slate-100 placeholder:text-slate-500 text-xs sm:text-sm focus:border-cyan-400 outline-none"
+                className="flex-1 px-4 py-3 rounded-2xl bg-white dark:bg-[#091527] border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-slate-100 placeholder:text-[#94A3B8] dark:placeholder:text-slate-500 text-xs sm:text-sm focus:border-[#0EA5E9] dark:focus:border-cyan-400 outline-none"
               />
               <button
                 onClick={() => handleSendFollowup()}
                 disabled={isFollowupLoading || !currentQuestion.trim()}
-                className="p-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold disabled:opacity-50 hover:scale-105 transition-all shadow-md"
+                className="p-3 rounded-2xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 dark:text-slate-950 font-bold disabled:opacity-50 hover:scale-105 transition-all shadow-md"
               >
                 <Send className="w-4 h-4 rotate-180" />
               </button>

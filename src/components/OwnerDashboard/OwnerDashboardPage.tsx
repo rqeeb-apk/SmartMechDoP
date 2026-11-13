@@ -173,24 +173,24 @@ export const OwnerDashboardPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 text-[#0F172A] dark:text-slate-100">
       {/* Top Banner Header */}
-      <div className="bg-[#0D1B2A] border border-amber-500/30 rounded-3xl p-6 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+      <div className="champagne-card rounded-3xl p-6 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden dark:border-amber-500/30">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl p-1 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-lg shadow-amber-500/20 shrink-0">
+          <div className="w-16 h-16 rounded-2xl p-1 bg-gradient-to-tr from-amber-400 via-[#0EA5E9] to-amber-500 shadow-lg shadow-amber-500/20 shrink-0">
             <img src={OFFICIAL_LOGO_URL} alt="Logo" className="w-full h-full object-cover rounded-xl" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-6 h-6 text-amber-400" />
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white">
+            <div className="flex items-center gap-2 flex-wrap">
+              <ShieldAlert className="w-6 h-6 text-[#0EA5E9] dark:text-amber-400" />
+              <h1 className="text-xl sm:text-2xl font-extrabold text-[#0F172A] dark:text-white">
                 لوحة مالك منصة الدكتور الذكي (Owner Console)
               </h1>
-              <span className="bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md border border-amber-500/40">
+              <span className="bg-[#E0F2FE] dark:bg-amber-500/20 text-[#0284C7] dark:text-amber-300 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md border border-[#0EA5E9]/30 dark:border-amber-500/40">
                 VERIFIED SERVER BACKEND
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
               إدارة شاملة لـ 300 كود تفعيل، الاشتراكات السنوية (4000 ريال يمني/365 يوماً)، سجل الأمان ومحرك الذكاء الاصطناعي
             </p>
           </div>
@@ -198,8 +198,8 @@ export const OwnerDashboardPage: React.FC = () => {
 
         {/* Status Indicator & Exit Button */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-mono font-bold flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
             <span>خادم الجلسات: مصادق</span>
           </div>
           <button
@@ -207,7 +207,7 @@ export const OwnerDashboardPage: React.FC = () => {
               localStorage.removeItem('owner_token');
               window.location.reload();
             }}
-            className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition-colors"
+            className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 dark:border-rose-500/40 dark:text-rose-300 text-xs font-bold transition-colors"
           >
             تسجيل الخروج والعودة للمنصة
           </button>
@@ -215,7 +215,7 @@ export const OwnerDashboardPage: React.FC = () => {
       </div>
 
       {/* 12 Operational Tabs Strip */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-[#0D1B2A] p-2 rounded-2xl border border-slate-800 text-xs font-bold">
+      <div className="champagne-card flex items-center gap-1.5 overflow-x-auto no-scrollbar p-2 rounded-2xl text-xs font-bold">
         {navTabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.id;
@@ -225,11 +225,11 @@ export const OwnerDashboardPage: React.FC = () => {
               onClick={() => setActiveTab(t.id as any)}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl whitespace-nowrap shrink-0 transition-all ${
                 isActive
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md shadow-amber-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 dark:text-slate-950 font-bold shadow-md'
+                  : 'text-[#475569] hover:text-[#0F172A] hover:bg-[#E0F2FE]/50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-white dark:text-slate-950' : 'text-[#475569] dark:text-slate-400'}`} />
               <span>{t.label}</span>
             </button>
           );
@@ -240,76 +240,76 @@ export const OwnerDashboardPage: React.FC = () => {
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#0D1B2A] border border-amber-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-slate-400 block">إجمالي أكواد التفعيل المصدرة</span>
-              <div className="text-3xl font-extrabold font-mono text-amber-400">{stats.totalCount} كود</div>
-              <p className="text-[11px] text-slate-400">من DR-248G3C7X إلى DR-ZX2N4K8L</p>
+            <div className="champagne-card dark:border-amber-500/30 p-5 rounded-2xl space-y-2">
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">إجمالي أكواد التفعيل المصدرة</span>
+              <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400">{stats.totalCount} كود</div>
+              <p className="text-[11px] text-[#475569] dark:text-slate-400">من DR-248G3C7X إلى DR-ZX2N4K8L</p>
             </div>
 
-            <div className="bg-[#0D1B2A] border border-cyan-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-slate-400 block">الأكواد غير المستخدمة</span>
-              <div className="text-3xl font-extrabold font-mono text-cyan-400">{stats.unusedCount} كود</div>
-              <p className="text-[11px] text-cyan-300/80">جاهزة للتوزيع والتفعيل</p>
+            <div className="champagne-card dark:border-cyan-500/30 p-5 rounded-2xl space-y-2">
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الأكواد غير المستخدمة</span>
+              <div className="text-3xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">{stats.unusedCount} كود</div>
+              <p className="text-[11px] text-[#0284C7] dark:text-cyan-300/80">جاهزة للتوزيع والتفعيل</p>
             </div>
 
-            <div className="bg-[#0D1B2A] border border-emerald-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-slate-400 block">الاشتراكات المفعلة والمحصلة</span>
-              <div className="text-3xl font-extrabold font-mono text-emerald-400">{stats.activeCount} طالب</div>
-              <p className="text-[11px] text-emerald-300">سارية لمدة 365 يومًا</p>
+            <div className="champagne-card dark:border-emerald-500/30 p-5 rounded-2xl space-y-2">
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الاشتراكات المفعلة والمحصلة</span>
+              <div className="text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">{stats.activeCount} طالب</div>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300">سارية لمدة 365 يومًا</p>
             </div>
 
-            <div className="bg-[#0D1B2A] border border-purple-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-slate-400 block">الإيرادات الفعلية (بالريال اليمني)</span>
-              <div className="text-3xl font-extrabold font-mono text-purple-300">
+            <div className="champagne-card dark:border-purple-500/30 p-5 rounded-2xl space-y-2">
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الإيرادات الفعلية (بالريال اليمني)</span>
+              <div className="text-3xl font-extrabold font-mono text-purple-700 dark:text-purple-300">
                 {stats.totalRevenueYER.toLocaleString()} YER
               </div>
-              <p className="text-[11px] text-slate-400">سعر الاشتراك السنوي: 4000 ريال yemen</p>
+              <p className="text-[11px] text-[#475569] dark:text-slate-400">سعر الاشتراك السنوي: 4000 ريال yemen</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-400" />
+            <div className="champagne-card p-6 rounded-2xl space-y-4">
+              <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <Zap className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
                 <span>حالة محرك الذكاء الاصطناعي (Gemini 429 Prevention)</span>
               </h3>
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs font-mono">
+              <div className="champagne-subcard p-4 rounded-xl space-y-2 text-xs font-mono">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">النموذج الرئيسي:</span>
-                  <span className="text-amber-400 font-bold">{aiModel}</span>
+                  <span className="text-[#475569] dark:text-slate-400">النموذج الرئيسي:</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">{aiModel}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">النموذج الاحتياطي عند الضغط:</span>
-                  <span className="text-cyan-400 font-bold">{aiFallback}</span>
+                  <span className="text-[#475569] dark:text-slate-400">النموذج الاحتياطي عند الضغط:</span>
+                  <span className="text-[#0284C7] dark:text-cyan-400 font-bold">{aiFallback}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">حد التوكن المقتطع:</span>
-                  <span className="text-emerald-400 font-bold">1500 Tokens / Request</span>
+                  <span className="text-[#475569] dark:text-slate-400">حد التوكن المقتطع:</span>
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">1500 Tokens / Request</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">آلية تلافي الأخطاء:</span>
-                  <span className="text-purple-300 font-bold">Exponential Backoff + Jitter</span>
+                  <span className="text-[#475569] dark:text-slate-400">آلية تلافي الأخطاء:</span>
+                  <span className="text-purple-700 dark:text-purple-300 font-bold">Exponential Backoff + Jitter</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-amber-400" />
+            <div className="champagne-card p-6 rounded-2xl space-y-4">
+              <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
                 <span>حالة نظام الحماية وحظر الهجمات</span>
               </h3>
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs font-mono">
+              <div className="champagne-subcard p-4 rounded-xl space-y-2 text-xs font-mono">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">أقصى محاولات خاطئة:</span>
-                  <span className="text-rose-400 font-bold">5 محاولات</span>
+                  <span className="text-[#475569] dark:text-slate-400">أقصى محاولات خاطئة:</span>
+                  <span className="text-rose-600 dark:text-rose-400 font-bold">5 محاولات</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">مدة حظر الإيبيهات:</span>
-                  <span className="text-rose-400 font-bold">15 دقيقة (900 ثانية)</span>
+                  <span className="text-[#475569] dark:text-slate-400">مدة حظر الإيبيهات:</span>
+                  <span className="text-rose-600 dark:text-rose-400 font-bold">15 دقيقة (900 ثانية)</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">طريقة تفعيل لوحة المالك:</span>
-                  <span className="text-amber-300 font-bold">20 نقرة متتالية على الشعار</span>
+                  <span className="text-[#475569] dark:text-slate-400">طريقة تفعيل لوحة المالك:</span>
+                  <span className="text-amber-600 dark:text-amber-300 font-bold">20 نقرة متتالية على الشعار</span>
                 </div>
               </div>
             </div>
@@ -319,14 +319,14 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 2: STUDENT MANAGEMENT */}
       {activeTab === 'students' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h3 className="text-base font-bold text-white">إدارة الطلاب المسجلين والاشتراكات السنوية</h3>
-          <p className="text-xs text-slate-400">عرض حالة الطلاب، الأكواد المفعلة، تواريخ الانتهاء، وإمكانية تجميد أو تمديد الحسابات</p>
+        <div className="champagne-card p-6 rounded-2xl space-y-4">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">إدارة الطلاب المسجلين والاشتراكات السنوية</h3>
+          <p className="text-xs text-[#475569] dark:text-slate-400">عرض حالة الطلاب، الأكواد المفعلة، تواريخ الانتهاء، وإمكانية تجميد أو تمديد الحسابات</p>
 
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
+                <tr className="border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-[#475569] dark:text-slate-400">
                   <th className="pb-3 px-3">اسم الطالب</th>
                   <th className="pb-3 px-3">البريد الإلكتروني</th>
                   <th className="pb-3 px-3">كود الاشتراك المستعمل</th>
@@ -335,10 +335,10 @@ export const OwnerDashboardPage: React.FC = () => {
                   <th className="pb-3 px-3">إجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
+              <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/60 font-mono">
                 {codes.filter((c) => c.status === 'active').length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 font-sans">
+                    <td colSpan={6} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
                       لا يوجد طلاب مفعلين حالياً. قم بتسليم الأكواد غير المستخدمة للطلاب لتفعيل اشتراكاتهم.
                     </td>
                   </tr>
@@ -346,22 +346,22 @@ export const OwnerDashboardPage: React.FC = () => {
                   codes
                     .filter((c) => c.status === 'active')
                     .map((c) => (
-                      <tr key={c.code} className="hover:bg-slate-900/50">
-                        <td className="py-3 px-3 font-sans font-bold text-white">{c.redeemedBy?.studentName || 'طالب ميكاترونكس'}</td>
-                        <td className="py-3 px-3 text-cyan-300">{c.redeemedBy?.studentEmail || 'student@dr-smart.edu'}</td>
-                        <td className="py-3 px-3 font-bold text-amber-400">{c.code}</td>
+                      <tr key={c.code} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-900/50">
+                        <td className="py-3 px-3 font-sans font-bold text-[#0F172A] dark:text-white">{c.redeemedBy?.studentName || 'طالب ميكاترونكس'}</td>
+                        <td className="py-3 px-3 text-[#0284C7] dark:text-cyan-300">{c.redeemedBy?.studentEmail || 'student@dr-smart.edu'}</td>
+                        <td className="py-3 px-3 font-bold text-amber-600 dark:text-amber-400">{c.code}</td>
                         <td className="py-3 px-3">
-                          <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                          <span className="px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
                             نشط (365 يوم)
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-slate-400">
+                        <td className="py-3 px-3 text-[#475569] dark:text-slate-400">
                           {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString('ar-EG') : '365 يوم'}
                         </td>
                         <td className="py-3 px-3">
                           <button
                             onClick={() => handleResetCode(c.code)}
-                            className="px-2 py-1 rounded bg-slate-800 text-amber-300 hover:bg-slate-700 text-[10px]"
+                            className="px-2 py-1 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 text-[10px] transition-colors"
                           >
                             إلغاء التفعيل
                           </button>
@@ -377,36 +377,36 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 3: SUBSCRIPTION & PRICING */}
       {activeTab === 'pricing' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-6">
-          <h3 className="text-base font-bold text-white">إعدادات أسعار خطة الاشتراك السنوي الشاملة</h3>
+        <div className="champagne-card p-6 rounded-2xl space-y-6">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">إعدادات أسعار خطة الاشتراك السنوي الشاملة</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">سعر الاشتراك السنوي:</label>
+            <div className="champagne-subcard p-4 rounded-xl space-y-2">
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 block">سعر الاشتراك السنوي:</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   value={yearlyPrice}
                   onChange={(e) => setYearlyPrice(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 font-mono text-amber-400 font-bold text-sm"
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 font-mono text-amber-600 dark:text-amber-400 font-bold text-sm focus:border-[#0EA5E9] focus:outline-none"
                 />
-                <span className="text-xs font-bold text-slate-300">YER</span>
+                <span className="text-xs font-bold text-[#475569] dark:text-slate-300">YER</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">العملة الرسمية بالمنصة:</label>
+            <div className="champagne-subcard p-4 rounded-xl space-y-2">
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 block">العملة الرسمية بالمنصة:</label>
               <input
                 type="text"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 font-mono text-cyan-300 font-bold text-xs"
+                className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 font-mono text-[#0284C7] dark:text-cyan-300 font-bold text-xs focus:border-[#0EA5E9] focus:outline-none"
               />
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-              <label className="text-xs font-bold text-slate-300 block">مدة صلاحية الكود عند التفعيل:</label>
-              <div className="px-3 py-2 rounded-lg bg-slate-800 font-mono text-emerald-400 font-bold text-xs">
+            <div className="champagne-subcard p-4 rounded-xl space-y-2">
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 block">مدة صلاحية الكود عند التفعيل:</label>
+              <div className="px-3 py-2 rounded-lg bg-emerald-50 dark:bg-slate-800 border border-emerald-200 dark:border-transparent font-mono text-emerald-700 dark:text-emerald-400 font-bold text-xs">
                 365 يومًا (سنة كاملة)
               </div>
             </div>
@@ -416,14 +416,14 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 4: 300 ACTIVATION CODES MANAGER */}
       {activeTab === 'codes' && (
-        <div className="bg-[#0D1B2A] border border-amber-500/30 p-6 rounded-2xl space-y-6 shadow-xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-amber-500/20 pb-4">
+        <div className="champagne-card dark:border-amber-500/30 p-6 rounded-2xl space-y-6 shadow-xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.25)] dark:border-amber-500/20 pb-4">
             <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Key className="w-5 h-5 text-amber-400" />
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <Key className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
                 <span>إدارة وحفظ 300 كود تفعيل للأنظمة السنوية</span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
                 قيمة الكود: 4000 ريال يمني | صلاحية: 365 يوماً | الكود الأول: DR-248G3C7X - الكود الأخير: DR-ZX2N4K8L
               </p>
             </div>
@@ -431,7 +431,7 @@ export const OwnerDashboardPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleBatchCopyUnused}
-                className="px-3 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 text-xs font-bold flex items-center gap-2"
+                className="px-3 py-2 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-cyan-500/20 dark:border dark:border-cyan-500/40 dark:text-cyan-300 dark:hover:bg-cyan-500/30 text-xs font-bold flex items-center gap-2 transition-colors"
               >
                 <Copy className="w-4 h-4" />
                 <span>{batchCopied ? 'تم نسخ الأكواد!' : 'نسخ الأكواد غير المستخدمة'}</span>
@@ -439,7 +439,7 @@ export const OwnerDashboardPage: React.FC = () => {
 
               <button
                 onClick={handleExportCSV}
-                className="px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 text-xs font-bold flex items-center gap-2"
+                className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100 dark:bg-amber-500/20 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/30 text-xs font-bold flex items-center gap-2 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 <span>تصدير CSV</span>
@@ -447,7 +447,7 @@ export const OwnerDashboardPage: React.FC = () => {
 
               <button
                 onClick={() => window.print()}
-                className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-xs font-bold flex items-center gap-2"
+                className="px-3 py-2 rounded-xl bg-white border border-[rgba(212,175,55,0.35)] text-[#475569] hover:text-[#0F172A] dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 text-xs font-bold flex items-center gap-2 transition-colors"
               >
                 <Printer className="w-4 h-4" />
                 <span>طباعة</span>
@@ -458,17 +458,17 @@ export const OwnerDashboardPage: React.FC = () => {
           {/* Controls & Filter Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+              <Search className="w-4 h-4 text-[#64748B] dark:text-slate-400 absolute right-3 top-3" />
               <input
                 type="text"
                 placeholder="بحث في الأكواد..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-9 pl-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                className="w-full pr-9 pl-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-xs text-[#0F172A] dark:text-white placeholder:text-[#94A3B8] dark:placeholder-slate-500 focus:outline-none focus:border-[#0EA5E9] dark:focus:border-amber-400 font-mono"
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold overflow-x-auto no-scrollbar w-full sm:w-auto">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-xs font-bold overflow-x-auto no-scrollbar w-full sm:w-auto">
               {[
                 { id: 'all', label: `الكل (${stats.totalCount})` },
                 { id: 'unused', label: `غير مستخدم (${stats.unusedCount})` },
@@ -478,8 +478,8 @@ export const OwnerDashboardPage: React.FC = () => {
                 <button
                   key={f.id}
                   onClick={() => setCodeFilter(f.id as any)}
-                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap ${
-                    codeFilter === f.id ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                    codeFilter === f.id ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold' : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
                   }`}
                 >
                   {f.label}
@@ -489,10 +489,10 @@ export const OwnerDashboardPage: React.FC = () => {
           </div>
 
           {/* Activation Codes Grid / Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60">
+          <div className="overflow-x-auto rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 bg-white dark:bg-slate-900/60">
             <table className="w-full text-right text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 bg-slate-900">
+                <tr className="border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-[#475569] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-900">
                   <th className="py-3 px-4">#</th>
                   <th className="py-3 px-4">كود التفعيل (Code)</th>
                   <th className="py-3 px-4">الحالة</th>
@@ -503,50 +503,50 @@ export const OwnerDashboardPage: React.FC = () => {
                   <th className="py-3 px-4 text-center">إجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80 font-mono">
+              <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/80 font-mono">
                 {codes.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500 font-sans">
+                    <td colSpan={8} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
                       لا توجد أكواد مطابقة لمعايير البحث الحالية.
                     </td>
                   </tr>
                 ) : (
                   codes.slice(0, 100).map((c, i) => (
-                    <tr key={c.code} className="hover:bg-slate-800/50">
-                      <td className="py-2.5 px-4 text-slate-500 text-[11px]">{i + 1}</td>
-                      <td className="py-2.5 px-4 font-bold text-amber-300 font-mono tracking-wider">{c.code}</td>
+                    <tr key={c.code} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50">
+                      <td className="py-2.5 px-4 text-[#64748B] dark:text-slate-500 text-[11px]">{i + 1}</td>
+                      <td className="py-2.5 px-4 font-bold text-amber-600 dark:text-amber-300 font-mono tracking-wider">{c.code}</td>
                       <td className="py-2.5 px-4 font-sans">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             c.status === 'unused'
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                              ? 'bg-[#E0F2FE] text-[#0284C7] border border-[#0EA5E9]/30 dark:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-500/30'
                               : c.status === 'active'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
+                              : 'bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30'
                           }`}
                         >
                           {c.status === 'unused' ? 'غير مستخدم' : c.status === 'active' ? 'مفعل نشط' : 'ملغى'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-4 text-slate-300">{c.priceYER} YER</td>
-                      <td className="py-2.5 px-4 text-slate-300">{c.durationDays} يوم</td>
-                      <td className="py-2.5 px-4 text-slate-400 font-sans">{c.redeemedBy?.studentName || '-'}</td>
-                      <td className="py-2.5 px-4 text-slate-400 text-[11px]">
+                      <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300">{c.priceYER} YER</td>
+                      <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300">{c.durationDays} يوم</td>
+                      <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 font-sans">{c.redeemedBy?.studentName || '-'}</td>
+                      <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 text-[11px]">
                         {c.redeemedAt ? new Date(c.redeemedAt).toLocaleDateString('ar-EG') : '-'}
                       </td>
                       <td className="py-2.5 px-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleCopyCode(c.code)}
-                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 transition-colors"
+                            className="p-1 rounded bg-[#F8FAFC] hover:bg-[#E0F2FE] text-[#475569] hover:text-[#0284C7] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-amber-400 transition-colors"
                             title="نسخ الكود"
                           >
-                            {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
                           {c.status === 'active' && (
                             <button
                               onClick={() => handleResetCode(c.code)}
-                              className="px-2 py-0.5 rounded bg-slate-800 text-amber-400 hover:bg-slate-700 text-[10px] font-sans"
+                              className="px-2 py-0.5 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-400 dark:hover:bg-slate-700 text-[10px] font-sans transition-colors"
                             >
                               إعادة ضبط
                             </button>
@@ -554,7 +554,7 @@ export const OwnerDashboardPage: React.FC = () => {
                           {c.status !== 'revoked' && (
                             <button
                               onClick={() => handleRevokeCode(c.code)}
-                              className="p-1 rounded bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                              className="p-1 rounded bg-[#F8FAFC] hover:bg-rose-50 text-[#64748B] hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950 dark:text-slate-400 dark:hover:text-rose-400 transition-colors"
                               title="إلغاء الكود"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -573,22 +573,22 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 5: DOCTORS AVATARS */}
       {activeTab === 'doctors' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h3 className="text-base font-bold text-white">إدارة وإعدادات الدكاترة الافتراضيين</h3>
+        <div className="champagne-card p-6 rounded-2xl space-y-4">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">إدارة وإعدادات الدكاترة الافتراضيين</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {doctors.map((d) => (
-              <div key={d.id} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+              <div key={d.id} className="p-4 rounded-xl champagne-subcard space-y-3">
                 <div className="flex items-center gap-3">
-                  <img src={d.avatarUrl || OFFICIAL_LOGO_URL} alt={d.name} className="w-12 h-12 rounded-xl object-cover" />
+                  <img src={d.avatarUrl || OFFICIAL_LOGO_URL} alt={d.name} className="w-12 h-12 rounded-xl object-cover border border-[rgba(212,175,55,0.3)] dark:border-slate-700" />
                   <div>
-                    <h4 className="font-bold text-white text-xs">{d.name}</h4>
-                    <span className="text-[10px] text-cyan-400 block">{d.subject}</span>
+                    <h4 className="font-bold text-[#0F172A] dark:text-white text-xs">{d.name}</h4>
+                    <span className="text-[10px] text-[#0EA5E9] dark:text-cyan-400 font-bold block">{d.subject}</span>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">{d.description}</p>
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 font-mono">السرعة: {d.voiceSpeed}x</span>
-                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">
+                <p className="text-[11px] text-[#475569] dark:text-slate-400 leading-relaxed">{d.description}</p>
+                <div className="pt-2 border-t border-[rgba(212,175,55,0.25)] dark:border-slate-800 flex items-center justify-between text-[11px]">
+                  <span className="text-[#475569] dark:text-slate-400 font-mono">السرعة: {d.voiceSpeed}x</span>
+                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 font-bold text-[10px]">
                     {d.isDefault ? 'الرئيسي' : d.style}
                   </span>
                 </div>
@@ -600,30 +600,30 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 6: CONTENT & BOOKS */}
       {activeTab === 'content' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h3 className="text-base font-bold text-white">إدارة المحتوى والمكتبة الهندسية</h3>
+        <div className="champagne-card p-6 rounded-2xl space-y-4">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">إدارة المحتوى والمكتبة الهندسية</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-              <h4 className="text-xs font-bold text-cyan-400">كتب المكتبة الهندسية المعتمدة ({books.length}):</h4>
+            <div className="p-4 rounded-xl champagne-subcard space-y-2">
+              <h4 className="text-xs font-bold text-[#0EA5E9] dark:text-cyan-400">كتب المكتبة الهندسية المعتمدة ({books.length}):</h4>
               {books.map((b) => (
-                <div key={b.id} className="p-2.5 rounded-lg bg-slate-800/60 flex items-center justify-between text-xs">
+                <div key={b.id} className="p-2.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-white block">{b.title}</span>
-                    <span className="text-[10px] text-slate-400">{b.category} • {b.pages} صفحة</span>
+                    <span className="font-bold text-[#0F172A] dark:text-white block">{b.title}</span>
+                    <span className="text-[10px] text-[#475569] dark:text-slate-400">{b.category} • {b.pages} صفحة</span>
                   </div>
-                  <span className="text-amber-400 font-mono text-[11px]">★ {b.rating}</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-mono font-bold text-[11px]">★ {b.rating}</span>
                 </div>
               ))}
             </div>
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-              <h4 className="text-xs font-bold text-cyan-400">المشاريع والمحاضرات المحفوظة ({projects.length}):</h4>
+            <div className="p-4 rounded-xl champagne-subcard space-y-2">
+              <h4 className="text-xs font-bold text-[#0EA5E9] dark:text-cyan-400">المشاريع والمحاضرات المحفوظة ({projects.length}):</h4>
               {projects.map((p) => (
-                <div key={p.id} className="p-2.5 rounded-lg bg-slate-800/60 flex items-center justify-between text-xs">
+                <div key={p.id} className="p-2.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-white block">{p.title}</span>
-                    <span className="text-[10px] text-slate-400">بواسطة: {p.authorName}</span>
+                    <span className="font-bold text-[#0F172A] dark:text-white block">{p.title}</span>
+                    <span className="text-[10px] text-[#475569] dark:text-slate-400">بواسطة: {p.authorName}</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px]">
+                  <span className="px-2 py-0.5 rounded bg-[#E0F2FE] text-[#0284C7] dark:bg-cyan-500/20 dark:text-cyan-300 font-bold text-[10px]">
                     {p.status}
                   </span>
                 </div>
@@ -635,17 +635,17 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 7: 3D LABS CONTROL */}
       {activeTab === 'labs3d' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h3 className="text-base font-bold text-white">التحكم بالمختبر ثلاثي الأبعاد 3D Simulaton</h3>
+        <div className="champagne-card p-6 rounded-2xl space-y-4">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">التحكم بالمختبر ثلاثي الأبعاد 3D Simulaton</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { title: 'مختبر الدوائر الكهربائية DC/AC', status: 'مفعل 100%' },
               { title: 'مختبر المحاكات Arduino & Sensors', status: 'مفعل 100%' },
               { title: 'مختبر حركة الذراع الروبوتية 3D', status: 'مفعل 100%' },
             ].map((lab, idx) => (
-              <div key={idx} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <h4 className="font-bold text-white text-xs">{lab.title}</h4>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+              <div key={idx} className="p-4 rounded-xl champagne-subcard space-y-2">
+                <h4 className="font-bold text-[#0F172A] dark:text-white text-xs">{lab.title}</h4>
+                <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 text-[10px] font-bold">
                   {lab.status}
                 </span>
               </div>
@@ -656,18 +656,18 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 8: AI QUOTA & ERROR 429 MANAGER */}
       {activeTab === 'ai_quota' && (
-        <div className="bg-[#0D1B2A] border border-amber-500/30 p-6 rounded-2xl space-y-4">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-400" />
+        <div className="champagne-card dark:border-amber-500/30 p-6 rounded-2xl space-y-4">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+            <Zap className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             <span>إدارة استهلاك محرك الذكاء الاصطناعي وحلول خطأ 429</span>
           </h3>
 
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 font-mono text-xs">
-            <div className="flex items-center justify-between text-cyan-400 border-b border-slate-800 pb-2">
+          <div className="p-4 rounded-xl champagne-subcard space-y-3 font-mono text-xs">
+            <div className="flex items-center justify-between text-[#0EA5E9] dark:text-cyan-400 border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-2 font-bold">
               <span>اسم النموذج المستعمل: gemini-3.8-flash</span>
-              <span className="text-emerald-400">الحالة: نشط ومحمي عبر الخادم</span>
+              <span className="text-emerald-600 dark:text-emerald-400">الحالة: نشط ومحمي عبر الخادم</span>
             </div>
-            <div className="space-y-1.5 text-slate-300">
+            <div className="space-y-1.5 text-[#334155] dark:text-slate-300">
               <div>• نظام التراجع الأسّي (Exponential Backoff + Jitter): مفعّل تلقائياً عند تلقي 429</div>
               <div>• قفل الطلبات المتزامنة (Request Lock Middleware): يمنع تكرار النقرات على زر الشرح</div>
               <div>• اقتطاع النصوص الطويلة (Token Budget Limit): بحد أقصى 1500 توكن لكل طلب لشرح المحاضرة</div>
@@ -678,16 +678,16 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 9: AVATAR & WHITEBOARD */}
       {activeTab === 'avatar' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
-          <h3 className="text-base font-bold text-white">إعدادات الشخصية الافتراضية والسبورة التفاعلية</h3>
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 text-xs">
+        <div className="champagne-card p-6 rounded-2xl space-y-4">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">إعدادات الشخصية الافتراضية والسبورة التفاعلية</h3>
+          <div className="p-4 rounded-xl champagne-subcard space-y-3 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-slate-300">حساسية مزامنة الشفاه مع الصوت (Lip Sync):</span>
-              <span className="font-mono text-amber-400 font-bold">عالية (100%)</span>
+              <span className="text-[#334155] dark:text-slate-300 font-medium">حساسية مزامنة الشفاه مع الصوت (Lip Sync):</span>
+              <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">عالية (100%)</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-300">سرعة كتابة المعادلات على السبورة:</span>
-              <span className="font-mono text-cyan-400 font-bold">1.2x</span>
+              <span className="text-[#334155] dark:text-slate-300 font-medium">سرعة كتابة المعادلات على السبورة:</span>
+              <span className="font-mono text-[#0EA5E9] dark:text-cyan-400 font-bold">1.2x</span>
             </div>
           </div>
         </div>
@@ -695,25 +695,25 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 10: SECURITY AUDIT & SYSTEM LOGS */}
       {activeTab === 'logs' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-4">
+        <div className="champagne-card p-6 rounded-2xl space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-amber-400" />
+            <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+              <Activity className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <span>سجل الأمان وتدقيق العمليات الحية (Audit Logs)</span>
             </h3>
             <button
               onClick={fetchLogs}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               <span>تحديث السجل</span>
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
+          <div className="overflow-x-auto rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 bg-white dark:bg-slate-900">
             <table className="w-full text-right text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400">
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-[#475569] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-900">
                   <th className="py-3 px-4">التاريخ والوقت</th>
                   <th className="py-3 px-4">نوع الحدث</th>
                   <th className="py-3 px-4">الفئة</th>
@@ -721,33 +721,33 @@ export const OwnerDashboardPage: React.FC = () => {
                   <th className="py-3 px-4">تفاصيل العملية</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80 font-mono">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80 font-mono">
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-500">لا توجد سجلات أمان حالياً</td>
+                    <td colSpan={5} className="py-6 text-center text-[#64748B] dark:text-slate-500">لا توجد سجلات أمان حالياً</td>
                   </tr>
                 ) : (
                   logs.map((l) => (
-                    <tr key={l.id} className="hover:bg-slate-800/50">
-                      <td className="py-2.5 px-4 text-slate-400 text-[11px]">
+                    <tr key={l.id} className="hover:bg-[#FDFBF7] dark:hover:bg-slate-800/50">
+                      <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 text-[11px]">
                         {new Date(l.timestamp).toLocaleTimeString('ar-EG')}
                       </td>
-                      <td className="py-2.5 px-4 font-bold text-white font-sans">{l.event}</td>
+                      <td className="py-2.5 px-4 font-bold text-[#0F172A] dark:text-white font-sans">{l.event}</td>
                       <td className="py-2.5 px-4">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             l.severity === 'danger'
-                              ? 'bg-rose-500/20 text-rose-300'
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
                               : l.severity === 'warning'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-cyan-500/20 text-cyan-300'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                              : 'bg-[#E0F2FE] text-[#0284C7] dark:bg-cyan-500/20 dark:text-cyan-300'
                           }`}
                         >
                           {l.category}
                         </span>
                       </td>
-                      <td className="py-2.5 px-4 text-cyan-300">{l.ip}</td>
-                      <td className="py-2.5 px-4 text-slate-300 font-sans text-[11px]">{l.details}</td>
+                      <td className="py-2.5 px-4 text-[#0284C7] dark:text-cyan-300">{l.ip}</td>
+                      <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300 font-sans text-[11px]">{l.details}</td>
                     </tr>
                   ))
                 )}
@@ -759,19 +759,21 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 11: SYSTEM SETTINGS */}
       {activeTab === 'system' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-6">
-          <h3 className="text-base font-bold text-white">إعدادات النظام وتخصيص الهوية</h3>
+        <div className="champagne-card p-6 rounded-2xl space-y-6">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white">إعدادات النظام وتخصيص الهوية</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <div className="p-4 rounded-xl champagne-subcard flex items-center justify-between">
               <div>
-                <span className="font-bold text-white text-xs block">وضع الصيانة العامة (Maintenance Mode)</span>
-                <span className="text-[11px] text-slate-400">إيقاف استقبال تفعيل الأكواد مؤقتاً</span>
+                <span className="font-bold text-[#0F172A] dark:text-white text-xs block">وضع الصيانة العامة (Maintenance Mode)</span>
+                <span className="text-[11px] text-[#475569] dark:text-slate-400">إيقاف استقبال تفعيل الأكواد مؤقتاً</span>
               </div>
               <button
                 onClick={() => setMaintenanceMode(!maintenanceMode)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
-                  maintenanceMode ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  maintenanceMode
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-slate-100 text-[#475569] border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
                 }`}
               >
                 {maintenanceMode ? 'مفعل' : 'معطل'}
@@ -783,35 +785,35 @@ export const OwnerDashboardPage: React.FC = () => {
 
       {/* SECTION 12: FINANCIAL ANALYTICS */}
       {activeTab === 'finance' && (
-        <div className="bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl space-y-6">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-amber-400" />
+        <div className="champagne-card p-6 rounded-2xl space-y-6">
+          <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             <span>التقارير المالية وإجمالي أرباح اشتراكات 300 كود</span>
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-              <span className="text-xs text-slate-400 font-bold block">إجمالي القيمة الكلية لـ 300 كود:</span>
-              <div className="text-2xl font-extrabold font-mono text-amber-400">
+            <div className="p-5 rounded-2xl champagne-subcard space-y-2">
+              <span className="text-xs text-[#475569] dark:text-slate-400 font-bold block">إجمالي القيمة الكلية لـ 300 كود:</span>
+              <div className="text-2xl font-extrabold font-mono text-amber-600 dark:text-amber-400">
                 {(300 * 4000).toLocaleString()} YER
               </div>
-              <p className="text-[10px] text-slate-400">300 كود × 4000 ريال يمني</p>
+              <p className="text-[10px] text-[#475569] dark:text-slate-400">300 كود × 4000 ريال يمني</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-              <span className="text-xs text-slate-400 font-bold block">الإيرادات المحصلة فعلياً:</span>
-              <div className="text-2xl font-extrabold font-mono text-emerald-400">
+            <div className="p-5 rounded-2xl champagne-subcard space-y-2">
+              <span className="text-xs text-[#475569] dark:text-slate-400 font-bold block">الإيرادات المحصلة فعلياً:</span>
+              <div className="text-2xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
                 {stats.totalRevenueYER.toLocaleString()} YER
               </div>
-              <p className="text-[10px] text-emerald-300">من الطلاب الذين قاموا بتفعيل الأكواد</p>
+              <p className="text-[10px] text-emerald-700 dark:text-emerald-300">من الطلاب الذين قاموا بتفعيل الأكواد</p>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-              <span className="text-xs text-slate-400 font-bold block">القيمة المتبقية من الأكواد غير المستخدمة:</span>
-              <div className="text-2xl font-extrabold font-mono text-cyan-300">
+            <div className="p-5 rounded-2xl champagne-subcard space-y-2">
+              <span className="text-xs text-[#475569] dark:text-slate-400 font-bold block">القيمة المتبقية من الأكواد غير المستخدمة:</span>
+              <div className="text-2xl font-extrabold font-mono text-[#0284C7] dark:text-cyan-300">
                 {(stats.unusedCount * 4000).toLocaleString()} YER
               </div>
-              <p className="text-[10px] text-cyan-300/80">{stats.unusedCount} كود غير مستخدم</p>
+              <p className="text-[10px] text-[#0EA5E9] dark:text-cyan-300/80">{stats.unusedCount} كود غير مستخدم</p>
             </div>
           </div>
         </div>

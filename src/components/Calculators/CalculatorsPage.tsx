@@ -47,19 +47,19 @@ export const CalculatorsPage: React.FC = () => {
     <div className="space-y-8 pb-12">
       
       {/* Header */}
-      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+      <div className="champagne-card rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl sky-icon-box flex items-center justify-center shrink-0">
             <Calculator className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">الحاسبات الهندسية المتخصصة</h1>
-            <p className="text-xs text-slate-400">حاسبات دقيقة لقوانين الكهرباء، المقاومة المكافئة، محاثة المكثفات والعزم وتحويل الوحدات</p>
+            <h1 className="text-2xl font-bold text-[#0F172A] dark:text-white">الحاسبات الهندسية المتخصصة</h1>
+            <p className="text-xs text-[#475569] dark:text-slate-400">حاسبات دقيقة لقوانين الكهرباء، المقاومة المكافئة، محاثة المكثفات والعزم وتحويل الوحدات</p>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs font-semibold">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-xs font-semibold">
           {[
             { id: 'ohm', label: 'قانون أوم والقدرة' },
             { id: 'resistors', label: 'المقاومة المكافئة' },
@@ -71,7 +71,9 @@ export const CalculatorsPage: React.FC = () => {
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}
               className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-                activeTab === t.id ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-white'
+                activeTab === t.id
+                  ? 'bg-[#0EA5E9] text-white dark:bg-cyan-500 dark:text-black font-bold shadow-sm'
+                  : 'text-[#475569] dark:text-slate-400 hover:text-[#0F172A] dark:hover:text-white'
               }`}
             >
               {t.label}
@@ -81,21 +83,21 @@ export const CalculatorsPage: React.FC = () => {
       </div>
 
       {/* Tab Contents */}
-      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-6 text-slate-100 shadow-xl max-w-4xl mx-auto">
+      <div className="champagne-card rounded-2xl p-6 text-[#0F172A] dark:text-slate-100 max-w-4xl mx-auto">
         
         {activeTab === 'ohm' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-400" />
+            <div className="border-b border-[rgba(212,175,55,0.22)] dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-500 dark:text-amber-400" />
                 <span>حاسبة قانون أوم وقدرة الطاقة (Ohm & Power Calculator)</span>
               </h3>
-              <p className="text-xs text-slate-400">المعادلة: V = I × R | P = V × I</p>
+              <p className="text-xs text-[#475569] dark:text-slate-400">المعادلة: V = I × R | P = V × I</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">الجهد الكهربائي V (فولت):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">الجهد الكهربائي V (فولت):</label>
                 <input
                   type="number"
                   value={voltage}
@@ -105,12 +107,12 @@ export const CalculatorsPage: React.FC = () => {
                     setCurrent(parseFloat((v / Math.max(1, resistance)).toFixed(2)));
                     setPower(parseFloat((v * (v / Math.max(1, resistance))).toFixed(2)));
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-cyan-300 text-sm font-mono font-bold"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0284C7] dark:text-cyan-300 text-sm font-mono font-bold focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">التيار الكهربائي I (أمبير):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">التيار الكهربائي I (أمبير):</label>
                 <input
                   type="number"
                   value={current}
@@ -120,12 +122,12 @@ export const CalculatorsPage: React.FC = () => {
                     setVoltage(parseFloat((i * resistance).toFixed(2)));
                     setPower(parseFloat((i * i * resistance).toFixed(2)));
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-cyan-300 text-sm font-mono font-bold"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0284C7] dark:text-cyan-300 text-sm font-mono font-bold focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاومة R (أوم Ω):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">المقاومة R (أوم Ω):</label>
                 <input
                   type="number"
                   value={resistance}
@@ -135,66 +137,66 @@ export const CalculatorsPage: React.FC = () => {
                     setCurrent(parseFloat((voltage / r).toFixed(2)));
                     setPower(parseFloat(((voltage * voltage) / r).toFixed(2)));
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-cyan-300 text-sm font-mono font-bold"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0284C7] dark:text-cyan-300 text-sm font-mono font-bold focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-300">القدرة الكهربائية المستهلكة (Power P):</span>
-              <span className="text-xl font-bold font-mono text-cyan-300">{power} Watt (واط)</span>
+            <div className="p-4 rounded-xl bg-[#E0F2FE] dark:bg-cyan-500/10 border border-[#0EA5E9]/30 dark:border-cyan-500/30 flex items-center justify-between">
+              <span className="text-xs font-bold text-[#0F172A] dark:text-slate-300">القدرة الكهربائية المستهلكة (Power P):</span>
+              <span className="text-xl font-bold font-mono text-[#0284C7] dark:text-cyan-300">{power} Watt (واط)</span>
             </div>
           </div>
         )}
 
         {activeTab === 'resistors' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-cyan-400" />
+            <div className="border-b border-[rgba(212,175,55,0.22)] dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-[#0EA5E9] dark:text-cyan-400" />
                 <span>حاسبة المقاومة المكافئة (Series & Parallel Equivalent)</span>
               </h3>
-              <p className="text-xs text-slate-400">حساب قيم المقاومات الثلاث عند التوصيل على التوالي أو التوازي</p>
+              <p className="text-xs text-[#475569] dark:text-slate-400">حساب قيم المقاومات الثلاث عند التوصيل على التوالي أو التوازي</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاومة الأولى R1 (Ω):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">المقاومة الأولى R1 (Ω):</label>
                 <input
                   type="number"
                   value={r1}
                   onChange={(e) => setR1(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاومة الثانية R2 (Ω):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">المقاومة الثانية R2 (Ω):</label>
                 <input
                   type="number"
                   value={r2}
                   onChange={(e) => setR2(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاومة الثالثة R3 (Ω):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">المقاومة الثالثة R3 (Ω):</label>
                 <input
                   type="number"
                   value={r3}
                   onChange={(e) => setR3(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                <span className="text-xs text-slate-400 font-semibold">التوصيل على التوالي (Series):</span>
-                <div className="text-xl font-bold font-mono text-cyan-300">{reqSeries.toFixed(2)} Ω</div>
+              <div className="p-4 rounded-xl champagne-subcard space-y-1">
+                <span className="text-xs text-[#475569] dark:text-slate-400 font-semibold">التوصيل على التوالي (Series):</span>
+                <div className="text-xl font-bold font-mono text-[#0284C7] dark:text-cyan-300">{reqSeries.toFixed(2)} Ω</div>
               </div>
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                <span className="text-xs text-slate-400 font-semibold">التوصيل على التوازي (Parallel):</span>
-                <div className="text-xl font-bold font-mono text-emerald-300">{reqParallel.toFixed(2)} Ω</div>
+              <div className="p-4 rounded-xl champagne-subcard space-y-1">
+                <span className="text-xs text-[#475569] dark:text-slate-400 font-semibold">التوصيل على التوازي (Parallel):</span>
+                <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-300">{reqParallel.toFixed(2)} Ω</div>
               </div>
             </div>
           </div>
@@ -202,44 +204,44 @@ export const CalculatorsPage: React.FC = () => {
 
         {activeTab === 'rc_time' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Activity className="w-5 h-5 text-purple-400" />
+            <div className="border-b border-[rgba(212,175,55,0.22)] dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#0EA5E9] dark:text-purple-400" />
                 <span>حاسبة الثابت الزمني ترانزيت RC (Time Constant & Cutoff Frequency)</span>
               </h3>
-              <p className="text-xs text-slate-400">حساب زمن شحن المكثف τ = R × C وتردد القطع</p>
+              <p className="text-xs text-[#475569] dark:text-slate-400">حساب زمن شحن المكثف τ = R × C وتردد القطع</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاومة R (Ω):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">المقاومة R (Ω):</label>
                 <input
                   type="number"
                   value={capR}
                   onChange={(e) => setCapR(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">سعة المكثف C (ميكروفاراد µF):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">سعة المكثف C (ميكروفاراد µF):</label>
                 <input
                   type="number"
                   value={capC}
                   onChange={(e) => setCapC(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-1">
-                <span className="text-xs text-purple-300 font-bold">الثابت الزمني τ (Time Constant):</span>
-                <div className="text-xl font-bold font-mono text-white">{rcTau.toFixed(4)} ثانية (Sec)</div>
+              <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 space-y-1">
+                <span className="text-xs text-purple-700 dark:text-purple-300 font-bold">الثابت الزمني τ (Time Constant):</span>
+                <div className="text-xl font-bold font-mono text-[#0F172A] dark:text-white">{rcTau.toFixed(4)} ثانية (Sec)</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 space-y-1">
-                <span className="text-xs text-cyan-300 font-bold">تردد القطع fc (Cutoff Frequency):</span>
-                <div className="text-xl font-bold font-mono text-white">{cutoffFreq.toFixed(2)} Hz (هيرتز)</div>
+              <div className="p-4 rounded-xl bg-[#E0F2FE] dark:bg-cyan-500/10 border border-[#0EA5E9]/30 dark:border-cyan-500/30 space-y-1">
+                <span className="text-xs text-[#0284C7] dark:text-cyan-300 font-bold">تردد القطع fc (Cutoff Frequency):</span>
+                <div className="text-xl font-bold font-mono text-[#0F172A] dark:text-white">{cutoffFreq.toFixed(2)} Hz (هيرتز)</div>
               </div>
             </div>
           </div>
@@ -247,58 +249,58 @@ export const CalculatorsPage: React.FC = () => {
 
         {activeTab === 'motor' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-amber-400" />
+            <div className="border-b border-[rgba(212,175,55,0.22)] dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-amber-500 dark:text-amber-400" />
                 <span>حاسبة عزم المحرك والقدرة الدورانية (Motor Torque Calculator)</span>
               </h3>
-              <p className="text-xs text-slate-400">المعادلة: Torque T = (P × 9.5488) / RPM</p>
+              <p className="text-xs text-[#475569] dark:text-slate-400">المعادلة: Torque T = (P × 9.5488) / RPM</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">القدرة الكهربائية للمحرك (Watt):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">القدرة الكهربائية للمحرك (Watt):</label>
                 <input
                   type="number"
                   value={motorPowerW}
                   onChange={(e) => setMotorPowerW(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">السرعة الدورانية RPM (دورة/دقيقة):</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">السرعة الدورانية RPM (دورة/دقيقة):</label>
                 <input
                   type="number"
                   value={motorRpmVal}
                   onChange={(e) => setMotorRpmVal(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-300">العزم الناتج (Output Torque):</span>
-              <span className="text-2xl font-bold font-mono text-amber-400">{motorTorqueNm.toFixed(3)} N.m (نيوتن.متر)</span>
+            <div className="p-5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-800 dark:text-amber-300">العزم الناتج (Output Torque):</span>
+              <span className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{motorTorqueNm.toFixed(3)} N.m (نيوتن.متر)</span>
             </div>
           </div>
         )}
 
         {activeTab === 'units' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <ArrowLeftRight className="w-5 h-5 text-cyan-400" />
+            <div className="border-b border-[rgba(212,175,55,0.22)] dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <ArrowLeftRight className="w-5 h-5 text-[#0EA5E9] dark:text-cyan-400" />
                 <span>مُحول الوحدات الهندسية (Engineering Unit Converter)</span>
               </h3>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">نوع الكمية الهندسية:</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">نوع الكمية الهندسية:</label>
                 <select
                   value={unitType}
                   onChange={(e) => setUnitType(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-xs font-semibold focus:border-[#0EA5E9] focus:outline-none"
                 >
                   <option value="torque">العزم (N.m ↔ Kg.cm)</option>
                   <option value="pressure">الضغط (Bar ↔ PSI ↔ Pascal)</option>
@@ -307,32 +309,32 @@ export const CalculatorsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">القيمة المدخلة:</label>
+                <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1">القيمة المدخلة:</label>
                 <input
                   type="number"
                   value={unitValue}
                   onChange={(e) => setUnitValue(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm font-mono focus:border-[#0EA5E9] focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
-              <h4 className="font-bold text-cyan-400">نتائج التحويل الفوري:</h4>
+            <div className="p-4 rounded-xl champagne-subcard space-y-2 text-xs">
+              <h4 className="font-bold text-[#0284C7] dark:text-cyan-400">نتائج التحويل الفوري:</h4>
               {unitType === 'torque' && (
-                <div className="space-y-1 font-mono text-slate-300">
+                <div className="space-y-1 font-mono text-[#0F172A] dark:text-slate-300">
                   <div>• N.m ➔ Kg.cm = {(unitValue * 10.197).toFixed(2)} Kg.cm</div>
                   <div>• N.m ➔ lb.ft = {(unitValue * 0.7375).toFixed(2)} lb.ft</div>
                 </div>
               )}
               {unitType === 'pressure' && (
-                <div className="space-y-1 font-mono text-slate-300">
+                <div className="space-y-1 font-mono text-[#0F172A] dark:text-slate-300">
                   <div>• Bar ➔ PSI = {(unitValue * 14.5038).toFixed(2)} PSI</div>
                   <div>• Bar ➔ KPa = {(unitValue * 100).toFixed(2)} KPa</div>
                 </div>
               )}
               {unitType === 'frequency' && (
-                <div className="space-y-1 font-mono text-slate-300">
+                <div className="space-y-1 font-mono text-[#0F172A] dark:text-slate-300">
                   <div>• Period T (ms) = {((1 / Math.max(0.01, unitValue)) * 1000).toFixed(2)} ms</div>
                   <div>• Angular Frequency ω = {(2 * Math.PI * unitValue).toFixed(2)} rad/s</div>
                 </div>

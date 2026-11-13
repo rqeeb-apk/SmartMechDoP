@@ -55,53 +55,99 @@ const INITIAL_BOOKS: EngineeringBook[] = [
     id: 'b1',
     title: 'أساسيات الميكاترونكس والنظم المدمجة',
     category: 'ميكاترونكس',
+    year: 'year1',
     author: 'د. محمد الكيلاني',
-    level: 'مبتدئ - متوسط',
-    description: 'مرجع شامل يغطي الحساسات، المشغلات الميكانيكية، متحكمات الأردوينو، ودوائر الواجهة.',
+    level: 'السنة الأولى',
+    description: 'مرجع شامل يغطي مبادئ الهندسة الكهربائية، الحساسات، المشغلات الميكانيكية، ومتحكمات الأردوينو.',
     pages: 340,
     coverImage: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&auto=format&fit=crop',
-    pdfFileName: 'Mechatronics_Fundamentals.pdf',
+    pdfFileName: 'Mechatronics_Fundamentals_Year1.pdf',
     rating: 4.9,
     downloadCount: 1420
   },
   {
-    id: 'b2',
-    title: 'تحليل وتصميم الدوائر الإلكترونية والكهربائية',
+    id: 'b_cw_1',
+    title: 'دليل محاكاة الدوائر في Circuit Wizard وتصميم PCB',
     category: 'إلكترونيات',
-    author: 'م. خالد الصالص',
-    level: 'متوسط',
-    description: 'شرح قوانين كيرشوف وشبكات الثنائيات والمعاملات الترانزستورية مع أمثلة حسابية محلولة.',
-    pages: 280,
+    year: 'year1',
+    author: 'دكتور الميكاترونكس الذكي',
+    level: 'السنة الأولى - الثانية',
+    description: 'شرح عملي لبناء دوائر أوم وكيرشوف وتخطيط اللوحات المطبوعة PCB ومحاكاة راسم الإشارة والملتميتر.',
+    pages: 265,
     coverImage: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop',
-    pdfFileName: 'Circuit_Analysis_Guide.pdf',
+    pdfFileName: 'Circuit_Wizard_PCB_Guide.pdf',
+    rating: 5.0,
+    downloadCount: 2890
+  },
+  {
+    id: 'b2',
+    title: 'تحليل وتصميم الدوائر الإلكترونية والمضخمات Op-Amp & BJT',
+    category: 'إلكترونيات',
+    year: 'year2',
+    author: 'م. خالد الصالح',
+    level: 'السنة الثانية',
+    description: 'شرح قوانين كيرشوف، الترانزستورات ثنائية القطب BJT، الموسفت MOSFET، والمقومات مع أمثلة محلولة.',
+    pages: 280,
+    coverImage: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop',
+    pdfFileName: 'Electronic_Circuits_Year2.pdf',
     rating: 4.8,
     downloadCount: 980
   },
   {
-    id: 'b3',
-    title: 'حركية الروبوتات والتحكم الآلي Kinematics & Robotics',
-    category: 'روبوتات',
-    author: 'د. سارة المحمود',
-    level: 'متقدم',
-    description: 'رياضيات مصفوفات التحويل الدوارة، التحكم في محركات الخطوة والسيرفو وتخطيط المسارات.',
-    pages: 410,
-    coverImage: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500&auto=format&fit=crop',
-    pdfFileName: 'Robotics_Kinematics.pdf',
-    rating: 5.0,
-    downloadCount: 2150
+    id: 'b_mech_2',
+    title: 'تصميم التروس ونسب التخفيض والديناميكا الميكانيكية',
+    category: 'ميكاترونكس',
+    year: 'year2',
+    author: 'د. طارق اليماني',
+    level: 'السنة الثانية',
+    description: 'حساب العزم والسرعة الزاوية وتصميم علب التروس والأعمدة الدوارة للمحركات الصناعية.',
+    pages: 315,
+    coverImage: 'https://images.unsplash.com/photo-1537462715879-360eeb61a0ad?w=500&auto=format&fit=crop',
+    pdfFileName: 'Mechanical_Gears_Design_Year2.pdf',
+    rating: 4.8,
+    downloadCount: 1120
   },
   {
     id: 'b4',
     title: 'دليل مهندس البرمجة والأنظمة المضمنة ESP32 & Arduino',
     category: 'برمجة',
+    year: 'year3',
     author: 'دكتور الميكاترونكس الذكي',
-    level: 'جميع المستويات',
-    description: 'مشاريع عملية في الاتصال اللاسلكي Wi-Fi/Bluetooth ومعالجة الإشارات في الوقت الحقيقي.',
+    level: 'السنة الثالثة',
+    description: 'مشاريع عملية في المقاطعات Timers و PWM والاتصال التسلسلي UART/I2C/SPI ومعالجة الإشارات.',
     pages: 310,
     coverImage: 'https://images.unsplash.com/photo-1555680202-c86f0e12f086?w=500&auto=format&fit=crop',
-    pdfFileName: 'Embedded_Systems_ESP32.pdf',
+    pdfFileName: 'Embedded_Systems_Year3.pdf',
     rating: 4.9,
     downloadCount: 3100
+  },
+  {
+    id: 'b3',
+    title: 'حركية الروبوتات والتحكم الآلي PID & PLC',
+    category: 'روبوتات',
+    year: 'year4',
+    author: 'د. سارة المحمود',
+    level: 'السنة الرابعة',
+    description: 'رياضيات مصفوفات التحويل الدوارة DH Parameters، ضبط متحكمات PID، وبرمجة Ladder Logic في PLC.',
+    pages: 410,
+    coverImage: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=500&auto=format&fit=crop',
+    pdfFileName: 'Robotics_Control_PLC_Year4.pdf',
+    rating: 5.0,
+    downloadCount: 2150
+  },
+  {
+    id: 'b_uav_5',
+    title: 'هندسة الطائرات المسيرة UAV والذكاء الاصطناعي الصناعي IIoT',
+    category: 'روبوتات',
+    year: 'year5',
+    author: 'فريق دكتور الميكاترونكس',
+    level: 'السنة الخامسة (التخرج)',
+    description: 'دليل مشاريع التخرج: استقرار الطائرات الرباعية، الرؤية الحاسوبية OpenCV، والتحكم الرقمي CNC.',
+    pages: 390,
+    coverImage: 'https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=500&auto=format&fit=crop',
+    pdfFileName: 'UAV_IIoT_Graduation_Year5.pdf',
+    rating: 4.9,
+    downloadCount: 1840
   }
 ];
 
@@ -440,7 +486,29 @@ export const getStoredBooks = (): EngineeringBook[] => {
     localStorage.setItem('dr_smart_books', JSON.stringify(INITIAL_BOOKS));
     return INITIAL_BOOKS;
   }
-  return JSON.parse(data);
+  try {
+    const parsed: EngineeringBook[] = JSON.parse(data);
+    const byId = new Map(parsed.map((b) => [b.id, b]));
+    let changed = false;
+    const merged: EngineeringBook[] = [...parsed];
+
+    for (const defBook of INITIAL_BOOKS) {
+      const existing = byId.get(defBook.id);
+      if (!existing) {
+        merged.push(defBook);
+        changed = true;
+      } else if (!existing.year && defBook.year) {
+        existing.year = defBook.year;
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem('dr_smart_books', JSON.stringify(merged));
+    }
+    return merged;
+  } catch {
+    return INITIAL_BOOKS;
+  }
 };
 
 export const getStoredVideos = (): VideoResource[] => {

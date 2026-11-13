@@ -46,6 +46,13 @@ export interface LectureData {
   };
   summary: string;
   quiz?: QuizQuestion[];
+  realWorldExamples?: DoctorRealWorldExample[];
+  visualDiagram?: {
+    diagramType?: 'circuit' | 'gears' | 'plc' | 'arduino' | 'servo' | 'graph' | 'mindmap';
+    diagramTitle?: string;
+    equation?: string;
+    nodes?: { label: string; value?: string; role?: string }[];
+  };
 }
 
 export interface SavedLecture {
@@ -126,6 +133,7 @@ export interface EngineeringBook {
   pdfFileName: string;
   rating: number;
   downloadCount: number;
+  year?: AcademicYearId;
 }
 
 export interface VideoResource {
@@ -336,4 +344,37 @@ export interface SavedSummaryItem {
   createdAt: string;
   data: LectureSummaryData;
 }
+
+export type QuestionFormatType = 'automation' | 'mcq' | 'true_false' | 'essay' | 'direct';
+
+export interface SolvedQuestionItem {
+  questionNumber: number;
+  questionText: string;
+  questionType: QuestionFormatType;
+  options?: string[];
+  finalAnswerSummary: string;
+  reasonAndExplanation: string;
+  steps?: string[];
+  keyFormula?: string;
+}
+
+export interface SolveQuestionsResponse {
+  examTitle: string;
+  subjectArea: string;
+  totalQuestionsFound: number;
+  doctorOverviewSpeech: string;
+  boardSummaryNotes: string[];
+  boardKeyFormula?: string;
+  diagramType: 'circuit' | 'gears' | 'plc' | 'arduino' | 'servo' | 'graph' | 'mindmap';
+  questions: SolvedQuestionItem[];
+}
+
+export type AcademicYearId = 'year1' | 'year2' | 'year3' | 'year4' | 'year5';
+
+export interface DoctorRealWorldExample {
+  title: string;
+  yemeniAnalogy: string;
+  engineeringApplication: string;
+}
+
 

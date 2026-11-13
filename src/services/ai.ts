@@ -206,7 +206,9 @@ export async function requestLectureExplanation(
   userPrompt: string,
   uploadedContent?: string,
   onProgress?: (stage: LectureProgressStage) => void,
-  uploadedMimeType?: string
+  uploadedMimeType?: string,
+  socialUrl?: string,
+  videoFrames?: string[]
 ): Promise<LectureData> {
   if (onProgress) onProgress('uploading');
 
@@ -229,6 +231,8 @@ export async function requestLectureExplanation(
       userPrompt,
       uploadedContent,
       uploadedMimeType,
+      socialUrl,
+      videoFrames,
       requestFingerprint: `req_${doctor.id}_${Date.now()}`,
     },
     'فشل محرك إلقاء المحاضرة من الدكتور الذكي'

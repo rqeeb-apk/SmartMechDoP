@@ -135,9 +135,9 @@ async function generateGeminiContentWithRetry(params: {
 }): Promise<string> {
   const ai = getGeminiClient();
   const modelCascade = [
-    params.primaryModel || 'gemini-3.1-flash-lite',
-    params.fallbackModel || 'gemini-flash-latest',
-    'gemini-3.8-flash',
+    params.primaryModel || 'gemini-4-hydrogen',
+    params.fallbackModel || 'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
   ];
   const maxAttempts = params.maxAttempts || 3;
 
@@ -148,10 +148,19 @@ async function generateGeminiContentWithRetry(params: {
     attempt++;
     try {
       console.log(`[AI Engine Fast] Attempt ${attempt}/${maxAttempts} using model: ${currentModel}`);
-      
-      const configPayload = { ...params.config };
-      if (currentModel === 'gemini-3.8-flash') {
-        configPayload.thinkingConfig = { thinkingLevel: 'LOW' };
+
+      const configPayload: any = { ...(params.config || {}) };
+      if (configPayload.tools && configPayload.tools.length > 0) {
+        delete configPayload.responseMimeType;
+        delete configPayload.responseSchema;
+      }
+      if (currentModel === 'gemini-4-hydrogen') {
+        delete configPayload.temperature;
+        delete configPayload.topP;
+        delete configPayload.topK;
+        if (configPayload.thinkingConfig?.thinkingBudget !== undefined) {
+          delete configPayload.thinkingConfig;
+        }
       }
 
       const response = await ai.models.generateContent({
@@ -175,10 +184,9 @@ async function generateGeminiContentWithRetry(params: {
         errMsg.includes('overloaded') ||
         errMsg.includes('Temporarily Unavailable');
 
-      console.warn(`[AI Engine] Error on attempt ${attempt} with model ${currentModel}:`, errMsg.slice(0, 150));
+      console.warn(`[AI Engine] Error on attempt ${attempt} with model ${currentModel}:`, errMsg.slice(0, 180));
 
-      if (!isRetryable && attempt < 2) {
-        // If not typical retryable, still try fallback model once
+      if (!isRetryable && attempt < maxAttempts) {
         console.log(`[AI Engine] Switching to next model in cascade...`);
         continue;
       }
@@ -187,12 +195,11 @@ async function generateGeminiContentWithRetry(params: {
         const retryDelayMs = parseRetryDelayMs(err);
         const retrySec = Math.ceil(retryDelayMs / 1000);
         throw new Error(
-          `خادم الذكاء الاصطناعي مشغول حالياً بسبب كثرة الطلبات. يرجى الانتظار ${retrySec} ثانية ثم المحاولة مجدداً.`
+          `خادم الذكاء الاصطناعي مشغول حالياً أو تعذر الوصول للنموذج. يرجى المحاولة بعد ${retrySec} ثانية.`
         );
       }
 
-      const backoffDelay = 1000 * attempt + Math.floor(Math.random() * 500);
-      console.log(`[AI Engine] Waiting ${backoffDelay}ms before attempt ${attempt + 1}...`);
+      const backoffDelay = 900 * attempt + Math.floor(Math.random() * 400);
       await new Promise((resolve) => setTimeout(resolve, backoffDelay));
     }
   }
@@ -214,9 +221,9 @@ async function generateGeminiContentStreamWithRetry(params: {
 }): Promise<string> {
   const ai = getGeminiClient();
   const modelCascade = [
-    params.primaryModel || 'gemini-3.1-flash-lite',
-    params.fallbackModel || 'gemini-flash-latest',
-    'gemini-3.8-flash',
+    params.primaryModel || 'gemini-4-hydrogen',
+    params.fallbackModel || 'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
   ];
   const maxAttempts = params.maxAttempts || 3;
   let attempt = 0;
@@ -227,12 +234,17 @@ async function generateGeminiContentStreamWithRetry(params: {
     try {
       console.log(`[AI Streaming Engine] Attempt ${attempt}/${maxAttempts} with model: ${currentModel}`);
       if (params.onStatus) {
-        params.onStatus(`جاري بث الشرح مباشرة عبر النموذج السريع (${currentModel})...`);
+        params.onStatus(`جاري بث الشرح مباشرة عبر النموذج الذكي (${currentModel})...`);
       }
 
-      const configPayload = { ...params.config };
-      if (currentModel === 'gemini-3.8-flash') {
-        configPayload.thinkingConfig = { thinkingLevel: 'LOW' };
+      const configPayload: any = { ...(params.config || {}) };
+      if (currentModel === 'gemini-4-hydrogen') {
+        delete configPayload.temperature;
+        delete configPayload.topP;
+        delete configPayload.topK;
+        if (configPayload.thinkingConfig?.thinkingBudget !== undefined) {
+          delete configPayload.thinkingConfig;
+        }
       }
 
       const streamResult = await ai.models.generateContentStream({
@@ -259,7 +271,7 @@ async function generateGeminiContentStreamWithRetry(params: {
         throw new Error(err?.message || 'تعذر استكمال بث الشرح بعد عدة محاولات.');
       }
 
-      const backoffDelay = 1000 * attempt + Math.floor(Math.random() * 500);
+      const backoffDelay = 900 * attempt + Math.floor(Math.random() * 400);
       await new Promise((resolve) => setTimeout(resolve, backoffDelay));
     }
   }
@@ -1309,91 +1321,174 @@ ${typeof summaryContext === 'string' ? summaryContext : JSON.stringify(summaryCo
   }
 });
 
+/**
+ * Shared Multimodal Parts Builder supporting:
+ * - Image data URLs / Camera captures
+ * - Video keyframes array (extracted client-side) or direct small video base64
+ * - PDF documents inlineData
+ * - Plain text / code files
+ * - Social media / video URLs with automatic Gemini urlContext + googleSearch grounding
+ */
+function buildMultimodalPayload(params: {
+  promptText: string;
+  uploadedContent?: string;
+  uploadedMimeType?: string;
+  videoFrames?: string[];
+  socialUrl?: string;
+}): { contentsPayload: any; useWebTools: boolean; plainTextAttach: string } {
+  const { promptText, uploadedContent, uploadedMimeType, videoFrames, socialUrl } = params;
+  const parts: any[] = [];
+  let plainTextAttach = '';
+
+  // 1. Add video frames if provided
+  if (Array.isArray(videoFrames) && videoFrames.length > 0) {
+    videoFrames.slice(0, 6).forEach((frameUrl) => {
+      if (typeof frameUrl === 'string' && frameUrl.startsWith('data:')) {
+        const matches = frameUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches && matches[2]) {
+          parts.push({
+            inlineData: {
+              mimeType: matches[1] || 'image/jpeg',
+              data: matches[2],
+            },
+          });
+        }
+      }
+    });
+  } else if (typeof uploadedContent === 'string' && uploadedContent.trim()) {
+    const rawUploaded = uploadedContent.trim();
+    if (rawUploaded.startsWith('data:')) {
+      const matches = rawUploaded.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches && matches[2]) {
+        const mime = matches[1] || uploadedMimeType || 'image/jpeg';
+        if (mime.startsWith('image/') || mime === 'application/pdf' || mime.startsWith('video/')) {
+          parts.push({
+            inlineData: {
+              mimeType: mime,
+              data: matches[2],
+            },
+          });
+        } else {
+          // Decode base64 text-like docs cleanly
+          try {
+            const decoded = Buffer.from(matches[2], 'base64').toString('utf8');
+            plainTextAttach = decoded.slice(0, 12000);
+          } catch {}
+        }
+      }
+    } else if (!rawUploaded.startsWith('blob:')) {
+      plainTextAttach = extractRelevantContentChunk(rawUploaded, promptText, 4000);
+    }
+  }
+
+  const cleanUrl = typeof socialUrl === 'string' ? socialUrl.trim() : '';
+  const useWebTools = Boolean(cleanUrl && /^https?:\/\//i.test(cleanUrl));
+
+  const fullText = [
+    promptText,
+    plainTextAttach ? `\n--- محتوى الملف/المستند المرفق ---\n${plainTextAttach}\n` : '',
+    cleanUrl ? `\n--- رابط الفيديو/المنشور المرفق للتحليل والاستخراج ---\n${cleanUrl}\n` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  parts.push({ text: fullText });
+
+  return {
+    contentsPayload: parts.length === 1 ? parts[0].text : { parts },
+    useWebTools,
+    plainTextAttach,
+  };
+}
+
 // ==========================================
-// API: Dr. Smart Whiteboard Explain
+// API: Dr. Smart Whiteboard Explain (قاعة الدكتور الذكي)
 // ==========================================
 geminiRouter.post('/explain', async (req: Request, res: Response) => {
   const ip = (req as any).clientIp || '127.0.0.1';
   const estimatedTokens = (req as any).estimatedTokens || 500;
 
   try {
-    const { doctorName, subject, level, language, lessonTitle, userPrompt, uploadedContent, uploadedMimeType } = req.body;
+    const {
+      doctorName,
+      subject,
+      level,
+      language,
+      lessonTitle,
+      userPrompt,
+      uploadedContent,
+      uploadedMimeType,
+      socialUrl,
+      videoFrames,
+    } = req.body;
 
-    const queryContext = `${lessonTitle || ''} ${userPrompt || ''}`;
-    const rawUploaded = typeof uploadedContent === 'string' ? uploadedContent : '';
-    const isDataUrl = rawUploaded.startsWith('data:');
-    const isBlobOrInvalidUrl = rawUploaded.startsWith('blob:');
-    const validUploaded = isBlobOrInvalidUrl ? '' : rawUploaded;
-
-    let detectedMime = uploadedMimeType || 'image/jpeg';
-    let cleanBase64 = '';
-    let isBinaryInline = false;
-
-    if (isDataUrl) {
-      const matches = validUploaded.match(/^data:([^;]+);base64,(.+)$/);
-      if (matches) {
-        detectedMime = matches[1] || detectedMime;
-        cleanBase64 = matches[2] || '';
-        // Gemini inlineData supports image/* and application/pdf directly
-        if (detectedMime.startsWith('image/') || detectedMime === 'application/pdf') {
-          isBinaryInline = true;
-        }
-      }
-    }
-
-    const safeContentChunk = !isDataUrl ? extractRelevantContentChunk(validUploaded, queryContext, 1500) : '';
-
-    const promptText = `أنت الدكتور الأكاديمي "${doctorName || 'الدكتور الذكي'}"، خبير هندسي في ${subject || 'الميكاترونكس'}.
+    const promptText = `أنت "${doctorName || 'دكتور الميكاترونكس الذكي'}"، أستاذ جامعي يمني خبير في ${subject || 'هندسة الميكاترونكس'}.
 المستوى: ${level || 'متوسط'}.
-اللغة: ${language === 'en' ? 'English' : 'العربية الفصيحة مع المصطلحات الإنجليزية'}.
+اللغة والأسلوب: ${language === 'en' ? 'English engineering explanation' : 'العربية بلهجة أستاذ جامعي يمني ودودة وواضحة ومحببة للطالب مع المصطلحات الإنجليزية الدقيقة'}.
 
-عنوان الدرس/السؤال: ${lessonTitle || userPrompt || 'مقدمة ميكاترونكس'}
-${safeContentChunk ? `نص المستند المرفوق:\n${safeContentChunk}\n` : ''}
+عنوان الدرس/السؤال: ${lessonTitle || userPrompt || 'استفسار هندسي'}
+تفاصيل سؤال الطالب: ${userPrompt || 'اشرح المفهوم المرفق بوضوح على السبورة مع أمثلة واقعية ورسومات توضيحية'}
 
-يرجى إرجاع الإجابة بتنسيق JSON حصراً كالتالي:
+المطلوب بدقة:
+1. حلّل ما أرسله الطالب (نص / صورة / صورة مصورة بالكاميرا / فيديو / ملف / رابط فيديو).
+2. اشرحه شرحاً كاملاً مفهوماً يرسخ في ذهن الطالب مع أمثلة واقعية من الحياة والبيئة الصناعية اليمنية والعالمية.
+3. ارسم مخططاً توضيحياً للسبورة الذكية (circuit أو gears أو plc أو arduino أو servo أو graph أو mindmap) مع العقد والمعادلات.
+
+يرجى إرجاع الإجابة بتنسيق JSON صالح فقط بالهيكل التالي:
 {
-  "title": "عنوان المحاضرة",
-  "objectives": ["هدف 1", "هدف 2"],
+  "title": "عنوان المحاضرة/الإجابة",
+  "objectives": ["هدف 1", "هدف 2", "هدف 3"],
   "sections": [
     {
       "heading": "عنوان القسم التعليمي",
-      "content": "الشرح التوضيحي...",
-      "whiteboardNotes": "نص القوانين والمعادلات للكتابة على السبورة",
+      "content": "الشرح التفصيلي بأسلوب الدكتور الواضح والمبسط...",
+      "whiteboardNotes": "القانون أو الملاحظة المركزة على السبورة",
       "whiteboardDiagramType": "circuit",
-      "diagramCommands": ["DRAW_LABEL: تحليل العناصر"]
+      "diagramCommands": ["DRAW_LABEL: المفهوم الهندسي"]
     }
   ],
-  "solvedExample": {
-    "problem": "مسألة تطبيقية",
-    "steps": ["خطوة 1", "خطوة 2"],
-    "finalAnswer": "النتيجة النهائية"
+  "realWorldExamples": [
+    {
+      "title": "عنوان المثال الواقعي",
+      "yemeniAnalogy": "تشبيه عملي من الحياة اليومية اليمنية يقرّب الفكرة فوراً",
+      "engineeringApplication": "تطبيق صناعي وميكاتروني حقيقي في المصانع والروبوتات"
+    }
+  ],
+  "visualDiagram": {
+    "diagramType": "circuit",
+    "diagramTitle": "عنوان الرسم التوضيحي على السبورة",
+    "equation": "المعادلة الرياضية أو المنطقية الرئيسية",
+    "nodes": [
+      { "label": "العنصر 1", "value": "القيمة/الدور", "role": "Input" },
+      { "label": "العنصر 2", "value": "القيمة/الدور", "role": "Process" },
+      { "label": "العنصر 3", "value": "القيمة/الدور", "role": "Output" }
+    ]
   },
-  "summary": "ملخص ختامي",
+  "solvedExample": {
+    "problem": "مسألة تطبيقية أو مثال محلول من واقع السؤال",
+    "steps": ["خطوة 1", "خطوة 2", "خطوة 3"],
+    "finalAnswer": "النتيجة النهائية بالوحدات"
+  },
+  "summary": "ملخص الدكتور الصوتي المركز بأسلوب أستاذ جامعي يمني ودود ومشجع",
   "quiz": []
 }`;
 
-    let contentsPayload: any;
+    const { contentsPayload, useWebTools } = buildMultimodalPayload({
+      promptText,
+      uploadedContent,
+      uploadedMimeType,
+      videoFrames,
+      socialUrl,
+    });
 
-    if (isBinaryInline && cleanBase64) {
-      contentsPayload = {
-        parts: [
-          {
-            inlineData: {
-              mimeType: detectedMime,
-              data: cleanBase64,
-            },
-          },
-          { text: promptText },
-        ],
-      };
-    } else {
-      contentsPayload = promptText;
-    }
+    const config: any = useWebTools
+      ? { tools: [{ urlContext: {} }, { googleSearch: {} }] }
+      : { responseMimeType: 'application/json' };
 
     const text = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
       return await generateGeminiContentWithRetry({
         contents: contentsPayload,
-        config: { responseMimeType: 'application/json' },
+        config,
       });
     });
 
@@ -1496,7 +1591,12 @@ geminiRouter.post('/lecture-hall', async (req: Request, res: Response) => {
       courseSubject = 'electronics',
       topic = '',
       question = '',
+      extraDetails = '',
+      socialUrl = '',
       uploadedContent = '',
+      uploadedMimeType = '',
+      videoFrames = [],
+      fileName = '',
       stepIndex = 1,
       confusionPoint = '',
     } = req.body || {};
@@ -1504,7 +1604,7 @@ geminiRouter.post('/lecture-hall', async (req: Request, res: Response) => {
     const dialectGuide: Record<string, string> = {
       sanani: `تحدث باللهجة الصنعانية الأصيلة والمحببة للطلاب:
 - استخدم عبارات صنعانية طبيعية ومرحبة: "أهلاً وسهلاً بك يا مهندس"، "شوف يا ابني الموضوع بسيط جداً"، "خلّينا نمشي حبة حبة"، "تذكّر المهندس اليمني ما يعرف مستحيل".
-- اضرب أمثلة وتشبيهات من الحياة والبيئة اليمنية في صنعاء (مثل: تشبيه سريان التيار الكهربائي وضغط الجهد بشبكة خزانات ومياه صنعاء، أو تعشيق التروس بتروس المطاحن في سوق الملح، أو التوازن الحركي في بناء ناطحات السحاب الطينية).
+- اضرب أمثلة وتشبيهات من الحياة والبيئة اليمنية في صنعاء (مثل: تشبيه سريان التيار الكهربائي وضغط الجهد بشبكة خزانات ومياه صنعاء، أو تعشيق التروس بتروس المطاحن في سوق الملح).
 - حافظ على دقة المصطلحات الهندسية بالإنجليزية (Voltage, Current, PWM, PID, Ladder Logic, Op-Amp, Kinematics, Arduino).`,
       adani: `تحدث باللهجة العدنية الأصيلة المحببة للطلاب:
 - استخدم عبارات عدنية ودودة: "يا بوي ركّز معي"، "الموضوع عسل وسهل"، "خلّنا نفكك الدائرة خطوة خطوة"، "والله إنك مهندس شاطر وبطل"، "ما فيش شي صعب على عيال اليمن".
@@ -1525,14 +1625,17 @@ geminiRouter.post('/lecture-hall', async (req: Request, res: Response) => {
     const currentDialectPrompt = dialectGuide[dialect] || dialectGuide.sanani;
     const currentCourseName = courseMap[courseSubject] || courseMap.electronics;
 
-    // Check high-speed cache for text requests
     const cacheKey = computeCacheKey(
       `lecture_hall_${serviceType}_${dialect}_${courseSubject}`,
-      `${topic}_${question}_${confusionPoint}_${stepIndex}`
+      `${topic}_${question}_${extraDetails}_${socialUrl}_${confusionPoint}_${stepIndex}`
     );
 
-    const isBase64 = typeof uploadedContent === 'string' && (uploadedContent.startsWith('data:') || uploadedContent.length > 500);
-    if (!isBase64) {
+    const hasMedia =
+      (typeof uploadedContent === 'string' && uploadedContent.trim().length > 0) ||
+      (Array.isArray(videoFrames) && videoFrames.length > 0) ||
+      Boolean(socialUrl);
+
+    if (!hasMedia) {
       const cached = aiResponseCache.get(cacheKey);
       if (cached) {
         return res.json({ success: true, data: cached, fromCache: true });
@@ -1542,113 +1645,107 @@ geminiRouter.post('/lecture-hall', async (req: Request, res: Response) => {
     let serviceInstruction = '';
 
     if (serviceType === 'explain') {
-      serviceInstruction = `المهمة: اشرح المفهوم الهندسي بأسلوب الأستاذ اليمني الودود:
-- اشرح المفهوم ببساطة شديدة مع تشبيه واقعي من اليمن.
-- لخص أهم القوانين والمعادلات والنقاط لتظهر على السبورة الذكية.
-- حدد نوع المخطط التعليمي الأنسب للسبورة: (circuit أو gears أو plc أو arduino أو servo أو graph أو mindmap).
-- اختتم حديثك دائماً بالسؤال الودود: "فهمت ولا نعيدها بطريقة ثانية يا مهندس؟"`;
+      serviceInstruction = `المهمة: قسم "اشرح لي" داخل قاعة المحاضرات الذكية:
+- استخرج جميع الشرح والمفاهيم والمعادلات والخطوات من المحتوى المرفوع بالكامل (سواء نص، صورة، فيديو، ملف، أو رابط فيديو من مواقع التواصل الاجتماعي) مع الأخذ بكل ما طلبه الطالب في "التفاصيل الإضافية".
+- اشرح المفهوم بأسلوب الأستاذ اليمني الودود مع تشبيه واقعي من اليمن وتطبيق هندسي صناعي.
+- نظم الشرح ليعرض على السبورة الذكية بأنيميشن ذكي وخطوات متسلسلة ورسومات توضيحية تسهل على الطالب الفهم السريع.
+- اختتم حديثك بالسؤال الودود: "فهمت ولا نعيدها بطريقة ثانية يا مهندس؟"`;
     } else if (serviceType === 'ask_doctor') {
       serviceInstruction = `المهمة: إجابة تفاعلية مباشرة مع الطالب كأستاذ يمني جالس معه في القاعة:
 - ابدأ بترحيب ودود مثل: "سؤالك في الصميم يا مهندس"، "خلّينا نفكر مع بعض حبة حبة".
 - أجب بدقة علمية مع التبسيط والرسومات على السبورة.`;
     } else if (serviceType === 'solve_homework') {
-      serviceInstruction = `المهمة: حل مسألة أو واجب خطوة بخطوة مع توضيح السبب (Why) وراء كل خطوة:
-- قسّم الحل إلى 4 مراحل واضحة:
-  1. استخراج المعطيات والمطلوب (Given & Required).
-  2. تحديد القانون الهندسي وسبب اختياره دون غيره.
-  3. التعويض الحسابي والرياضي خطوة بخطوة.
-  4. النتيجة النهائية بالوحدات الفيزيائية الدقيقة (SI Units).
-- اضبط الخطوة الحالية وفق رقم المرحلة: ${stepIndex}.`;
+      serviceInstruction = `المهمة: تلخيص وتبسيط المحاضرة أو حل النقاط الصعبة خطوة بخطوة:
+- قسّم العرض إلى 4 مراحل متتابعة واضحة على السبورة الذكية.`;
     } else if (serviceType === 'quiz_me') {
       serviceInstruction = `المهمة: صياغة سؤال اختبار ذكي على السبورة لقياس فهم الطالب:
-- سؤال اختيار من متعدد (4 خيارات، خيار واحد صحيح).
-- تعليق يمني مشجع جداً في حال الإجابة الصحيحة: "صح لسانك يا بطل! كفو يا مهندس اليمن 🇾🇪".
-- تعليق يمني لطيف وداعم في حال الإجابة الخاطئة: "ما عليه يا ابني، الغلط هو بداية الفهم الحقيقي. خلّينا نتعلمها سوا".`;
+- سؤال اختيار من متعدد (4 خيارات، خيار واحد صحيح) مع تفسير يمني مشجع.`;
     } else if (serviceType === 'did_not_understand') {
       serviceInstruction = `المهمة: زر الطوارئ التعليمية (لم أفهم):
 - أعد الشرح بطريقة مختلفة تماماً وبمستوى أبسط بكثير وتشبيه فيزيائي بديل.
-- ركّز على نقطة الغموض التي حددها الطالب: "${confusionPoint || 'الفكرة الأساسية'}".
-- صمّم خريطة ذهنية (Mindmap) بسيطة ومباشرة للسبورة.`;
+- ركّز على نقطة الغموض التي حددها الطالب: "${confusionPoint || 'الفكرة الأساسية'}".`;
     }
 
-    const systemPrompt = `أنت "دكتور الميكاترونكس الذكي" - الأستاذ الأكاديمي المرموق والمحبوب لطلاب هندسة الميكاترونكس في الجامعات اليمنية (جامعة صنعاء، جامعة عدن، جامعة تعز، جامعة ذمار، وبقية كليات الهندسة).
+    const systemPrompt = `أنت "دكتور الميكاترونكس الذكي" - الأستاذ الأكاديمي المرموق والمحبوب لطلاب هندسة الميكاترونكس في الجامعات اليمنية.
 
 🎙️ الهوية الصوتية والإلقائية الإلزامية:
 - الصوت والشخصية: أستاذ وأب أكاديمي يمني (ذكر بالغ Adult Male)، عمرك الصوتي بين 40 و 50 سنة.
-- النبرة: دافئة، أبوية، واثقة، ومطمئنة لطلابك ("يا ابني"، "يا مهندس"، "ركز معي حبة حبة").
-- ممنوع منعاً باتاً استخدام أي صيغة أو نبرة أو ضمائر أنثوية لنفسك؛ الخطاب حصراً بصوت وهوية أستاذ ذكر بالغ.
-- الإلقاء والوقفات: وزّع الحديث بوقفات تعليمية طبيعية متزنة (سرعة 1.0x) وفواصل مريحة بين الجمل والفقرات في حقل doctorSpeech.
+- ممنوع منعاً باتاً استخدام أي صيغة أو ضمائر أنثوية لنفسك.
+- الإلقاء بوقفات تعليمية طبيعية متزنة وفواصل واضحة في حقل doctorSpeech.
 ${currentDialectPrompt}
 
-المقرر الدراسي الحالي: ${currentCourseName}
-موضوع المحاضرة: ${topic || 'هندسة الميكاترونكس'}
-سؤال أو استفسار الطالب: ${question || 'اشرح لي هذا المفهوم'}
+المقرر: ${currentCourseName}
+الموضوع: ${topic || 'هندسة الميكاترونكس'}
+المحتوى/السؤال الأساسي: ${question || 'اشرح لي هذا الدرس بالتفصيل'}
+${extraDetails ? `📌 تفاصيل إضافية طلبها الطالب: ${extraDetails}` : ''}
+${fileName ? `📎 اسم الملف المرفق: ${fileName}` : ''}
 
 ${serviceInstruction}
 
-يجب أن ترجع إجابتك حصراً بصيغة JSON نظيف بالهيكل التالي:
+أرجع النتيجة حصراً بصيغة JSON صالح فقط بالهيكل التالي (بدون نص خارج JSON):
 {
-  "doctorSpeech": "الكلام الصوتي المنطوق بلهجة يمنية طبيعية وودودة يرحب ويشرح...",
+  "doctorSpeech": "الشرح الصوتي الكامل والممتع بلهجة يمنية أصيلة وودودة يشمل الترحيب، كل الأفكار المستخرجة، والتشبيه اليمني، والخاتمة...",
   "boardTitle": "عنوان المفهوم المكتوب بخط عريض أعلى السبورة الذكية",
   "boardNotes": [
-    "ملاحظة أو فكرة 1 للسبورة",
-    "ملاحظة 2 للسبورة",
-    "قانون أو معادلة رئيسية"
+    "النقطة الرئيسية الأولى المستخرجة من المحتوى",
+    "النقطة الرئيسية الثانية والقانون",
+    "الخلاصة السريعة للتطبيق الهندسي"
   ],
-  "boardEquation": "المعادلة الرياضية الرئيسية بصيغة نصية واضحة مثل: V = I * R",
-  "diagramType": "circuit" | "gears" | "plc" | "arduino" | "servo" | "graph" | "mindmap",
-  "diagramTitle": "عنوان المخطط المرسوم على السبورة",
+  "boardEquation": "المعادلة الرياضية الرئيسية بصيغة واضحة",
+  "diagramType": "circuit",
+  "diagramTitle": "عنوان الرسم التوضيحي المتحرك على السبورة",
   "diagramData": {
-    "keyMetrics": ["5V Input", "220Ω Resistor", "20mA LED Current"],
-    "summary": "ملخص توضيحي لحركة المكونات"
+    "keyMetrics": ["عنصر 1", "عنصر 2", "عنصر 3"],
+    "summary": "وصف سريع لما يوضحه الرسم التوضيحي للطالب",
+    "nodes": [
+      { "id": "n1", "label": "المدخل Input", "sub": "تفصيل مختصر" },
+      { "id": "n2", "label": "المعالجة Process", "sub": "تفصيل مختصر" },
+      { "id": "n3", "label": "المخرج Output", "sub": "تفصيل مختصر" }
+    ]
   },
   "steps": [
-    { "phase": "المرحلة الأولى: استخراج المعطيات", "details": "شرح المعطيات..." },
-    { "phase": "المرحلة الثانية: اختيار القانون", "details": "القانون المطبق..." },
-    { "phase": "المرحلة الثالثة: التعويض والحل", "details": "خطوات التعويض..." },
-    { "phase": "المرحلة الرابعة: النتيجة النهائية", "details": "الناتج مع الوحدة..." }
+    { "phase": "الخطوة 1: الفكرة الأساسية", "details": "تفصيل واضح مستخرج من المصدر..." },
+    { "phase": "الخطوة 2: تحليل القوانين والعلاقات", "details": "شرح المعادلة والرموز..." },
+    { "phase": "الخطوة 3: المثال العملي والتطبيق", "details": "تطبيق بالأرقام أو الواقع..." },
+    { "phase": "الخطوة 4: الخلاصة الهندسية السريعة", "details": "أهم ما يجب تذكره للامتحان والعمل..." }
+  ],
+  "realWorldExamples": [
+    {
+      "title": "مثال واقعي من الحياة والمصانع",
+      "yemeniAnalogy": "تشبيه يمني بسيط من الواقع",
+      "engineeringApplication": "تطبيق هندسي مباشر في الميكاترونكس"
+    }
   ],
   "quiz": {
-    "question": "نص سؤال الاختبار الذكي...",
-    "options": ["الخيار أ", "الخيار ب", "الخيار ج", "الخيار د"],
+    "question": "سؤال سريع للتحقق من فهم الطالب...",
+    "options": ["أ", "ب", "ج", "د"],
     "correctIndex": 0,
-    "explanation": "التفسير العلمي السريع للحل..."
+    "explanation": "تفسير الإجابة..."
   },
   "yemeniEncouragement": "تذكّر: المهندس اليمني ما يعرف مستحيل! 🇾🇪",
-  "followupOptions": ["اشرح بمثال عملي إضافي", "أعطني مسألة اختبار", "لم أفهم نقطة معينة"]
+  "followupOptions": ["اشرح بمثال عملي إضافي", "أعطني مسألة اختبار", "لخّص أهم القوانين"]
 }`;
 
-    let contentsPayload: any;
-    if (isBase64) {
-      let mime = 'image/jpeg';
-      let cleanData = uploadedContent;
-      if (uploadedContent.startsWith('data:')) {
-        const matches = uploadedContent.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          mime = matches[1] || mime;
-          cleanData = matches[2];
-        }
-      }
-      contentsPayload = {
-        parts: [
-          { inlineData: { mimeType: mime, data: cleanData } },
-          { text: systemPrompt },
-        ],
-      };
-    } else {
-      contentsPayload = systemPrompt;
-    }
+    const { contentsPayload, useWebTools } = buildMultimodalPayload({
+      promptText: systemPrompt,
+      uploadedContent,
+      uploadedMimeType,
+      videoFrames,
+      socialUrl,
+    });
+
+    const config: any = useWebTools
+      ? { tools: [{ urlContext: {} }, { googleSearch: {} }], maxOutputTokens: 16384 }
+      : { responseMimeType: 'application/json', maxOutputTokens: 16384 };
 
     const rawText = await generateGeminiContentWithRetry({
       contents: contentsPayload,
-      config: { responseMimeType: 'application/json' },
-      primaryModel: 'gemini-3.1-flash-lite',
-      fallbackModel: 'gemini-flash-latest',
+      config,
     });
 
     const parsedData = parseJsonSafely(rawText);
 
-    if (!isBase64 && parsedData) {
+    if (!hasMedia && parsedData) {
       aiResponseCache.set(cacheKey, parsedData, 2 * 3600 * 1000);
     }
 
@@ -1658,6 +1755,114 @@ ${serviceInstruction}
     res.status(500).json({
       success: false,
       error: error?.message || 'حدث خطأ أثناء معالجة المحاضرة في قاعة المحاضرات.',
+    });
+  }
+});
+
+// ==========================================
+// API: «حل أسئلتي» (Solve Up To 30+ Questions across All Exam Formats)
+// Supports: أتمتة (Automation), اختيارات (MCQ), صح وخطأ (True/False), مقالي (Essay), مباشر (Direct)
+// ==========================================
+geminiRouter.post('/solve-questions', async (req: Request, res: Response) => {
+  const ip = (req as any).clientIp || '127.0.0.1';
+  const estimatedTokens = (req as any).estimatedTokens || 1500;
+
+  try {
+    const {
+      questionsText = '',
+      extraNotes = '',
+      uploadedContent = '',
+      uploadedMimeType = '',
+      videoFrames = [],
+      fileName = '',
+      dialect = 'sanani',
+    } = req.body || {};
+
+    if (!questionsText.trim() && !uploadedContent.trim() && (!videoFrames || videoFrames.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        error: 'يرجى كتابة الأسئلة أو رفع ورقة الأسئلة (صورة / ملف / فيديو) ثم الضغط على "حل".',
+      });
+    }
+
+    const solvePrompt = `أنت "دكتور الميكاترونكس الذكي" المتخصص في حل جميع الأسئلة والاختبارات الهندسية والجامعية بدقة 100%.
+
+المطلوب منك في خدمة "حل أسئلتي":
+1. اقرأ واستخرج **جميع الأسئلة الموجودة** في النص أو الصورة أو ورقة الأسئلة أو الفيديو أو الملف المرفوع **دون تجاهل أي سؤال حتى لو وصلت إلى 30 سؤالاً أو أكثر في ورقة واحدة!**.
+2. صنّف كل سؤال بدقة إلى أحد الأنواع الخمسة التالية:
+   - "automation": أسئلة أتمتة / اختيار من متعدد سريع / بنوك أسئلة مؤتمتة
+   - "mcq": أسئلة اختيارات متعددة (أ، ب، ج، د)
+   - "true_false": أسئلة صح وخطأ (True / False)
+   - "essay": أسئلة مقالية وشرح نظري
+   - "direct": أسئلة مباشرة (مسائل حسابية، تعاريف، قوانين، إكمال فراغ)
+3. لكل سؤال:
+   - اكتب **finalAnswerSummary**: خلاصة الإجابة النهائية الدقيقة والمباشرة (مثلاً: "الإجابة الصحيحة: ب) 24 فولت" أو "صح" أو "I = 2.5 A").
+   - اكتب **reasonAndExplanation**: **السبب للوصول لهذا الحل** بوضوح هندسي مبسط يجعل الطالب يفهم لماذا هذه هي الإجابة الصحيحة وليس غيرها!
+   - اكتب **steps**: خطوات الحل المرتبة إذا كان السؤال حسابياً أو تحليلياً.
+4. تحدث في **doctorOverviewSpeech** بلهجة أستاذ جامعي يمني (${dialect === 'adani' ? 'عدنية' : dialect === 'taizzi' ? 'تعزية' : 'صنعانية'}) يلخص فيها محاور الأسئلة وكيفية التعامل معها في الامتحان.
+5. أرجع **boardSummaryNotes** و **diagramType** المناسب لعرض ملخص الورقة على السبورة الذكية.
+
+نص الأسئلة المرسلة من الطالب:
+${questionsText || '(انظر ورقة الأسئلة / الملف / الصورة / الفيديو المرفق)'}
+${extraNotes ? `\nملاحظات إضافية من الطالب: ${extraNotes}` : ''}
+${fileName ? `\nاسم الملف المرفق: ${fileName}` : ''}
+
+أرجع الإجابة حصراً بصيغة JSON صالح فقط بالهيكل التالي:
+{
+  "examTitle": "عنوان ورقة الأسئلة أو المادة المستخرجة",
+  "subjectArea": "التخصص/المادة (مثل: إلكترونيات القوى، تحكم آلي، دوائر كهربائية)",
+  "totalQuestionsFound": 1,
+  "doctorOverviewSpeech": "ملخص صوتي ودود بلهجة يمنية دافئة (صوت أستاذ جامعي) يشرح فكرة الأسئلة ويطمئن الطالب...",
+  "boardSummaryNotes": [
+    "أهم قاعدة أو قانون متكرر في هذه الأسئلة",
+    "نصيحة ذهبية لتجنب الأخطاء الشائعة في هذا الامتحان",
+    "ملخص توزيع الأسئلة"
+  ],
+  "boardKeyFormula": "أهم قانون رئيسي في الورقة",
+  "diagramType": "circuit",
+  "questions": [
+    {
+      "questionNumber": 1,
+      "questionText": "نص السؤال المستخرج كاملاً بوضوح",
+      "questionType": "mcq",
+      "options": ["أ) ...", "ب) ...", "ج) ...", "د) ..."],
+      "finalAnswerSummary": "خلاصة الحل والإجابة النهائية الدقيقة",
+      "reasonAndExplanation": "السبب العلمي والمنطقي للوصول لهذا الحل بأسلوب واضح ومقنع للطالب...",
+      "steps": ["الخطوة 1...", "الخطوة 2..."],
+      "keyFormula": "القانون المستخدم إن وجد"
+    }
+  ]
+}`;
+
+    const { contentsPayload, useWebTools } = buildMultimodalPayload({
+      promptText: solvePrompt,
+      uploadedContent,
+      uploadedMimeType,
+      videoFrames,
+    });
+
+    const config: any = useWebTools
+      ? { tools: [{ urlContext: {} }, { googleSearch: {} }], maxOutputTokens: 32768 }
+      : { responseMimeType: 'application/json', maxOutputTokens: 32768 };
+
+    const rawText = await geminiQueue.enqueue(ip, estimatedTokens, async () => {
+      return await generateGeminiContentWithRetry({
+        contents: contentsPayload,
+        config,
+      });
+    });
+
+    const parsedData = parseJsonSafely(rawText || '{}');
+    if (Array.isArray(parsedData.questions)) {
+      parsedData.totalQuestionsFound = parsedData.questions.length;
+    }
+
+    res.json({ success: true, data: parsedData });
+  } catch (error: any) {
+    console.error('[Solve Questions API Error]:', error);
+    res.status(500).json({
+      success: false,
+      error: error?.message || 'حدث خطأ أثناء استخراج وحل الأسئلة.',
     });
   }
 });

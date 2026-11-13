@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Sparkles, MessageSquare, CheckCircle2, HelpCircle, AlertOctagon,
-  Mic, MicOff, Send, Upload, FileText, Download, RotateCcw,
-  BookOpen, ChevronRight, Award, Check, X, ArrowLeft, Layers, Volume2
+  Sparkles, CheckCircle2, AlertOctagon, Mic, MicOff, Upload, FileText, Download,
+  BookOpen, Award, Check, X, Video, Image as ImageIcon, Link2, Type, MessageSquare,
+  Lightbulb, Factory, ChevronRight, Trash2, Play
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SmartBoardCanvas } from './SmartBoardCanvas';
@@ -15,49 +15,51 @@ import {
   CourseSubject,
   LectureHallResponseData
 } from '../../services/lectureHallApi';
-import { readFileAsBase64OrText } from '../../services/explainLessonApi';
+import { processUploadedMedia, ProcessedMediaResult } from '../../services/mediaExtractor';
+
+type ExplainInputMode = 'text' | 'image' | 'video' | 'file' | 'social_url';
 
 const DEFAULT_WELCOME: LectureHallResponseData = {
   doctorSpeech:
-    'أهلاً وسهلاً بك يا مهندس في قاعة المحاضرات والسبورة الذكية! أنا دكتور الميكاترونكس، ومعنا اليوم سبورتنا التفاعلية. اختر أي خدمة من الخدمات الخمس، أو اطرح أي سؤال في مقررات الميكاترونكس وسأشرحه لك بالهندسة والواقع، حبة حبة، وتذكّر: المهندس اليمني ما يعرف مستحيل!',
-  boardTitle: 'قاعة المحاضرات الذكية · هندسة الميكاترونكس',
+    'أهلاً وسهلاً بك يا مهندس في قاعة المحاضرات والسبورة الذكية! اختر طريقة إدخال الدرس — نص، صورة، فيديو، ملف، أو حتى رابط فيديو من مواقع التواصل — وأضف أي تفاصيل تريدها ثم اضغط "اشرح"، وسأستخرج لك كل الشرح على السبورة بالأنيميشن واللهجة اليمنية!',
+  boardTitle: 'قاعة المحاضرات الذكية · قسم «اشرح لي»',
   boardNotes: [
-    'الربط التكاملي بين الميكانيكا، الإلكترونيات، والبرمجة',
-    'التحكم الدقيق في المحركات والأنظمة المضمنة Actuators & Sensors',
-    'تصميم وتنفيذ المشاريع الهندسية الذكية بكفاءة عالية',
+    'استخراج شامل لجميع المفاهيم من النص أو الصورة أو الفيديو أو الرابط',
+    'شرح مبسّط باللهجة اليمنية وأمثلة من الحياة والهندسة',
+    'رسومات تفاعلية متحركة على السبورة لتسريع الفهم',
   ],
-  boardEquation: 'System = Mechanical + Electronics + Software',
+  boardEquation: 'Understanding = Visual Animation + Yemeni Intuition + Engineering Math',
   diagramType: 'circuit',
-  diagramTitle: 'المفهوم الأساسي للمنظومة الذكية',
+  diagramTitle: 'السبورة الذكية التفاعلية للميكاترونكس',
   yemeniEncouragement: 'تذكّر: المهندس اليمني ما يعرف مستحيل! 🇾🇪',
   followupOptions: [
     'اشرح لي قانون أوم بتشبيه شبكة المياه بصنعاء',
-    'كيف يعمل محرك السيرفو ومسننات سوق الملح؟',
-    'أعطني مسألة اختبار هندسية',
+    'كيف يعمل محرك السيرفو وPWM؟',
+    'اشرح لي دائرة الترانزستور كمفتاح إلكتروني',
   ],
 };
 
 export const LectureHallPage: React.FC = () => {
-  // Dialect & Course Selection
   const [activeDialect, setActiveDialect] = useState<YemeniDialect>('sanani');
   const [activeCourse, setActiveCourse] = useState<CourseSubject>('electronics');
   const [activeService, setActiveService] = useState<LectureServiceType>('explain');
+  const [inputMode, setInputMode] = useState<ExplainInputMode>('text');
 
   // Input States
   const [inputText, setInputText] = useState('');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [uploadedBase64, setUploadedBase64] = useState<string>('');
+  const [extraDetails, setExtraDetails] = useState('');
+  const [socialUrl, setSocialUrl] = useState('');
+  const [processedMedia, setProcessedMedia] = useState<ProcessedMediaResult | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recognitionObj, setRecognitionObj] = useState<any>(null);
 
-  // Homework Solver Step state
+  // Solver & Emergency States
   const [currentStepIndex, setCurrentStepIndex] = useState(1);
-
-  // Emergency Did Not Understand state
   const [confusionChoice, setConfusionChoice] = useState<'concept' | 'math' | 'wiring'>('concept');
 
   // Execution & Progress State
   const [isLoading, setIsLoading] = useState(false);
+  const [isReadingMedia, setIsReadingMedia] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [lectureData, setLectureData] = useState<LectureHallResponseData>(DEFAULT_WELCOME);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -67,48 +69,26 @@ export const LectureHallPage: React.FC = () => {
   const [isQuizAnswered, setIsQuizAnswered] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
 
-  // Saved Notes history in localStorage
-  const [savedNotes, setSavedNotes] = useState<{ id: string; title: string; date: string; data: LectureHallResponseData }[]>([]);
-  const [showSavedNotesDrawer, setShowSavedNotesDrawer] = useState(false);
-
-  // Speech Recognition Setup (Web Speech API)
+  // Speech Recognition Setup
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const reco = new SpeechRecognition();
-        reco.lang = 'ar-YE'; // Yemeni Arabic
+        reco.lang = 'ar-YE';
         reco.continuous = false;
         reco.interimResults = false;
-
         reco.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setInputText(transcript);
+          setInputText((prev) => `${prev ? prev + ' ' : ''}${event.results[0][0].transcript}`);
           setIsRecording(false);
         };
-
-        reco.onerror = () => {
-          setIsRecording(false);
-        };
-
-        reco.onend = () => {
-          setIsRecording(false);
-        };
-
+        reco.onerror = () => setIsRecording(false);
+        reco.onend = () => setIsRecording(false);
         setRecognitionObj(reco);
       }
     }
 
-    try {
-      const stored = localStorage.getItem('dr_mecha_lecture_notes');
-      if (stored) setSavedNotes(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  // Play Doctor Welcome Speech on first load
-  useEffect(() => {
-    // Speak initial welcome
     yemeniDoctorVoice.speak(
       DEFAULT_WELCOME.doctorSpeech,
       () => setIsSpeaking(true),
@@ -156,10 +136,9 @@ export const LectureHallPage: React.FC = () => {
 
   const handleToggleVoiceInput = () => {
     if (!recognitionObj) {
-      alert('المتصفح الحالي لا يدعم التعرف الصوتي المباشر. يمكنك الكتابة في المربع.');
+      setErrorMsg('المتصفح لا يدعم الإملاء الصوتي المباشر. يمكنك الكتابة في المربع.');
       return;
     }
-
     if (isRecording) {
       recognitionObj.stop();
       setIsRecording(false);
@@ -169,23 +148,29 @@ export const LectureHallPage: React.FC = () => {
     }
   };
 
-  const handleFileProcess = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileProcess = async (e: React.ChangeEvent<HTMLInputElement>, expectedKind?: ExplainInputMode) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadedFile(file);
+    setErrorMsg('');
+    setIsReadingMedia(true);
     try {
-      const res = await readFileAsBase64OrText(file);
-      setUploadedBase64(res.content);
+      const processed = await processUploadedMedia(file);
+      setProcessedMedia(processed);
+      if (expectedKind) setInputMode(expectedKind);
     } catch {
-      setErrorMsg('تعذر قراءة الملف.');
+      setErrorMsg('تعذر معالجة الملف المرفوع. يرجى المحاولة بملف آخر.');
+    } finally {
+      setIsReadingMedia(false);
     }
   };
 
-  // Submit to Backend
   const handleSubmitService = async (overridePrompt?: string, customStepIndex?: number) => {
-    const promptToSend = overridePrompt || inputText;
-    if (!promptToSend.trim() && !uploadedBase64 && activeService !== 'quiz_me') {
-      setErrorMsg('يرجى كتابة السؤال أو اختيار موضوع أو رفع صورة المسألة.');
+    const promptToSend = overridePrompt ?? inputText;
+    const hasMedia = Boolean(processedMedia?.content || (processedMedia?.videoFrames && processedMedia.videoFrames.length > 0));
+    const hasSocial = Boolean(socialUrl.trim());
+
+    if (!promptToSend.trim() && !hasMedia && !hasSocial && !extraDetails.trim() && activeService !== 'quiz_me') {
+      setErrorMsg('يرجى كتابة نص الدرس، أو رفع صورة/فيديو/ملف، أو وضع رابط الفيديو ثم الضغط على «اشرح».');
       return;
     }
 
@@ -201,9 +186,14 @@ export const LectureHallPage: React.FC = () => {
         serviceType: activeService,
         dialect: activeDialect,
         courseSubject: activeCourse,
-        topic: promptToSend.slice(0, 80),
+        topic: (promptToSend || processedMedia?.fileName || socialUrl || extraDetails).slice(0, 90),
         question: promptToSend,
-        uploadedContent: uploadedBase64,
+        extraDetails: extraDetails.trim() || undefined,
+        socialUrl: socialUrl.trim() || undefined,
+        uploadedContent: processedMedia?.content,
+        uploadedMimeType: processedMedia?.mimeType,
+        videoFrames: processedMedia?.videoFrames,
+        fileName: processedMedia?.fileName,
         stepIndex: customStepIndex || currentStepIndex,
         confusionPoint:
           activeService === 'did_not_understand'
@@ -217,7 +207,6 @@ export const LectureHallPage: React.FC = () => {
 
       setLectureData(result);
 
-      // Play Doctor Voice automatically
       if (result.doctorSpeech) {
         yemeniDoctorVoice.speak(
           result.doctorSpeech,
@@ -227,56 +216,30 @@ export const LectureHallPage: React.FC = () => {
         );
       }
 
-      // If quiz, celebration if correct
-      if (activeService === 'quiz_me') {
-        setSelectedQuizAnswer(null);
-      }
-
-      // Save to history automatically
-      const newNote = {
-        id: `note_${Date.now()}`,
-        title: result.boardTitle || promptToSend.slice(0, 40),
-        date: new Date().toLocaleDateString('ar-EG'),
-        data: result,
-      };
-      const updatedNotes = [newNote, ...savedNotes.slice(0, 15)];
-      setSavedNotes(updatedNotes);
-      try {
-        localStorage.setItem('dr_mecha_lecture_notes', JSON.stringify(updatedNotes));
-      } catch {}
-
-      if (activeService === 'explain' || activeService === 'solve_homework') {
-        confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+      if (activeService === 'explain') {
+        confetti({ particleCount: 35, spread: 50, origin: { y: 0.6 } });
       }
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'حدث خطأ أثناء إعداد المحاضرة.');
+      setErrorMsg(err.message || 'حدث خطأ أثناء استخراج الشرح على السبورة الذكية.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Answer Quiz Option
   const handleAnswerQuiz = (index: number) => {
     if (isQuizAnswered || !lectureData?.quiz) return;
     setSelectedQuizAnswer(index);
     setIsQuizAnswered(true);
 
-    const isCorrect = index === lectureData.quiz.correctIndex;
-    if (isCorrect) {
+    if (index === lectureData.quiz.correctIndex) {
       setQuizScore((prev) => prev + 25);
       confetti({ particleCount: 70, spread: 70, origin: { y: 0.5 } });
-      yemeniDoctorVoice.speak(
-        'صح لسانك يا بطل! كفو يا مهندس اليمن، إجابة هندسية نموذجية ودقيقة 🇾🇪!'
-      );
+      yemeniDoctorVoice.speak('صح لسانك يا بطل! كفو يا مهندس اليمن، إجابة هندسية نموذجية ودقيقة 🇾🇪!');
     } else {
-      yemeniDoctorVoice.speak(
-        'ما عليه يا ابني، الغلط هو بداية الفهم الحقيقي. ركّز في تفسير السؤال والتعويض الصحيح.'
-      );
+      yemeniDoctorVoice.speak('ما عليه يا ابني، الغلط هو بداية الفهم الحقيقي. ركّز في تفسير السؤال.');
     }
   };
 
-  // Export / Print Summary Notes
   const handleExportSummary = () => {
     if (!lectureData) return;
     const content = `================================================
@@ -284,56 +247,43 @@ export const LectureHallPage: React.FC = () => {
 ================================================
 عنوان الدرس: ${lectureData.boardTitle}
 المعادلة الرئيسية: ${lectureData.boardEquation || 'لا توجد'}
-المقرر: ${activeCourse} | اللهجة: ${activeDialect}
 
-شرح دكتور الميكاترونكس:
+الشرح باللهجة اليمنية:
 ${lectureData.doctorSpeech}
 
-ملاحظات السبورة الذكية:
+نقاط السبورة الذكية:
 ${lectureData.boardNotes.map((n, i) => `${i + 1}. ${n}`).join('\n')}
 
-${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[${s.phase}]\n${s.details}`).join('\n\n') : ''}
-
-حكمة المهندس: ${lectureData.yemeniEncouragement || 'المهندس اليمني ما يعرف مستحيل'}
-تاريخ المحاضرة: ${new Date().toLocaleString('ar-EG')}
+${lectureData.steps ? `خطوات الفهم المستخرجة:\n${lectureData.steps.map((s) => `- ${s.phase}: ${s.details}`).join('\n')}` : ''}
 `;
-
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${lectureData.boardTitle.replace(/[\/\\?%*:|"<>]/g, '_')}_محاضرة.txt`;
+    a.download = `${(lectureData.boardTitle || 'محاضرة').replace(/[\/\\?%*:|"<>]/g, '_')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="space-y-6 pb-20 font-sans select-none text-slate-100 w-full max-w-full overflow-x-hidden min-w-0">
-      
-      {/* =========================================================================
-          SECTION 1: Top Lecture Hall Navigation & Preferences
-          ========================================================================= */}
-      <section className="bg-gradient-to-br from-[#0F1D33] via-[#0A1628] to-[#141F36] border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        
-        {/* Title & Badge */}
+    <div className="space-y-5 pb-20 font-sans text-[#0F172A] dark:text-slate-100 w-full max-w-full overflow-x-hidden min-w-0">
+      {/* SECTION 1: Top Hall Preferences & Dialect Selector */}
+      <section className="champagne-card dark:bg-gradient-to-br dark:from-[#0F1D33] dark:via-[#0A1628] dark:to-[#141F36] dark:border-2 dark:border-amber-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div className="space-y-1 text-right">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>قاعة المحاضرات التفاعلية 🎓</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E0F2FE] dark:bg-amber-500/15 border border-[#0EA5E9]/30 dark:border-amber-400/40 text-[#0284C7] dark:text-amber-300 text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-[#0EA5E9] dark:bg-emerald-400 animate-pulse" />
+            <span>الخدمة 1 · قاعة المحاضرات الذكية 🎓</span>
           </div>
-          <h1 className="text-xl sm:text-3xl font-black text-white">
-            سبورة <span className="gold-gradient-text">دكتور الميكاترونكس</span> الذكية
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-[#0F172A] dark:text-white">
+            قسم <span className="text-[#0EA5E9] dark:text-amber-400">«اشرح لي»</span> والسبورة الذكية
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300">
-            بيئة تفاعلية حية بلهجة يمنية أصيلة، سبورة ترسم الأنيميشن، وتفاعل مباشر كأنك في قلب قاعة الجامعة.
+          <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300">
+            اكتب نصاً أو ارفع صورة أو فيديو أو ملفاً أو رابط فيديو من التواصل الاجتماعي + تفاصيلك الإضافية، وسيشرحها الدكتور بالأنيميشن واللهجة اليمنية!
           </p>
         </div>
 
-        {/* Dialect Switcher & Course Selector Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start sm:justify-end">
-          
-          {/* Dialect Switcher (صنعاني / عدني / تعزي) */}
-          <div className="flex items-center bg-[#070F1E] p-1 rounded-2xl border border-slate-700/80 text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center bg-white dark:bg-[#070F1E] p-1 rounded-2xl border border-[rgba(212,175,55,0.35)] dark:border-slate-700/80 text-xs font-bold shadow-sm">
             {[
               { id: 'sanani', label: 'صنعاني 🇾🇪' },
               { id: 'adani', label: 'عدني 🏖️' },
@@ -342,10 +292,10 @@ ${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[
               <button
                 key={d.id}
                 onClick={() => setActiveDialect(d.id as YemeniDialect)}
-                className={`px-3 py-1.5 rounded-xl transition-all ${
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                   activeDialect === d.id
-                    ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-black shadow-sm'
+                    : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
                 }`}
               >
                 {d.label}
@@ -353,11 +303,10 @@ ${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[
             ))}
           </div>
 
-          {/* Course Subject Selector */}
           <select
             value={activeCourse}
             onChange={(e) => setActiveCourse(e.target.value as CourseSubject)}
-            className="px-3 py-2 rounded-2xl bg-[#070F1E] border border-amber-500/40 text-xs font-bold text-amber-300 outline-none cursor-pointer"
+            className="px-3 py-2 rounded-2xl bg-white dark:bg-[#070F1E] border border-[rgba(212,175,55,0.4)] dark:border-amber-500/40 text-xs font-bold text-[#0F172A] dark:text-amber-300 outline-none shadow-sm"
           >
             <option value="electronics">⚡ الإلكترونيات والدوائر</option>
             <option value="control">🛡️ التحكم الآلي و PLC</option>
@@ -366,59 +315,24 @@ ${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[
             <option value="robotics">🤖 الروبوتات والذكاء الاصطناعي</option>
           </select>
 
-          {/* Export Notes Button */}
           <button
             onClick={handleExportSummary}
-            className="px-3 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors"
-            title="تصدير وحفظ ملاحظات المحاضرة"
+            className="px-3 py-2 rounded-2xl bg-[#E0F2FE] hover:bg-sky-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0284C7] dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-[#0EA5E9]/30 dark:border-slate-700 cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">احفظ الملخص</span>
+            <Download className="w-3.5 h-3.5 text-[#0EA5E9] dark:text-cyan-400" />
+            <span>حفظ الشرح</span>
           </button>
         </div>
-
       </section>
 
-      {/* =========================================================================
-          SECTION 2: The 5 Core Service Selector Tabs
-          ========================================================================= */}
-      <section className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+      {/* SECTION 2: Hall Sub-Sections Navigation */}
+      <section className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
-          {
-            id: 'explain',
-            label: '1. اشرح لي',
-            desc: 'شرح المفهوم بأسلوب وتشبيه يمني',
-            badge: '💡 شرح مبسط',
-            color: 'from-amber-500 to-orange-500',
-          },
-          {
-            id: 'ask_doctor',
-            label: '2. اسأل دكتورك',
-            desc: 'حوار مباشر بالصوت والنص',
-            badge: '🎙️ محادثة تفاعلية',
-            color: 'from-cyan-500 to-blue-500',
-          },
-          {
-            id: 'solve_homework',
-            label: '3. حل أسئلتي',
-            desc: 'حل المسائل والواجبات خطوة بخطوة',
-            badge: '📐 حل مرحلي مع السبب',
-            color: 'from-emerald-500 to-teal-500',
-          },
-          {
-            id: 'quiz_me',
-            label: '4. اختبرني',
-            desc: 'سؤال تفاعلي بشارة مهندس يمني',
-            badge: '🏆 نقاط وشارات 🇾🇪',
-            color: 'from-purple-500 to-pink-500',
-          },
-          {
-            id: 'did_not_understand',
-            label: '5. لم أفهم',
-            desc: 'زر الطوارئ لإعادة الشرح بزاوية أخرى',
-            badge: '🚨 طوارئ تعليمية',
-            color: 'from-rose-500 to-red-600',
-          },
+          { id: 'explain', label: 'قسم اشرح لي ✨', desc: 'نص/صورة/فيديو/ملف/رابط + تفاصيل' },
+          { id: 'solve_homework', label: 'تبسيط وخطوات 📐', desc: 'تفكيك الدرس 4 مراحل' },
+          { id: 'ask_doctor', label: 'مناقشة القاعة 💬', desc: 'استفسار سريع داخل المحاضرة' },
+          { id: 'quiz_me', label: 'اختبرني سريعاً 🏆', desc: 'سؤال فوري على السبورة' },
+          { id: 'did_not_understand', label: 'لم أفهم (طوارئ) 🚨', desc: 'إعادة شرح بتشبيه أبسط' },
         ].map((srv) => {
           const isActive = activeService === srv.id;
           return (
@@ -427,32 +341,262 @@ ${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[
               onClick={() => {
                 setActiveService(srv.id as LectureServiceType);
                 if (srv.id === 'quiz_me') {
-                  handleSubmitService('سؤال اختبار ذكي في المقرر', 1);
+                  handleSubmitService('أعطني سؤال اختبار ذكي في المقرر مع الشرح', 1);
                 }
               }}
-              className={`p-3.5 rounded-2xl border text-right transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
+              className={`p-3 rounded-2xl border text-right transition-all flex flex-col justify-between gap-1 cursor-pointer ${
                 isActive
-                  ? 'bg-gradient-to-br from-[#0D2240] to-[#0A1628] border-amber-400 shadow-xl shadow-amber-500/20 text-white'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-[#0EA5E9] border-[#0284C7] shadow-md shadow-sky-500/20 text-white dark:bg-gradient-to-br dark:from-[#0D2240] dark:to-[#0A1628] dark:border-amber-400 dark:shadow-lg dark:text-white'
+                  : 'champagne-subcard dark:bg-slate-900/80 dark:border-slate-800 text-[#475569] dark:text-slate-400 hover:border-[#0EA5E9] dark:hover:text-white dark:hover:bg-slate-800'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className={`text-xs font-black ${isActive ? 'text-amber-300' : 'text-slate-200'}`}>
-                  {srv.label}
-                </span>
-                <span className="text-[10px] font-mono">{srv.badge}</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-tight">
+              <span className={`text-xs font-black ${isActive ? 'text-white dark:text-amber-300' : 'text-[#0F172A] dark:text-slate-200'}`}>
+                {srv.label}
+              </span>
+              <span className={`text-[10px] leading-tight ${isActive ? 'text-sky-50 dark:text-slate-300' : 'text-[#475569] dark:text-slate-400'}`}>
                 {srv.desc}
-              </p>
+              </span>
             </button>
           );
         })}
       </section>
 
-      {/* =========================================================================
-          SECTION 3: The Central Interactive Smart Board Canvas
-          ========================================================================= */}
+      {/* SECTION 3: Multimodal Input Dock (Text, Image, Video, File, Social Link + Extra Details + "اشرح") */}
+      <section className="champagne-card dark:bg-[#0A1628] dark:border-2 dark:border-cyan-500/40 rounded-2xl sm:rounded-3xl p-4 sm:p-5 space-y-4">
+        {/* 5 Input Modality Tabs */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-black text-[#0F172A] dark:text-amber-300 ml-1">اختر نوع المحتوى:</span>
+          {[
+            { id: 'text', label: 'كتابة نص', icon: Type },
+            { id: 'image', label: 'رفع صورة', icon: ImageIcon },
+            { id: 'video', label: 'رفع فيديو', icon: Video },
+            { id: 'file', label: 'رفع ملف PDF/مستند', icon: FileText },
+            { id: 'social_url', label: 'رابط فيديو تواصل اجتماعي', icon: Link2 },
+          ].map((m) => {
+            const Icon = m.icon;
+            const active = inputMode === m.id;
+            return (
+              <button
+                type="button"
+                key={m.id}
+                onClick={() => setInputMode(m.id as ExplainInputMode)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all min-h-[40px] cursor-pointer ${
+                  active
+                    ? 'bg-[#0EA5E9] text-white dark:bg-cyan-500 dark:text-slate-950 font-black shadow-md'
+                    : 'bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-slate-300 hover:border-[#0EA5E9] dark:hover:border-amber-400'
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white dark:text-slate-950' : 'text-[#0EA5E9] dark:text-slate-300'}`} />
+                <span>{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active Modality Inputs */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          {/* Primary Input Zone */}
+          <div className="lg:col-span-7 space-y-3">
+            {inputMode === 'social_url' && (
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-[#0EA5E9]/40 dark:border-cyan-500/40 space-y-2">
+                <label className="text-xs font-bold text-[#0284C7] dark:text-cyan-300 flex items-center gap-1.5">
+                  <Link2 className="w-4 h-4" />
+                  <span>رابط فيديو من مواقع التواصل الاجتماعي (YouTube, TikTok, Instagram, Facebook, X):</span>
+                </label>
+                <input
+                  type="url"
+                  dir="ltr"
+                  value={socialUrl}
+                  onChange={(e) => setSocialUrl(e.target.value)}
+                  placeholder="https://youtube.com/... أو https://tiktok.com/..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-[#0F172A] dark:text-cyan-300 text-xs font-mono focus:border-[#0EA5E9] dark:focus:border-amber-400 outline-none"
+                />
+              </div>
+            )}
+
+            {(inputMode === 'image' || inputMode === 'video' || inputMode === 'file') && (
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/90 border-2 border-dashed border-[#0EA5E9]/45 dark:border-cyan-500/40 hover:border-[#0284C7] dark:hover:border-amber-400 transition-colors">
+                <label className="flex flex-col items-center justify-center gap-2 cursor-pointer text-center">
+                  <span className="w-12 h-12 rounded-2xl sky-icon-box flex items-center justify-center">
+                    <Upload className="w-6 h-6" />
+                  </span>
+                  <span className="text-xs font-black text-[#0F172A] dark:text-white">
+                    {inputMode === 'image' && 'اضغط لرفع صورة صفحة الكتاب أو الدائرة أو اللوحة'}
+                    {inputMode === 'video' && 'اضغط لرفع فيديو الشرح (سيتم استخراج الإطارات وتحليلها تلقائياً)'}
+                    {inputMode === 'file' && 'اضغط لرفع ملف (PDF, Word, TXT, Arduino Code)'}
+                  </span>
+                  <input
+                    type="file"
+                    accept={
+                      inputMode === 'image'
+                        ? 'image/*'
+                        : inputMode === 'video'
+                        ? 'video/*'
+                        : '.pdf,.doc,.docx,.txt,.ppt,.pptx,.ino,.cpp,.py'
+                    }
+                    onChange={(e) => handleFileProcess(e, inputMode)}
+                    className="hidden"
+                  />
+                </label>
+
+                {isReadingMedia && (
+                  <p className="text-center text-xs text-[#0284C7] dark:text-amber-300 font-bold mt-2 animate-pulse">
+                    جاري تجهيز واستخراج بيانات الملف/الفيديو...
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Main Text Box + Voice Dictation */}
+            <div className="relative">
+              <textarea
+                rows={inputMode === 'text' ? 4 : 2}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder={
+                  inputMode === 'text'
+                    ? 'اكتب نص المحاضرة أو المفهوم أو السؤال الهندسي الذي تريد أن يشرحه الدكتور على السبورة...'
+                    : 'عنوان الدرس أو نص إضافي مع المرفق (اختياري)...'
+                }
+                className="w-full p-3.5 pl-12 rounded-2xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs sm:text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none resize-y shadow-inner"
+              />
+              <button
+                type="button"
+                onClick={handleToggleVoiceInput}
+                className={`absolute left-3 top-3 p-2 rounded-xl transition-all cursor-pointer ${
+                  isRecording
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'bg-[#E0F2FE] dark:bg-slate-800 text-[#0284C7] dark:text-slate-300 hover:bg-[#0EA5E9] hover:text-white dark:hover:text-amber-400'
+                }`}
+                title="إملاء صوتي"
+              >
+                {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Additional Details Textarea + Media Preview */}
+          <div className="lg:col-span-5 flex flex-col justify-between gap-3">
+            <div className="space-y-1.5 flex-1">
+              <label className="text-xs font-black text-[#0F172A] dark:text-amber-300 flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4 text-[#0EA5E9] dark:text-amber-300" />
+                <span>مربع كتابة تفاصيل إضافية (اختياري):</span>
+              </label>
+              <textarea
+                rows={4}
+                value={extraDetails}
+                onChange={(e) => setExtraDetails(e.target.value)}
+                placeholder="مثال: ركّز على القوانين، أعطني تشبيهاً بسيطاً جداً، واشرح لي الجزء العملي في السوق والمصنع..."
+                className="w-full p-3 rounded-2xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-amber-500/30 text-[#0F172A] dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none resize-none shadow-inner"
+              />
+            </div>
+
+            {processedMedia && (
+              <div className="p-2.5 rounded-xl bg-[#E0F2FE] dark:bg-emerald-500/10 border border-[#0EA5E9]/40 dark:border-emerald-500/40 flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  {processedMedia.mediaKind === 'image' && processedMedia.previewUrl && (
+                    <img src={processedMedia.previewUrl} alt="preview" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-bold text-[#0F172A] dark:text-emerald-300 truncate">{processedMedia.fileName}</div>
+                    <div className="text-[10px] text-[#475569] dark:text-slate-300">
+                      {processedMedia.videoFrames?.length
+                        ? `تم استخراج ${processedMedia.videoFrames.length} إطارات فيديو للتحليل`
+                        : 'مرفق جاهز لاستخراج الشرح'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProcessedMedia(null)}
+                  className="p-1.5 rounded-lg text-rose-500 dark:text-rose-400 hover:bg-rose-500/15"
+                  title="إزالة المرفق"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Topic Chips + Big «اشرح» Button */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs min-w-0 flex-1">
+            <span className="text-[#475569] dark:text-slate-400 font-bold shrink-0 text-[11px]">اقتراحات سريعة:</span>
+            {(lectureData?.followupOptions || DEFAULT_WELCOME.followupOptions || []).map((opt, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  setInputText(opt);
+                  handleSubmitService(opt);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#475569] dark:text-slate-300 hover:text-[#0284C7] hover:border-[#0EA5E9] dark:hover:text-amber-300 dark:hover:border-amber-400 whitespace-nowrap shrink-0 text-[11px] cursor-pointer"
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleSubmitService()}
+            disabled={isLoading || isReadingMedia}
+            className={`px-8 py-3.5 rounded-2xl text-sm font-black flex items-center justify-center gap-2 shadow-lg transition-all shrink-0 cursor-pointer ${
+              isLoading || isReadingMedia
+                ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                : 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-400 dark:via-orange-500 dark:to-amber-500 dark:text-slate-950 hover:scale-[1.02] active:scale-95 shadow-sky-500/25 dark:shadow-amber-500/30'
+            }`}
+          >
+            {isLoading ? (
+              <span>جاري استخراج الشرح على السبورة...</span>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-current" />
+                <span>اشرح</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-xs font-bold text-right">
+            {errorMsg}
+          </div>
+        )}
+      </section>
+
+      {/* Emergency Confusion Chooser (if active) */}
+      {activeService === 'did_not_understand' && (
+        <section className="bg-rose-50 dark:bg-[#1a0f1d] border-2 border-rose-300 dark:border-rose-500/40 rounded-3xl p-4 sm:p-5 shadow-lg space-y-3">
+          <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-black text-sm">
+            <AlertOctagon className="w-5 h-5 text-rose-500 dark:text-rose-400 animate-pulse" />
+            <span>وين بالضبط وقفت معك؟ حدّد نقطة الغموض ليعيد الدكتور الشرح من زاوية أسهل:</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {[
+              { id: 'concept', label: '1. الفكرة النظرية', desc: 'أريد تشبيهاً أبسط من الواقع' },
+              { id: 'math', label: '2. القوانين والحسابات', desc: 'كيف نطبق الأرقام والوحدات' },
+              { id: 'wiring', label: '3. التوصيل والواقع', desc: 'كيف تركب وتعمل في المعمل' },
+            ].map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setConfusionChoice(c.id as any)}
+                className={`p-3 rounded-2xl border text-right transition-all cursor-pointer ${
+                  confusionChoice === c.id
+                    ? 'bg-rose-600 border-rose-500 text-white dark:bg-rose-500/25 dark:border-rose-400'
+                    : 'bg-white dark:bg-slate-900/60 border-rose-200 dark:border-slate-800 text-[#475569] dark:text-slate-400'
+                }`}
+              >
+                <div className="text-xs font-bold">{c.label}</div>
+                <div className={`text-[11px] ${confusionChoice === c.id ? 'text-rose-100' : 'text-[#475569] dark:text-slate-400'}`}>{c.desc}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* SECTION 4: Animated Smart Board Canvas */}
       <SmartBoardCanvas
         lectureData={lectureData}
         isSpeaking={isSpeaking}
@@ -460,9 +604,7 @@ ${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[
         onClearBoard={() => {}}
       />
 
-      {/* =========================================================================
-          SECTION 4: Animated Dr. Mechatronics Avatar with Spoken Audio
-          ========================================================================= */}
+      {/* SECTION 5: Yemeni Adult Male Doctor Avatar & Complete Audio Speech */}
       <YemeniDoctorAvatar
         doctorSpeech={lectureData?.doctorSpeech}
         isSpeaking={isSpeaking}
@@ -472,253 +614,94 @@ ${lectureData.steps ? `مراحل الحل:\n` + lectureData.steps.map((s) => `[
         dialect={activeDialect}
       />
 
-      {/* =========================================================================
-          SECTION 5: Service Specific Interaction Panels
-          ========================================================================= */}
-      
-      {/* 5A. Phase-by-Phase Steps Viewer (For 'solve_homework') */}
-      {activeService === 'solve_homework' && lectureData?.steps && lectureData.steps.length > 0 && (
-        <section className="bg-[#0A1628] border-2 border-emerald-500/40 rounded-3xl p-5 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-black text-emerald-300 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span>مراحل حل المسألة الهندسية خطوة بخطوة</span>
+      {/* SECTION 6: Extracted Complete Step-by-Step Explanation */}
+      {lectureData?.steps && lectureData.steps.length > 0 && (
+        <section className="champagne-card dark:bg-[#0A1628] dark:border dark:border-emerald-500/40 rounded-3xl p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-base sm:text-lg font-black text-[#0F172A] dark:text-emerald-300 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-xl sky-icon-box flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </span>
+              <span>الشرح التفصيلي المستخرج خطوة بخطوة</span>
             </h3>
-            <span className="text-xs font-mono font-bold text-amber-300">
-              المرحلة {currentStepIndex} من {lectureData.steps.length}
-            </span>
+            {activeService === 'solve_homework' && (
+              <button
+                onClick={() => {
+                  const next = currentStepIndex < (lectureData.steps?.length || 4) ? currentStepIndex + 1 : 1;
+                  setCurrentStepIndex(next);
+                  handleSubmitService(inputText, next);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-emerald-500 dark:text-slate-950 font-black text-xs flex items-center gap-1 cursor-pointer"
+              >
+                <span>المرحلة التالية</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {lectureData.steps.map((st, i) => (
               <div
                 key={i}
-                className={`p-3.5 rounded-2xl border text-right transition-all ${
-                  i + 1 === currentStepIndex
-                    ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-lg'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-300'
-                }`}
+                className="p-3.5 rounded-2xl champagne-subcard dark:bg-slate-900/80 dark:border-slate-800 hover:border-[#0EA5E9] dark:hover:border-amber-400/50 text-right space-y-1.5 transition-colors"
               >
-                <div className="text-[10px] font-bold text-emerald-400 mb-1">{st.phase}</div>
-                <div className="text-xs leading-relaxed">{st.details}</div>
+                <div className="text-xs font-black text-[#0284C7] dark:text-amber-300">{st.phase}</div>
+                <div className="text-xs text-[#475569] dark:text-slate-200 leading-relaxed">{st.details}</div>
               </div>
             ))}
-          </div>
-
-          {/* Stepper Advance Button */}
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={() => {
-                const nextStep = currentStepIndex < (lectureData.steps?.length || 4) ? currentStepIndex + 1 : 1;
-                setCurrentStepIndex(nextStep);
-                handleSubmitService(inputText, nextStep);
-              }}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs shadow-lg hover:opacity-90 flex items-center gap-2"
-            >
-              <span>{currentStepIndex < (lectureData.steps?.length || 4) ? `الانتقال للمرحلة ${currentStepIndex + 1}` : 'إعادة الحل من البداية'}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
         </section>
       )}
 
-      {/* 5B. Interactive Quiz Card on Board (For 'quiz_me') */}
+      {/* Interactive Quiz Reveal on Board */}
       {activeService === 'quiz_me' && lectureData?.quiz && (
-        <section className="bg-[#0A1628] border-2 border-purple-500/40 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-black text-purple-300 flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-400" />
-              <span>اختبار السبورة الذكي (مقرر {activeCourse})</span>
+        <section className="champagne-card dark:bg-[#0A1628] dark:border-2 dark:border-purple-500/40 rounded-3xl p-5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-base font-black text-[#0F172A] dark:text-purple-300 flex items-center gap-2">
+              <Award className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
+              <span>اختبار الفهم السريع على السبورة</span>
             </h3>
-
-            {/* Yemeni Engineer Badge Counter */}
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-bold font-mono">
-              <span>رصيد النقاط: {quizScore}</span>
-              {quizScore >= 75 && <span>🎖️ شارة مهندس يمني كفء 🇾🇪</span>}
-            </div>
+            <span className="px-3 py-1 rounded-full bg-[#E0F2FE] dark:bg-amber-500/15 border border-[#0EA5E9]/30 dark:border-amber-400/40 text-[#0284C7] dark:text-amber-300 text-xs font-bold font-mono">
+              النقاط: {quizScore}
+            </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-sm font-bold text-white text-right leading-relaxed">
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-sm font-bold text-[#0F172A] dark:text-white text-right">
             {lectureData.quiz.question}
           </div>
 
-          {/* 4 Options Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {lectureData.quiz.options.map((opt, idx) => {
               const isSelected = selectedQuizAnswer === idx;
               const isCorrect = idx === lectureData.quiz?.correctIndex;
-              let btnClass = 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800';
-
+              let btnClass = 'bg-white dark:bg-slate-900 border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-[#0F172A] dark:text-slate-200 hover:border-[#0EA5E9] dark:hover:bg-slate-800';
               if (isQuizAnswered) {
-                if (isCorrect) {
-                  btnClass = 'bg-emerald-500/25 border-emerald-400 text-emerald-200 font-bold';
-                } else if (isSelected) {
-                  btnClass = 'bg-rose-500/25 border-rose-400 text-rose-200 font-bold';
-                }
+                if (isCorrect) btnClass = 'bg-emerald-50 dark:bg-emerald-500/25 border-emerald-500 dark:border-emerald-400 text-emerald-800 dark:text-emerald-200 font-bold';
+                else if (isSelected) btnClass = 'bg-rose-50 dark:bg-rose-500/25 border-rose-500 dark:border-rose-400 text-rose-800 dark:text-rose-200 font-bold';
               }
-
               return (
                 <button
                   key={idx}
                   onClick={() => handleAnswerQuiz(idx)}
                   disabled={isQuizAnswered}
-                  className={`p-3.5 rounded-2xl border text-right text-xs transition-all flex items-center justify-between ${btnClass}`}
+                  className={`p-3.5 rounded-2xl border text-right text-xs flex items-center justify-between cursor-pointer ${btnClass}`}
                 >
                   <span>{opt}</span>
-                  {isQuizAnswered && isCorrect && <Check className="w-4 h-4 text-emerald-400" />}
-                  {isQuizAnswered && isSelected && !isCorrect && <X className="w-4 h-4 text-rose-400" />}
+                  {isQuizAnswered && isCorrect && <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+                  {isQuizAnswered && isSelected && !isCorrect && <X className="w-4 h-4 text-rose-600 dark:text-rose-400" />}
                 </button>
               );
             })}
           </div>
 
-          {/* Explanation reveal */}
           {isQuizAnswered && (
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-purple-500/30 text-xs text-slate-200 space-y-2 text-right">
-              <span className="font-bold text-amber-300">التفسير الأكاديمي للدكتور:</span>
-              <p>{lectureData.quiz.explanation}</p>
-              
-              <div className="pt-2 flex justify-end">
-                <button
-                  onClick={() => handleSubmitService('سؤال اختبار جديد في الميكاترونكس')}
-                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all"
-                >
-                  سؤال اختبار جديد 🎯
-                </button>
-              </div>
+            <div className="p-4 rounded-2xl bg-[#F8FAFC] dark:bg-slate-950/80 border border-slate-200 dark:border-purple-500/30 text-xs text-[#475569] dark:text-slate-200 text-right">
+              <strong className="text-[#0284C7] dark:text-amber-300">التفسير: </strong>
+              {lectureData.quiz.explanation}
             </div>
           )}
         </section>
       )}
-
-      {/* 5C. Emergency Confusion Chooser (For 'did_not_understand') */}
-      {activeService === 'did_not_understand' && (
-        <section className="bg-[#1a0f1d] border-2 border-rose-500/40 rounded-3xl p-5 shadow-2xl space-y-4">
-          <div className="flex items-center gap-2 text-rose-300 font-black text-sm sm:text-base">
-            <AlertOctagon className="w-5 h-5 text-rose-400 animate-pulse" />
-            <span>وين بالضبط وقفت معك؟ (حدّد نقطة الغموض وسيعيد الدكتور الشرح بزاوية ثانية):</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {[
-              { id: 'concept', label: '1. الفكرة النظرية والمفهوم', desc: 'أريد تشبيهاً أبسط بكثير من الواقع' },
-              { id: 'math', label: '2. التعويض الحسابي والرياضي', desc: 'أريد معرفة كيف طُبقت الأرقام والوحدات' },
-              { id: 'wiring', label: '3. التوصيل والواقع العملي', desc: 'أريد معرفة كيف تركب القطع بالواقع' },
-            ].map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setConfusionChoice(c.id as any)}
-                className={`p-3.5 rounded-2xl border text-right transition-all ${
-                  confusionChoice === c.id
-                    ? 'bg-rose-500/25 border-rose-400 text-white shadow-md'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-400'
-                }`}
-              >
-                <div className="text-xs font-bold mb-1">{c.label}</div>
-                <div className="text-[11px] text-slate-400">{c.desc}</div>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* =========================================================================
-          SECTION 6: Interactive Input Bar (Voice + Text + File Upload)
-          ========================================================================= */}
-      <section className="bg-[#0A1628] border-2 border-amber-500/40 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
-        
-        {/* Quick Suggestion Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
-          <span className="text-slate-400 font-bold shrink-0 text-[11px]">مواضيع مقترحة:</span>
-          {(lectureData?.followupOptions || DEFAULT_WELCOME.followupOptions || []).map((opt, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setInputText(opt);
-                handleSubmitService(opt);
-              }}
-              className="px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-300 hover:text-amber-300 hover:border-amber-400/50 whitespace-nowrap shrink-0 text-[11px] transition-all"
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-
-        {/* Input Bar with Mic, File Upload, and Send */}
-        <div className="flex flex-col sm:flex-row items-center gap-2">
-          
-          {/* Main Input Text Field */}
-          <div className="relative w-full flex-1">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmitService()}
-              placeholder={
-                activeService === 'solve_homework'
-                  ? 'اكتب المسألة أو الواجب هنا، أو ارفع صورة المسألة...'
-                  : activeService === 'ask_doctor'
-                  ? 'تحدث أو اكتب سؤالك للدكتور بالهندسة...'
-                  : 'اكتب موضوع المحاضرة الذي تريد شرحه على السبورة...'
-              }
-              className="w-full pr-4 pl-12 py-3.5 rounded-2xl bg-slate-900 border border-slate-700/80 text-white placeholder:text-slate-500 text-xs sm:text-sm focus:border-amber-400 focus:outline-none font-sans"
-            />
-
-            {/* Voice Input Button */}
-            <button
-              type="button"
-              onClick={handleToggleVoiceInput}
-              className={`absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all ${
-                isRecording
-                  ? 'bg-rose-500 text-white animate-pulse'
-                  : 'text-slate-400 hover:text-amber-400'
-              }`}
-              title="تحدث بصوتك بالهاتف أو الحاسوب"
-            >
-              {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {/* File Upload Attachment Button */}
-          <label className="p-3.5 rounded-2xl bg-slate-900 border border-slate-700/80 text-slate-300 hover:text-amber-400 hover:border-amber-400 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5 text-xs font-bold">
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">{uploadedFile ? uploadedFile.name.slice(0, 15) : 'رفع صورة'}</span>
-            <input
-              type="file"
-              accept="image/*,.pdf,.txt"
-              onChange={handleFileProcess}
-              className="hidden"
-            />
-          </label>
-
-          {/* Primary Action Button: «اطرح على السبورة» */}
-          <button
-            onClick={() => handleSubmitService()}
-            disabled={isLoading}
-            className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
-              isLoading
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-slate-950 hover:scale-105 active:scale-95 shadow-amber-500/25'
-            }`}
-          >
-            {isLoading ? (
-              <span>جاري التحضير على السبورة...</span>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                <span>شرح على السبورة الذكية</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-bold text-right">
-            {errorMsg}
-          </div>
-        )}
-      </section>
-
     </div>
   );
 };

@@ -86,33 +86,33 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-slate-900/65 dark:bg-black/85 backdrop-blur-md animate-fade-in">
       <div className="min-h-full w-full flex items-center justify-center p-3 sm:p-6 text-center">
-        <div className="relative w-full max-w-lg bg-[#0F213E] border border-amber-500/40 rounded-3xl p-5 sm:p-8 shadow-2xl text-slate-100 text-right overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="relative w-full max-w-lg champagne-card dark:bg-[#0F213E] rounded-3xl p-5 sm:p-8 shadow-2xl text-[#0F172A] dark:text-slate-100 text-right overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
           
           {/* Glow Effects */}
-          <div className="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="hidden dark:block absolute -top-24 -left-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="hidden dark:block absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 left-4 p-2 text-slate-400 hover:text-white bg-slate-800/60 rounded-full transition-colors z-10"
+            className="absolute top-4 left-4 p-2 text-[#475569] dark:text-slate-400 hover:text-[#0F172A] dark:hover:text-white bg-white dark:bg-slate-800/60 border border-[rgba(212,175,55,0.3)] dark:border-transparent rounded-full transition-colors z-10"
           >
             <X className="w-5 h-5" />
           </button>
 
           {/* Header Badge */}
-          <div className="flex items-center gap-3 mb-6 border-b border-amber-500/20 pb-4">
-            <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md shrink-0">
+          <div className="flex items-center gap-3 mb-6 border-b border-[rgba(212,175,55,0.25)] dark:border-amber-500/20 pb-4">
+            <div className="w-12 h-12 rounded-2xl p-0.5 bg-gradient-to-tr from-[#0EA5E9] via-amber-400 to-[#0284C7] shadow-md shrink-0">
               <img src={OFFICIAL_LOGO_URL} alt="Logo" className="w-full h-full object-cover rounded-xl" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-amber-400" />
-                <h3 className="text-lg font-bold text-white">مصادقة مالك المنصة</h3>
+                <ShieldCheck className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
+                <h3 className="text-lg font-bold text-[#0F172A] dark:text-white">مصادقة مالك المنصة</h3>
               </div>
-              <p className="text-xs text-amber-300/80 font-mono">
+              <p className="text-xs text-[#475569] dark:text-amber-300/80 font-mono">
                 بوابة الإدارة المركزية والتحكم الشامل · دكتور الميكاترونكس
               </p>
             </div>
@@ -125,7 +125,6 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
             { step: 2, label: 'كلمة المرور', icon: Lock },
             { step: 3, label: 'الرمز السري PIN', icon: KeyRound },
           ].map((s) => {
-            const Icon = s.icon;
             const isDone = stage > s.step;
             const isCurrent = stage === s.step;
             return (
@@ -133,15 +132,15 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     isDone
-                      ? 'bg-emerald-500 text-slate-950 font-mono'
+                      ? 'bg-emerald-500 text-white dark:text-slate-950 font-mono'
                       : isCurrent
-                      ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-500/20'
-                      : 'bg-slate-800 text-slate-400'
+                      ? 'bg-[#0EA5E9] text-white dark:bg-amber-400 dark:text-slate-950 ring-4 ring-[#0EA5E9]/20 dark:ring-amber-500/20'
+                      : 'bg-slate-200 dark:bg-slate-800 text-[#475569] dark:text-slate-400'
                   }`}
                 >
                   {isDone ? <CheckCircle2 className="w-4 h-4" /> : s.step}
                 </div>
-                <span className={`text-xs font-semibold ${isCurrent ? 'text-amber-300' : 'text-slate-400'}`}>
+                <span className={`text-xs font-semibold ${isCurrent ? 'text-[#0284C7] dark:text-amber-300' : 'text-[#475569] dark:text-slate-400'}`}>
                   {s.label}
                 </span>
               </div>
@@ -151,13 +150,13 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
 
         {/* Error / Lockout Banners */}
         {lockedSec ? (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block mb-1">تم حظر الوصول المؤقت (Brute-Force Protection)</span>
               <span>
                 تجاوزت الحد المسموح به من المحاولات الفاشلة. المتبقي حتى رفع الحظر:{' '}
-                <strong className="font-mono text-white">
+                <strong className="font-mono text-[#0F172A] dark:text-white">
                   {Math.floor(lockedSec / 60)} دقيقة و {lockedSec % 60} ثانية
                 </strong>
               </span>
@@ -166,13 +165,13 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
         ) : null}
 
         {error && !lockedSec ? (
-          <div className="mb-6 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between">
+          <div className="mb-6 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0" />
               <span>{error}</span>
             </div>
             {remainingAttempts !== null && (
-              <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-200 font-mono text-[10px]">
+              <span className="px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-200 font-mono text-[10px]">
                 محاولات: {remainingAttempts}/5
               </span>
             )}
@@ -183,8 +182,8 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
         <form onSubmit={handleNextStage} className="space-y-4">
           {stage === 1 && (
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-amber-400" />
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
                 <span>المرحلة 1: البريد الإلكتروني للمالك</span>
               </label>
               <input
@@ -194,15 +193,15 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
                 placeholder="أدخل البريد الإلكتروني للمالك"
                 disabled={!!lockedSec}
                 required
-                className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-sm"
+                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900/90 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0EA5E9] dark:focus:border-amber-400 font-mono text-sm"
               />
             </div>
           )}
 
           {stage === 2 && (
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-400" />
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
                 <span>المرحلة 2: كلمة المرور</span>
               </label>
               <input
@@ -212,15 +211,15 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
                 placeholder="أدخل كلمة المرور"
                 disabled={!!lockedSec}
                 required
-                className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-sm"
+                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900/90 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0EA5E9] dark:focus:border-amber-400 font-mono text-sm"
               />
             </div>
           )}
 
           {stage === 3 && (
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-amber-400" />
+              <label className="text-xs font-bold text-[#0F172A] dark:text-slate-300 flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
                 <span>المرحلة 3: الرمز السري PIN</span>
               </label>
               <input
@@ -231,7 +230,7 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
                 placeholder="••••"
                 disabled={!!lockedSec}
                 required
-                className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-amber-500/50 text-amber-400 text-center font-mono text-2xl tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900/90 border border-[rgba(212,175,55,0.45)] dark:border-amber-500/50 text-[#0F172A] dark:text-amber-400 text-center font-mono text-2xl tracking-[0.5em] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0EA5E9] dark:focus:border-amber-400"
               />
             </div>
           )}
@@ -245,7 +244,7 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
                   setStage((s) => (s - 1) as any);
                 }}
                 disabled={loading || !!lockedSec}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-bold transition-colors"
+                className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#475569] dark:text-slate-300 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-xs font-bold transition-colors"
               >
                 السابق
               </button>
@@ -254,7 +253,7 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
             <button
               type="submit"
               disabled={loading || !!lockedSec}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 text-white dark:text-slate-950 font-bold text-xs shadow-md transition-all disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -273,7 +272,7 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
           </div>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-slate-800/80 text-[10px] text-slate-400 text-center flex items-center justify-center gap-2 font-mono">
+        <div className="mt-6 pt-4 border-t border-[rgba(212,175,55,0.22)] dark:border-slate-800/80 text-[10px] text-[#475569] dark:text-slate-400 text-center flex items-center justify-center gap-2 font-mono">
           <span>DR. SMART MECHATRONICS</span>
           <span>•</span>
           <span>PROTECTED OWNER CONSOLE v2.5</span>

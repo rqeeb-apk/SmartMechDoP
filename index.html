@@ -1,8 +1,15 @@
 <!doctype html>
-<html lang="ar" dir="rtl" class="dark">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <script>
+      try {
+        if (localStorage.getItem('dr_smart_theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    </script>
     <title>دكتور الميكاترونكس الذكي | Dr Mecha Smart</title>
     
     <!-- Canonical URL -->
@@ -33,9 +40,9 @@
 
     <!-- PWA & Mobile Web App -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0A192F" />
+    <meta name="theme-color" content="#FFFFFF" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="دكتور الميكاترونكس" />
 
     <!-- Favicons -->
@@ -68,7 +75,7 @@
     }
     </script>
   </head>
-  <body class="bg-[#0A192F] text-slate-100 antialiased selection:bg-cyan-500 selection:text-black">
+  <body class="bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 antialiased selection:bg-[#0EA5E9] selection:text-white dark:selection:bg-cyan-500 dark:selection:text-black">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

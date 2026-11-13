@@ -13,6 +13,7 @@ import { InteractiveLabWorkspace } from './InteractiveLabWorkspace';
 
 interface LabWorkspace3DProps {
   initialLabType?: LabType;
+  initialViewMode?: '3d_sim' | 'drag_drop';
 }
 
 // Interactive 3D item placed on the workbench table
@@ -31,14 +32,27 @@ export interface Interactive3DItem {
   color?: string;
 }
 
-export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType = 'circuits' }) => {
+export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({
+  initialLabType = 'circuits',
+  initialViewMode = 'drag_drop',
+}) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const canvasOscilloscopeRef = useRef<HTMLCanvasElement | null>(null);
 
   // Lab Type & View Mode
   const [activeLab, setActiveLab] = useState<LabType>(initialLabType);
-  const [viewMode, setViewMode] = useState<'3d_sim' | 'drag_drop'>('drag_drop');
+  const [viewMode, setViewMode] = useState<'3d_sim' | 'drag_drop'>(initialViewMode);
   const [isSimulating, setIsSimulating] = useState(true);
+
+  useEffect(() => {
+    setActiveLab(initialLabType);
+  }, [initialLabType]);
+
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
   const [showControlsDock, setShowControlsDock] = useState(true);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [interactionMode, setInteractionMode] = useState<'drag' | 'orbit'>('drag');
@@ -867,10 +881,10 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
   const selectedItem = placedItems.find((i) => i.id === selectedItemId);
 
   return (
-    <div className="space-y-6 pb-12 font-sans select-none w-full max-w-full overflow-x-hidden min-w-0">
+    <div className="space-y-6 pb-12 font-sans select-none w-full max-w-full overflow-x-hidden min-w-0 text-[#0F172A] dark:text-slate-100">
       
       {/* Top Header & Lab Mode Navigation */}
-      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl w-full max-w-full min-w-0">
+      <div className="champagne-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 w-full max-w-full min-w-0">
         
         {/* Lab Switcher Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full min-w-0">
@@ -889,8 +903,8 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                 onClick={() => setActiveLab(tab.id as LabType)}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 font-extrabold'
-                    : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'
+                    ? 'bg-[#0EA5E9] text-white dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 dark:text-slate-950 shadow-md shadow-sky-500/20 dark:shadow-amber-500/20 font-extrabold'
+                    : 'bg-white text-[#475569] hover:bg-[#E0F2FE] hover:text-[#0F172A] border border-[rgba(212,175,55,0.3)] dark:bg-slate-900/90 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:border-slate-800'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -901,38 +915,38 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
         </div>
 
         {/* View Mode & Simulation Controls */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 p-1 rounded-xl text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto min-w-0">
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 p-1 rounded-xl text-xs font-bold overflow-x-auto no-scrollbar max-w-full">
             <button
               onClick={() => setViewMode('3d_sim')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-all ${
                 viewMode === '3d_sim'
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#0EA5E9] text-white dark:bg-cyan-500 dark:text-slate-950 font-bold shadow-md'
+                  : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
               }`}
             >
-              <Box className="w-3.5 h-3.5" />
+              <Box className="w-3.5 h-3.5 shrink-0" />
               <span>المحاكاة ثلاثية الأبعاد 3D</span>
             </button>
             <button
               onClick={() => setViewMode('drag_drop')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition-all ${
                 viewMode === 'drag_drop'
-                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold shadow-md'
+                  : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
               }`}
             >
-              <Zap className="w-3.5 h-3.5" />
-              <span>مختبر السحب والإفلات (2D Studio)</span>
+              <Zap className="w-3.5 h-3.5 shrink-0" />
+              <span>Circuit Wizard (2D Studio)</span>
             </button>
           </div>
 
           <button
             onClick={() => setIsSimulating(!isSimulating)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all whitespace-nowrap ${
               isSimulating
                 ? 'bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-amber-500/20'
-                : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-cyan-500/25'
+                : 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-cyan-500 dark:to-blue-600 shadow-sky-500/25 dark:shadow-cyan-500/25'
             }`}
           >
             <Play className={`w-4 h-4 ${isSimulating ? 'animate-spin' : ''}`} />
@@ -947,7 +961,7 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
       ) : (
         /* 3D Viewport with Object Dragging, Gizmo Controls & Telemetry */
         <div className="space-y-4">
-          <div className="relative w-full h-[600px] rounded-2xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-[#0A192F]">
+          <div className="relative w-full h-[600px] rounded-2xl overflow-hidden border-2 border-[rgba(212,175,55,0.45)] dark:border-slate-800 shadow-2xl bg-[#0A192F]">
             
             {/* 3D Canvas Mount */}
             <div
@@ -960,13 +974,13 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
 
             {/* Top-Left: Mode Switcher (Drag Tools vs Orbit Camera) */}
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-              <div className="bg-[#0D1B2A]/90 backdrop-blur-md border border-cyan-500/40 rounded-2xl p-1.5 flex items-center gap-1 shadow-2xl">
+              <div className="bg-white/95 dark:bg-[#0D1B2A]/90 backdrop-blur-md border border-[rgba(212,175,55,0.45)] dark:border-cyan-500/40 rounded-2xl p-1.5 flex items-center gap-1 shadow-2xl">
                 <button
                   onClick={() => setInteractionMode('drag')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                     interactionMode === 'drag'
-                      ? 'bg-amber-500 text-slate-950 font-extrabold shadow-md'
-                      : 'text-slate-300 hover:text-white'
+                      ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-extrabold shadow-md'
+                      : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-300 dark:hover:text-white'
                   }`}
                   title="سحب وتحريك الأدوات واللوحات بحرية على الطاولة"
                 >
@@ -977,8 +991,8 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                   onClick={() => setInteractionMode('orbit')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                     interactionMode === 'orbit'
-                      ? 'bg-cyan-500 text-slate-950 font-extrabold shadow-md'
-                      : 'text-slate-300 hover:text-white'
+                      ? 'bg-[#0EA5E9] text-white dark:bg-cyan-500 dark:text-slate-950 font-extrabold shadow-md'
+                      : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-300 dark:hover:text-white'
                   }`}
                   title="تدوير الكاميرا والتكبير حول الطاولة"
                 >
@@ -988,13 +1002,13 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
               </div>
 
               {/* Camera Angle Presets */}
-              <div className="bg-[#0D1B2A]/90 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 flex items-center gap-1 text-[11px] font-bold text-slate-300">
-                <span className="text-[10px] text-slate-400 font-mono px-1">المنظور:</span>
-                <button onClick={() => setCameraPreset('isometric')} className="px-2 py-1 rounded-lg hover:bg-slate-800 text-cyan-300">أيزومتري</button>
-                <button onClick={() => setCameraPreset('top')} className="px-2 py-1 rounded-lg hover:bg-slate-800">علوي</button>
-                <button onClick={() => setCameraPreset('front')} className="px-2 py-1 rounded-lg hover:bg-slate-800">أمامي</button>
-                <button onClick={() => setCameraPreset('closeup')} className="px-2 py-1 rounded-lg hover:bg-slate-800">قريب</button>
-                <button onClick={() => setCameraPreset('reset')} className="p-1 rounded-lg hover:bg-slate-800 text-amber-400" title="إعادة ضبط"><RotateCcw className="w-3 h-3" /></button>
+              <div className="bg-white/95 dark:bg-[#0D1B2A]/90 backdrop-blur-md border border-[rgba(212,175,55,0.4)] dark:border-slate-800 rounded-xl p-1.5 flex items-center gap-1 text-[11px] font-bold text-[#334155] dark:text-slate-300 shadow-lg">
+                <span className="text-[10px] text-[#475569] dark:text-slate-400 font-mono px-1">المنظور:</span>
+                <button onClick={() => setCameraPreset('isometric')} className="px-2 py-1 rounded-lg hover:bg-[#E0F2FE] dark:hover:bg-slate-800 text-[#0284C7] dark:text-cyan-300">أيزومتري</button>
+                <button onClick={() => setCameraPreset('top')} className="px-2 py-1 rounded-lg hover:bg-[#E0F2FE] dark:hover:bg-slate-800">علوي</button>
+                <button onClick={() => setCameraPreset('front')} className="px-2 py-1 rounded-lg hover:bg-[#E0F2FE] dark:hover:bg-slate-800">أمامي</button>
+                <button onClick={() => setCameraPreset('closeup')} className="px-2 py-1 rounded-lg hover:bg-[#E0F2FE] dark:hover:bg-slate-800">قريب</button>
+                <button onClick={() => setCameraPreset('reset')} className="p-1 rounded-lg hover:bg-amber-100 dark:hover:bg-slate-800 text-amber-600 dark:text-amber-400" title="إعادة ضبط"><RotateCcw className="w-3 h-3" /></button>
               </div>
             </div>
 
@@ -1002,7 +1016,7 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
               <button
                 onClick={() => setShowAddMenu(!showAddMenu)}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 dark:text-slate-950 font-extrabold text-xs shadow-lg shadow-sky-500/25 dark:shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" />
                 <span>+ إضافة أداة / لوحة للمشهد 3D</span>
@@ -1010,8 +1024,8 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
 
               {/* Dropdown Menu of 3D Components */}
               {showAddMenu && (
-                <div className="absolute top-12 right-0 w-64 bg-[#0D1B2A] border border-cyan-500/40 rounded-2xl p-2 shadow-2xl space-y-1 text-xs font-bold text-white z-50">
-                  <div className="px-2 py-1 text-[10px] text-slate-400 font-mono border-b border-slate-800">
+                <div className="absolute top-12 right-0 w-64 bg-white dark:bg-[#0D1B2A] border border-[rgba(212,175,55,0.45)] dark:border-cyan-500/40 rounded-2xl p-2 shadow-2xl space-y-1 text-xs font-bold text-[#0F172A] dark:text-white z-50">
+                  <div className="px-2 py-1 text-[10px] text-[#475569] dark:text-slate-400 font-mono border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800">
                     اختر المكون لإضافته لفضاء 3D:
                   </div>
                   {[
@@ -1026,10 +1040,10 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                     <button
                       key={comp.name}
                       onClick={() => handleAdd3DTool(comp.type as any, comp.name, comp.unit, comp.val, comp.color)}
-                      className="w-full text-right px-3 py-2 rounded-xl hover:bg-slate-800 hover:text-cyan-300 transition-colors flex items-center justify-between"
+                      className="w-full text-right px-3 py-2 rounded-xl hover:bg-[#E0F2FE] hover:text-[#0284C7] dark:hover:bg-slate-800 dark:hover:text-cyan-300 transition-colors flex items-center justify-between"
                     >
                       <span>{comp.name}</span>
-                      <span className="text-[10px] text-amber-400 font-mono">+ إضافة</span>
+                      <span className="text-[10px] text-[#0EA5E9] dark:text-amber-400 font-mono">+ إضافة</span>
                     </button>
                   ))}
                 </div>
@@ -1038,18 +1052,18 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
 
             {/* Three.js Ergonomic Collapsible Bottom Control Dock (Directives Compliant) */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-4xl">
-              <div className="bg-[#0D1B2A]/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl overflow-hidden text-slate-100">
+              <div className="bg-white/95 dark:bg-[#0D1B2A]/95 backdrop-blur-md border border-[rgba(212,175,55,0.45)] dark:border-cyan-500/30 rounded-2xl shadow-2xl overflow-hidden text-[#0F172A] dark:text-slate-100">
                 
                 {/* Dock Header Bar */}
                 <div
                   onClick={() => setShowControlsDock(!showControlsDock)}
-                  className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800/80 flex items-center justify-between cursor-pointer text-xs font-bold text-cyan-400 hover:text-white"
+                  className="px-4 py-2.5 bg-[#FDFBF7] dark:bg-slate-900/90 border-b border-[rgba(212,175,55,0.3)] dark:border-slate-800/80 flex items-center justify-between cursor-pointer text-xs font-bold text-[#0284C7] dark:text-cyan-400 hover:text-[#0EA5E9] dark:hover:text-white"
                 >
                   <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-amber-400" />
+                    <Sliders className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
                     <span>لوحة التحكم وتعديل وتحريك أدوات المختبر والمشاريع 3D</span>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-2 text-[11px] text-[#475569] dark:text-slate-400">
                     <span>{showControlsDock ? 'إخفاء لوحة التحكم' : 'عرض لوحة التحكم'}</span>
                     {showControlsDock ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                   </div>
@@ -1061,42 +1075,42 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                     
                     {/* Specialized Project Controls */}
                     {activeLab === 'robotics' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F8FAFC] dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">مفصل القاعدة Base: {jointBase}°</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">مفصل القاعدة Base: {jointBase}°</label>
                           <input
                             type="range"
                             min="0"
                             max="180"
                             value={jointBase}
                             onChange={(e) => setJointBase(parseInt(e.target.value))}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">مفصل الكتف Shoulder: {jointShoulder}°</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">مفصل الكتف Shoulder: {jointShoulder}°</label>
                           <input
                             type="range"
                             min="-45"
                             max="90"
                             value={jointShoulder}
                             onChange={(e) => setJointShoulder(parseInt(e.target.value))}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">مفصل الكوع Elbow: {jointElbow}°</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">مفصل الكوع Elbow: {jointElbow}°</label>
                           <input
                             type="range"
                             min="-90"
                             max="60"
                             value={jointElbow}
                             onChange={(e) => setJointElbow(parseInt(e.target.value))}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">موقع الروبوت X: {robotPosX.toFixed(1)}</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">موقع الروبوت X: {robotPosX.toFixed(1)}</label>
                           <input
                             type="range"
                             min="-8"
@@ -1104,16 +1118,16 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                             step="0.2"
                             value={robotPosX}
                             onChange={(e) => setRobotPosX(parseFloat(e.target.value))}
-                            className="w-full accent-amber-400"
+                            className="w-full accent-amber-500 dark:accent-amber-400"
                           />
                         </div>
                       </div>
                     )}
 
                     {activeLab === 'drones' && (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#F8FAFC] dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">ارتفاع الدرون Y: {dronePos.y.toFixed(1)}m</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">ارتفاع الدرون Y: {dronePos.y.toFixed(1)}m</label>
                           <input
                             type="range"
                             min="1.0"
@@ -1121,11 +1135,11 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                             step="0.2"
                             value={dronePos.y}
                             onChange={(e) => setDronePos({ ...dronePos, y: parseFloat(e.target.value) })}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">موقع الدرون X: {dronePos.x.toFixed(1)}</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">موقع الدرون X: {dronePos.x.toFixed(1)}</label>
                           <input
                             type="range"
                             min="-8"
@@ -1133,38 +1147,38 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                             step="0.2"
                             value={dronePos.x}
                             onChange={(e) => setDronePos({ ...dronePos, x: parseFloat(e.target.value) })}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">زاوية الميلان Pitch: {dronePitch}°</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">زاوية الميلان Pitch: {dronePitch}°</label>
                           <input
                             type="range"
                             min="-30"
                             max="30"
                             value={dronePitch}
                             onChange={(e) => setDronePitch(parseInt(e.target.value))}
-                            className="w-full accent-amber-400"
+                            className="w-full accent-amber-500 dark:accent-amber-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">دوران Yaw: {droneYaw}°</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">دوران Yaw: {droneYaw}°</label>
                           <input
                             type="range"
                             min="-180"
                             max="180"
                             value={droneYaw}
                             onChange={(e) => setDroneYaw(parseInt(e.target.value))}
-                            className="w-full accent-amber-400"
+                            className="w-full accent-amber-500 dark:accent-amber-400"
                           />
                         </div>
                       </div>
                     )}
 
                     {activeLab === 'mechanical' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#F8FAFC] dark:bg-slate-900/80 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">نسبة التروس Gear Ratio: 1:{gearRatio}</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">نسبة التروس Gear Ratio: 1:{gearRatio}</label>
                           <input
                             type="range"
                             min="0.5"
@@ -1172,11 +1186,11 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                             step="0.1"
                             value={gearRatio}
                             onChange={(e) => setGearRatio(parseFloat(e.target.value))}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">سرعة المحرك RPM: {motorRpm}</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">سرعة المحرك RPM: {motorRpm}</label>
                           <input
                             type="range"
                             min="100"
@@ -1184,11 +1198,11 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                             step="100"
                             value={motorRpm}
                             onChange={(e) => setMotorRpm(parseInt(e.target.value))}
-                            className="w-full accent-cyan-400"
+                            className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-slate-300 font-bold block">موضع الترس الثاني X: {gear2PosX.toFixed(1)}</label>
+                          <label className="text-[#0F172A] dark:text-slate-300 font-bold block">موضع الترس الثاني X: {gear2PosX.toFixed(1)}</label>
                           <input
                             type="range"
                             min="2.0"
@@ -1196,7 +1210,7 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                             step="0.2"
                             value={gear2PosX}
                             onChange={(e) => setGear2PosX(parseFloat(e.target.value))}
-                            className="w-full accent-amber-400"
+                            className="w-full accent-amber-500 dark:accent-amber-400"
                           />
                         </div>
                       </div>
@@ -1204,11 +1218,11 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
 
                     {/* Selected 3D Object Move, Position & Parameter Controls */}
                     {selectedItem ? (
-                      <div className="bg-[#0A192F] p-3 rounded-xl border border-cyan-500/40 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                      <div className="champagne-subcard dark:bg-[#0A192F] p-3 rounded-xl dark:border-cyan-500/40 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-2">
                           <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                            <span className="font-extrabold text-white text-xs">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                            <span className="font-extrabold text-[#0F172A] dark:text-white text-xs">
                               الأداة المحددة حالياً: {selectedItem.name} ({selectedItem.label})
                             </span>
                           </div>
@@ -1216,14 +1230,14 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                           <div className="flex items-center gap-2">
                             <button
                               onClick={handleDuplicateSelected3D}
-                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold flex items-center gap-1 border border-slate-700"
+                              className="px-2.5 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#0EA5E9] text-[#0284C7] hover:text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-cyan-300 font-bold flex items-center gap-1 border border-[#0EA5E9]/30 dark:border-slate-700 transition-colors"
                             >
                               <Copy className="w-3 h-3" />
                               <span>نسخ ومضاعفة</span>
                             </button>
                             <button
                               onClick={handleDeleteSelected3D}
-                              className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-300 font-bold flex items-center gap-1 border border-rose-500/30"
+                              className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-500 hover:text-white text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 font-bold flex items-center gap-1 border border-rose-300 dark:border-rose-500/30 transition-colors"
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>حذف من المشهد</span>
@@ -1234,7 +1248,7 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                         {/* Position & Angle Controls */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                           <div>
-                            <label className="text-slate-300 font-bold block mb-1">الموقع الأفقي X: {selectedItem.x.toFixed(1)}</label>
+                            <label className="text-[#0F172A] dark:text-slate-300 font-bold block mb-1">الموقع الأفقي X: {selectedItem.x.toFixed(1)}</label>
                             <input
                               type="range"
                               min="-10"
@@ -1245,12 +1259,12 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                                 const val = parseFloat(e.target.value);
                                 setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, x: val } : i)));
                               }}
-                              className="w-full accent-cyan-400"
+                              className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                             />
                           </div>
 
                           <div>
-                            <label className="text-slate-300 font-bold block mb-1">الموقع العميق Z: {selectedItem.z.toFixed(1)}</label>
+                            <label className="text-[#0F172A] dark:text-slate-300 font-bold block mb-1">الموقع العميق Z: {selectedItem.z.toFixed(1)}</label>
                             <input
                               type="range"
                               min="-6"
@@ -1261,12 +1275,12 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                                 const val = parseFloat(e.target.value);
                                 setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, z: val } : i)));
                               }}
-                              className="w-full accent-cyan-400"
+                              className="w-full accent-[#0EA5E9] dark:accent-cyan-400"
                             />
                           </div>
 
                           <div>
-                            <label className="text-slate-300 font-bold block mb-1">زاوية الدوران: {selectedItem.rotationY}°</label>
+                            <label className="text-[#0F172A] dark:text-slate-300 font-bold block mb-1">زاوية الدوران: {selectedItem.rotationY}°</label>
                             <input
                               type="range"
                               min="0"
@@ -1277,12 +1291,12 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                                 const val = parseInt(e.target.value);
                                 setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, rotationY: val } : i)));
                               }}
-                              className="w-full accent-amber-400"
+                              className="w-full accent-amber-500 dark:accent-amber-400"
                             />
                           </div>
 
                           <div>
-                            <label className="text-slate-300 font-bold block mb-1">القيمة ({selectedItem.unit}):</label>
+                            <label className="text-[#0F172A] dark:text-slate-300 font-bold block mb-1">القيمة ({selectedItem.unit}):</label>
                             <input
                               type="number"
                               value={selectedItem.value}
@@ -1290,13 +1304,13 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
                                 const val = parseFloat(e.target.value) || 0;
                                 setPlacedItems(placedItems.map((i) => (i.id === selectedItem.id ? { ...i, value: val } : i)));
                               }}
-                              className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold"
+                              className="w-full px-2 py-1 rounded bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0284C7] dark:text-amber-300 font-mono font-bold focus:border-[#0EA5E9] focus:outline-none"
                             />
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-2 text-slate-400 text-xs">
+                      <div className="text-center py-2 text-[#475569] dark:text-slate-400 text-xs">
                         💡 انقر على أي لوحة أو أداة في الفضاء 3D لتحديدها وسحبها وتعديل زاويتها وموقعها
                       </div>
                     )}

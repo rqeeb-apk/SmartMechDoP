@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User, ShieldAlert, Sparkles, Moon, Sun, BookOpen, Layers, Calculator, Award, Users, Bot, Cpu, FileText, GraduationCap } from 'lucide-react';
+import { User, Moon, Sun } from 'lucide-react';
 import { UserProfile } from '../types';
 import { OFFICIAL_LOGO_URL } from '../services/storage';
 import { OwnerLoginModal } from './OwnerDashboard/OwnerLoginModal';
@@ -28,31 +28,32 @@ export const Header: React.FC<HeaderProps> = ({
   const [logoClicks, setLogoClicks] = useState<number>(0);
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState<boolean>(false);
   const clickTimerRef = useRef<any>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
-  // Primary tabs matching the reference image top bar exactly
+  // Flagship 4 Services + Home & Profile
   const primaryTabs = [
     { id: 'home', label: 'الرئيسية', icon: '🏠' },
     { id: 'lecture_hall', label: 'قاعة المحاضرات', icon: '🎓' },
-    { id: 'doctor_hall', label: 'قاعة الدكتور الذكي', icon: '🏛️' },
-    { id: 'library', label: 'المكتبة الهندسية', icon: '📖' },
-    { id: 'lab_3d', label: 'المختبر 3D', icon: '🛠️' },
-    { id: 'calculators', label: 'الحاسبات الهندسية', icon: '🧮' },
+    { id: 'doctor_hall', label: 'قاعة الدكتور', icon: '🏛️' },
+    { id: 'solve_questions', label: 'حل أسئلتي', icon: '📝' },
+    { id: 'smart_labs', label: 'مختبرات ومعامل ذكية', icon: '⚡' },
     { id: 'profile', label: 'حسابي', icon: '👤' },
   ];
 
-  // Secondary tabs preserved for full functionality
+  // Supporting tools & community modules preserved in the More dropdown
   const secondaryTabs = [
-    { id: 'explain_lesson', label: 'اشرح لي الدرس', icon: '⚡' },
+    { id: 'lab_3d', label: 'Circuit Wizard والمختبر 3D', icon: '🛠️' },
+    { id: 'library', label: 'المكتبة الهندسية (1-5)', icon: '📖' },
+    { id: 'calculators', label: 'الحاسبات الهندسية', icon: '🧮' },
+    { id: 'assistant', label: 'مساعد الميكاترونكس الذكي', icon: '🤖' },
     { id: 'summarize', label: 'لخّص لي', icon: '📄' },
-    { id: 'assistant', label: 'المساعد الذكي', icon: '🤖' },
     { id: 'projects', label: 'مركز المشاريع', icon: '⚙️' },
     { id: 'quizzes', label: 'مركز الاختبارات', icon: '🏆' },
     { id: 'community', label: 'مجتمع المهندسين', icon: '👥' },
+    { id: 'videos', label: 'مكتبة الفيديوهات', icon: '🎬' },
   ];
 
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-
-  // 20-click tap counter handler with 3s reset timer (100% silent, zero public UI/hints)
+  // 20-click tap counter handler with 3s reset timer (silent owner access)
   const handleLogoClick = () => {
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current);
@@ -71,13 +72,12 @@ export const Header: React.FC<HeaderProps> = ({
       setLogoClicks(0);
     }, 3000);
 
-    // Default home click behavior if regular click
     if (nextCount === 1) {
       setCurrentTab('home');
     }
   };
 
-  const handleOwnerSuccess = (token: string) => {
+  const handleOwnerSuccess = () => {
     if (onOwnerAuthSuccess) {
       onOwnerAuthSuccess();
     } else {
@@ -87,19 +87,16 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full max-w-full overflow-x-hidden bg-[#071326]/98 backdrop-blur-md border-b border-cyan-500/30 text-slate-100 shadow-2xl transition-colors">
-        
-        {/* ROW 1: Logo & Brand + Action Buttons (Mobile-first responsive) */}
+      <header className="sticky top-0 z-50 w-full max-w-full overflow-x-clip bg-white/95 dark:bg-[#071326]/98 backdrop-blur-md border-b border-[rgba(212,175,55,0.35)] dark:border-cyan-500/30 text-[#0F172A] dark:text-slate-100 shadow-sm dark:shadow-2xl transition-colors">
+        {/* ROW 1: Logo & Brand + Action Buttons */}
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4 w-full min-w-0">
-          
-          {/* Right: Circular Official Logo + Brand Wordmark */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
             <button
               onClick={handleLogoClick}
               className="flex items-center gap-2 sm:gap-3 text-right hover:opacity-95 transition-opacity min-w-0 group focus:outline-none"
               title="دكتور الميكاترونكس الذكي"
             >
-              <div className="relative w-9 h-9 sm:w-12 sm:h-12 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/25 group-hover:scale-105 transition-transform overflow-hidden shrink-0">
+              <div className="relative w-9 h-9 sm:w-12 sm:h-12 rounded-full p-0.5 bg-gradient-to-tr from-[#D4AF37] via-[#0EA5E9] to-[#0284C7] dark:from-amber-400 dark:via-cyan-400 dark:to-blue-600 shadow-md shadow-sky-500/20 dark:shadow-cyan-500/25 group-hover:scale-105 transition-transform overflow-hidden shrink-0">
                 <img
                   src={OFFICIAL_LOGO_URL}
                   alt="شعار دكتور الميكاترونكس الذكي"
@@ -108,52 +105,58 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               <div className="min-w-0">
-                <span className="text-xs sm:text-lg lg:text-xl font-black tracking-tight text-white block truncate font-sans">
-                  دكتور <span className="text-amber-400 drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">الميكاترونكس</span> الذكي
+                <span className="text-xs sm:text-lg lg:text-xl font-black tracking-tight text-[#0F172A] dark:text-white block truncate font-sans">
+                  دكتور <span className="text-[#0EA5E9] dark:text-amber-400 dark:drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">الميكاترونكس</span> الذكي
                 </span>
-                <span className="text-[8px] sm:text-[9px] text-cyan-400 font-bold tracking-widest hidden sm:block font-mono truncate">
+                <span className="text-[8px] sm:text-[9px] text-[#0284C7] dark:text-cyan-400 font-bold tracking-widest hidden sm:block font-mono truncate">
                   DR MECHA SMART · DR-MECHASMART.ONLINE
                 </span>
               </div>
             </button>
           </div>
 
-          {/* Left: Top Actions [تجربة مجانية 24 ساعة] + [تسجيل الدخول / إنشاء حساب] */}
+          {/* Left: Top Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            
-            {/* 24-Hour Free Trial Pill */}
             {user.role !== 'owner' && (
-              <div className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#091830] border border-amber-400/60 text-amber-300 text-[10px] sm:text-[11px] font-extrabold flex items-center gap-1 shadow-md whitespace-nowrap">
+              <div className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#FAF5E8] dark:bg-[#091830] border border-[rgba(212,175,55,0.45)] dark:border-amber-400/60 text-[#0F172A] dark:text-amber-300 text-[10px] sm:text-[11px] font-extrabold flex items-center gap-1 shadow-sm whitespace-nowrap">
                 <span className="text-xs">⏳</span>
                 <span>{user.subscription?.status === 'active' ? '365 يوم' : 'تجربة 24 ساعة'}</span>
               </div>
             )}
 
-            {/* Main Yellow Login / Create Account Button */}
             {user.role !== 'owner' && (
               <button
                 onClick={onOpenAuthModal}
-                className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-[10px] sm:text-xs shadow-md shadow-amber-500/30 transition-transform active:scale-95 whitespace-nowrap shrink-0"
+                className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-400 dark:to-yellow-500 dark:hover:from-amber-300 dark:hover:to-yellow-400 dark:text-slate-950 font-black text-[10px] sm:text-xs shadow-md shadow-sky-500/20 dark:shadow-amber-500/30 transition-all active:scale-95 whitespace-nowrap shrink-0"
               >
-                <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-slate-950 shrink-0" />
+                <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>{user.email !== 'student@mechatronics.dr-smart.edu' ? (user.name.split(' ')[0] || user.name) : 'دخول / حساب'}</span>
               </button>
             )}
 
-            {/* Dark mode toggle */}
             <button
               onClick={() => setIsDark(!isDark)}
-              className="p-1 sm:p-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-amber-400 transition-colors shrink-0"
-              title="تبديل المظهر"
+              aria-label={isDark ? 'التبديل إلى الوضع النهاري' : 'التبديل إلى الوضع الليلي'}
+              title={isDark ? 'الوضع النهاري (Light Mode)' : 'الوضع الليلي (Dark Mode)'}
+              className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full bg-[#E0F2FE] hover:bg-sky-200/80 dark:bg-slate-900 dark:hover:bg-slate-800 border border-[#0EA5E9]/30 dark:border-slate-700 text-[#0284C7] dark:text-amber-400 transition-all shrink-0 shadow-sm cursor-pointer"
             >
-              {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-cyan-400" />}
+              {isDark ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden md:inline text-[10px] font-bold text-slate-200">نهاري</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-[#0EA5E9]" />
+                  <span className="hidden md:inline text-[10px] font-bold text-[#0F172A]">ليلي</span>
+                </>
+              )}
             </button>
 
-            {/* Owner badge */}
             {user.role === 'owner' && (
               <button
                 onClick={toggleRole}
-                className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold border bg-amber-500/20 text-amber-400 border-amber-500/50 shrink-0"
+                className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold border bg-[#E0F2FE] text-[#0284C7] border-[#0EA5E9]/40 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/50 shrink-0"
               >
                 المالك
               </button>
@@ -161,12 +164,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* ROW 2: Navigation Tabs Bar (Exact Styling & Order from Screenshot, Smooth Horizontal Scroll on Mobile) */}
-        <div className="border-t border-cyan-500/20 bg-[#051020]/90 px-2 sm:px-4 lg:px-8 py-1.5 w-full max-w-full overflow-hidden">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar w-full min-w-0">
-            
-            {/* Primary Navigation Tabs */}
-            <nav className="flex items-center gap-1.5 shrink-0">
+        {/* ROW 2: Primary 4 Services Navigation Bar */}
+        <div className="border-t border-slate-200/80 dark:border-cyan-500/20 bg-[#F8FAFC] dark:bg-[#051020]/90 px-2 sm:px-4 lg:px-8 py-1.5 w-full max-w-full">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2 w-full min-w-0">
+            <nav className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1">
               {primaryTabs.map((tab) => {
                 const isActive = currentTab === tab.id;
                 return (
@@ -179,10 +180,10 @@ export const Header: React.FC<HeaderProps> = ({
                         setCurrentTab(tab.id);
                       }
                     }}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all shadow-sm ${
+                    className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all shadow-sm shrink-0 ${
                       isActive
-                        ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md shadow-amber-500/25 ring-2 ring-amber-300/60'
-                        : 'bg-[#091A33] border border-cyan-500/30 text-slate-200 hover:border-amber-400 hover:text-white'
+                        ? 'bg-[#0EA5E9] hover:bg-[#0284C7] text-white shadow-md shadow-sky-500/25 ring-1 ring-[#0EA5E9]/40 dark:bg-gradient-to-r dark:from-amber-400 dark:to-yellow-500 dark:text-slate-950 dark:shadow-amber-500/25 dark:ring-2 dark:ring-amber-300/60'
+                        : 'bg-[#FDFBF7] dark:bg-[#091A33] border border-[rgba(212,175,55,0.35)] dark:border-cyan-500/30 text-[#0F172A] dark:text-slate-200 hover:border-[#0EA5E9] hover:text-[#0284C7] dark:hover:border-amber-400 dark:hover:text-white'
                     }`}
                   >
                     <span className="text-sm">{tab.icon}</span>
@@ -192,19 +193,19 @@ export const Header: React.FC<HeaderProps> = ({
               })}
             </nav>
 
-            {/* Secondary Services Dropdown so all 11 functionalities remain 100% accessible */}
+            {/* Supporting Tools Dropdown */}
             <div className="relative shrink-0">
               <button
                 onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#091A33] border border-cyan-500/40 text-cyan-300 hover:text-white hover:border-cyan-400 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#E0F2FE] dark:bg-[#091A33] border border-[#0EA5E9]/30 dark:border-cyan-500/40 text-[#0284C7] dark:text-cyan-300 hover:bg-[#0EA5E9] hover:text-white dark:hover:text-white dark:hover:border-cyan-400 transition-colors whitespace-nowrap"
               >
-                <span>المزيد من الخدمات</span>
+                <span>أدوات مساندة</span>
                 <span className="text-[10px]">▾</span>
               </button>
 
               {isMoreMenuOpen && (
                 <div
-                  className="absolute left-0 mt-2 w-56 rounded-2xl bg-[#081528] border-2 border-cyan-500/50 shadow-2xl p-2 z-50 space-y-1 animate-in fade-in"
+                  className="absolute left-0 mt-2 w-60 rounded-2xl bg-white dark:bg-[#081528] border border-[rgba(212,175,55,0.45)] dark:border-2 dark:border-cyan-500/50 shadow-2xl p-2 z-50 space-y-1 animate-in fade-in"
                   onClick={() => setIsMoreMenuOpen(false)}
                 >
                   {secondaryTabs.map((tab) => (
@@ -213,8 +214,8 @@ export const Header: React.FC<HeaderProps> = ({
                       onClick={() => setCurrentTab(tab.id)}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors text-right ${
                         currentTab === tab.id
-                          ? 'bg-amber-500 text-slate-950'
-                          : 'text-slate-200 hover:bg-slate-800'
+                          ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950'
+                          : 'text-[#0F172A] dark:text-slate-200 hover:bg-[#E0F2FE] hover:text-[#0284C7] dark:hover:bg-slate-800'
                       }`}
                     >
                       <span>{tab.icon}</span>
@@ -224,13 +225,10 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
             </div>
-
           </div>
         </div>
-
       </header>
 
-      {/* Owner Login Modal Triggered by 20 clicks or button */}
       <OwnerLoginModal
         isOpen={isOwnerModalOpen}
         onClose={() => setIsOwnerModalOpen(false)}
@@ -239,4 +237,3 @@ export const Header: React.FC<HeaderProps> = ({
     </>
   );
 };
-

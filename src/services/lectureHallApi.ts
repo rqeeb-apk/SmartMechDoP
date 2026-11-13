@@ -22,7 +22,12 @@ export interface LectureHallRequestParams {
   courseSubject: CourseSubject;
   topic: string;
   question?: string;
+  extraDetails?: string;
+  socialUrl?: string;
   uploadedContent?: string;
+  uploadedMimeType?: string;
+  videoFrames?: string[];
+  fileName?: string;
   stepIndex?: number;
   confusionPoint?: string;
 }
@@ -40,6 +45,7 @@ export interface LectureHallResponseData {
     nodes?: { id: string; label: string; sub?: string }[];
   };
   steps?: { phase: string; details: string }[];
+  realWorldExamples?: { title: string; yemeniAnalogy: string; engineeringApplication: string }[];
   quiz?: {
     question: string;
     options: string[];

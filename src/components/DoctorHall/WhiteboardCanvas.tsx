@@ -283,14 +283,14 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
   return (
     <div className="space-y-3">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl text-slate-200">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900/90 border border-[rgba(212,175,55,0.35)] dark:border-slate-800 p-2.5 rounded-xl text-[#0F172A] dark:text-slate-200 shadow-sm">
         
         {/* Tools */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setTool('pen')}
             className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              tool === 'pen' ? 'bg-cyan-500 text-black font-bold' : 'hover:bg-slate-800 text-slate-300'
+              tool === 'pen' ? 'bg-[#0EA5E9] text-white dark:bg-cyan-500 dark:text-black font-bold' : 'hover:bg-[#E0F2FE]/60 dark:hover:bg-slate-800 text-[#475569] dark:text-slate-300'
             }`}
             title="قلم كتابة"
           >
@@ -301,7 +301,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
           <button
             onClick={() => setTool('eraser')}
             className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              tool === 'eraser' ? 'bg-rose-500 text-white font-bold' : 'hover:bg-slate-800 text-slate-300'
+              tool === 'eraser' ? 'bg-rose-500 text-white font-bold' : 'hover:bg-[#E0F2FE]/60 dark:hover:bg-slate-800 text-[#475569] dark:text-slate-300'
             }`}
             title="ممحاة الإلكترونية"
           >
@@ -312,18 +312,18 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
           <button
             onClick={() => setTool('resistor')}
             className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              tool === 'resistor' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'hover:bg-slate-800 text-slate-300'
+              tool === 'resistor' ? 'bg-[#E0F2FE] text-[#0284C7] border border-[#0EA5E9]/40 dark:bg-cyan-500/20 dark:text-cyan-400 dark:border-cyan-500/40' : 'hover:bg-[#E0F2FE]/60 dark:hover:bg-slate-800 text-[#475569] dark:text-slate-300'
             }`}
             title="طبع مقاومة R"
           >
-            <Zap className="w-4 h-4 text-amber-400" />
+            <Zap className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             <span className="hidden sm:inline">مقاومة R</span>
           </button>
 
           <button
             onClick={() => setTool('text')}
             className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              tool === 'text' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'hover:bg-slate-800 text-slate-300'
+              tool === 'text' ? 'bg-[#E0F2FE] text-[#0284C7] border border-[#0EA5E9]/40 dark:bg-cyan-500/20 dark:text-cyan-400 dark:border-cyan-500/40' : 'hover:bg-[#E0F2FE]/60 dark:hover:bg-slate-800 text-[#475569] dark:text-slate-300'
             }`}
             title="إضافة معادلة/نص"
           >
@@ -339,7 +339,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
               key={c}
               onClick={() => setColor(c)}
               className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                color === c ? 'scale-125 border-white shadow-md' : 'border-slate-700 hover:scale-110'
+                color === c ? 'scale-125 border-[#0EA5E9] dark:border-white shadow-md' : 'border-slate-300 dark:border-slate-700 hover:scale-110'
               }`}
               style={{ backgroundColor: c }}
             />
@@ -348,11 +348,11 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
 
         {/* Pagination & Actions */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs font-mono text-slate-400 bg-slate-800 px-2 py-1 rounded-lg">
+          <div className="flex items-center gap-1 text-xs font-mono text-[#475569] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-800 border border-[rgba(212,175,55,0.25)] dark:border-transparent px-2 py-1 rounded-lg">
             <button
               disabled={currentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="disabled:opacity-40 hover:text-white"
+              className="disabled:opacity-40 hover:text-[#0F172A] dark:hover:text-white"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -364,7 +364,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
                 if (currentPage >= totalPages) setTotalPages((t) => t + 1);
                 setCurrentPage((p) => p + 1);
               }}
-              className="hover:text-white"
+              className="hover:text-[#0F172A] dark:hover:text-white"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -372,7 +372,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
 
           <button
             onClick={resetCanvas}
-            className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+            className="p-1.5 rounded-lg bg-[#F8FAFC] dark:bg-slate-800 border border-[rgba(212,175,55,0.25)] dark:border-transparent text-[#475569] hover:text-[#0F172A] dark:text-slate-300 dark:hover:text-white"
             title="مسح السبورة"
           >
             <RotateCcw className="w-4 h-4" />
@@ -380,7 +380,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
 
           <button
             onClick={downloadCanvasImage}
-            className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500 hover:text-black transition-colors"
+            className="p-1.5 rounded-lg bg-[#E0F2FE] dark:bg-cyan-500/10 text-[#0284C7] dark:text-cyan-400 border border-[#0EA5E9]/30 dark:border-cyan-500/30 hover:bg-[#0EA5E9] hover:text-white dark:hover:bg-cyan-500 dark:hover:text-black transition-colors"
             title="حفظ السبورة كصورة"
           >
             <Download className="w-4 h-4" />

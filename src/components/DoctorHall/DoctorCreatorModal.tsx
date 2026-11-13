@@ -59,23 +59,23 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-[#0D1B2A] border border-amber-500/30 w-full max-w-2xl rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6 text-slate-100 my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="champagne-card w-full max-w-2xl rounded-2xl shadow-2xl p-6 sm:p-8 space-y-6 text-[#0F172A] dark:text-slate-100 my-8">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-1 rounded-xl bg-amber-500/20 border border-amber-500/30">
+            <div className="p-1 rounded-xl bg-[#E0F2FE] dark:bg-amber-500/20 border border-[#0EA5E9]/30 dark:border-amber-500/30">
               <img src={OFFICIAL_LOGO_URL} alt="الشعار" className="w-8 h-8 rounded-lg object-cover" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-bold text-[#0F172A] dark:text-white">
                 {existingDoctor ? 'تعديل بيانات الدكتور الذكي' : 'إنشاء دكتور تعليمي جديد'}
               </h2>
-              <p className="text-xs text-slate-400">تخصيص هوية الدكتور واسم المادة ونوع السبورة ومستوى الشرح</p>
+              <p className="text-xs text-[#475569] dark:text-slate-400">تخصيص هوية الدكتور واسم المادة ونوع السبورة ومستوى الشرح</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white">
+          <button onClick={onClose} className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-[rgba(212,175,55,0.3)] dark:border-transparent text-[#475569] dark:text-slate-400 hover:text-[#0F172A] dark:hover:text-white">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -85,55 +85,55 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">اسم الدكتور</label>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1.5">اسم الدكتور</label>
               <input
                 type="text"
                 required
                 placeholder="مثال: دكتور الميكاترونكس الذكي"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">اسم المادة / التخصص</label>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1.5">اسم المادة / التخصص</label>
               <input
                 type="text"
                 required
                 placeholder="مثال: التحكم والأنظمة المدمجة والروبوتات"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">التخصص الدقيق والدرجة العلمية</label>
+            <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1.5">التخصص الدقيق والدرجة العلمية</label>
             <input
               type="text"
               placeholder="مثال: دكتوراة في هندسة الميكاترونكس والأنظمة المدمجة"
               value={specialization}
               onChange={(e) => setSpecialization(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-400 focus:outline-none"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">وصف أسلوب الدكتور</label>
+            <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1.5">وصف أسلوب الدكتور</label>
             <textarea
               rows={2}
               placeholder="وصف مختصر لطريقة الدكتور في الشرح والإجابة..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-400 focus:outline-none resize-none"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none resize-none"
             />
           </div>
 
           {/* Doctor Visual Style */}
           <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300">شكل مظهر الدكتور</label>
+            <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300">شكل مظهر الدكتور</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { id: 'real', label: 'الشعار الرسمي', desc: 'رمز أكاديمي موثوق' },
@@ -147,12 +147,12 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
                   onClick={() => setStyle(item.id as DoctorStyle)}
                   className={`p-3 rounded-xl border text-right transition-all ${
                     style === item.id
-                      ? 'bg-amber-500/15 border-amber-500 text-amber-300 font-bold'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                      ? 'bg-[#E0F2FE] dark:bg-amber-500/15 border-[#0EA5E9] dark:border-amber-500 text-[#0284C7] dark:text-amber-300 font-bold'
+                      : 'bg-white dark:bg-slate-900 border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-[#475569] dark:text-slate-400 hover:border-[#0EA5E9]/50 dark:hover:border-slate-700'
                   }`}
                 >
                   <div className="text-xs font-bold">{item.label}</div>
-                  <div className="text-[10px] opacity-70 mt-0.5">{item.desc}</div>
+                  <div className="text-[10px] opacity-80 mt-0.5">{item.desc}</div>
                 </button>
               ))}
             </div>
@@ -160,7 +160,7 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
 
           {/* Preset Avatar Selection */}
           <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300">اختيار صورة الشخصية</label>
+            <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300">اختيار صورة الشخصية</label>
             <div className="flex items-center gap-3">
               {sampleAvatars.map((av, idx) => (
                 <img
@@ -170,7 +170,7 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
                   title={av.label}
                   onClick={() => setAvatarUrl(av.url)}
                   className={`w-14 h-14 rounded-xl object-cover cursor-pointer border-2 transition-all ${
-                    avatarUrl === av.url ? 'border-amber-400 scale-105 shadow-md shadow-amber-500/30' : 'border-slate-700 opacity-60 hover:opacity-100'
+                    avatarUrl === av.url ? 'border-[#0EA5E9] dark:border-amber-400 scale-105 shadow-md' : 'border-slate-300 dark:border-slate-700 opacity-70 hover:opacity-100'
                   }`}
                 />
               ))}
@@ -179,8 +179,8 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
 
           {/* Blackboard Color Selection */}
           <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <Palette className="w-4 h-4 text-cyan-400" />
+            <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 flex items-center gap-1.5">
+              <Palette className="w-4 h-4 text-[#0EA5E9] dark:text-cyan-400" />
               <span>اختيار لون السبورة الإلكترونية</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -195,7 +195,7 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
                   key={b.id}
                   onClick={() => setBoardColor(b.id as BoardColor)}
                   className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all ${b.bg} ${
-                    boardColor === b.id ? 'ring-2 ring-amber-400 border-amber-400' : 'border-slate-700 opacity-80'
+                    boardColor === b.id ? 'ring-2 ring-[#0EA5E9] dark:ring-amber-400 border-[#0EA5E9] dark:border-amber-400' : 'border-slate-300 dark:border-slate-700 opacity-85'
                   }`}
                 >
                   <span>{b.label}</span>
@@ -207,11 +207,11 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
           {/* Language & Level & Voice Speed */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">لغة الشرح</label>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1.5">لغة الشرح</label>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as Language)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none"
               >
                 <option value="ar">العربية (مع مصطلحات بالإنجليزية)</option>
                 <option value="en">English (Academic Standard)</option>
@@ -219,11 +219,11 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">مستوى الشرح</label>
+              <label className="block text-xs font-semibold text-[#0F172A] dark:text-slate-300 mb-1.5">مستوى الشرح</label>
               <select
                 value={level}
                 onChange={(e) => setLevel(e.target.value as ExplanationLevel)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-amber-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white text-sm focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none"
               >
                 <option value="beginner">مبتدئ (مبسط بدون تعقيد)</option>
                 <option value="intermediate">متوسط (أكاديمي متوازن)</option>
@@ -234,8 +234,8 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-300">سرعة الصوت ({voiceSpeed}x)</label>
-                <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+                <label className="text-xs font-semibold text-[#0F172A] dark:text-slate-300">سرعة الصوت ({voiceSpeed}x)</label>
+                <span className="text-[10px] text-[#0284C7] dark:text-amber-300 font-bold bg-[#E0F2FE] dark:bg-amber-500/10 px-2 py-0.5 rounded-full border border-[#0EA5E9]/30 dark:border-amber-400/20">
                   صوت ذكر بالغ (40-50 سنة)
                 </span>
               </div>
@@ -246,27 +246,27 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
                 step="0.05"
                 value={voiceSpeed}
                 onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                className="w-full accent-amber-400 mt-1"
+                className="w-full accent-[#0EA5E9] dark:accent-amber-400 mt-1"
               />
-              <p className="text-[10px] text-slate-400 mt-1">
+              <p className="text-[10px] text-[#475569] dark:text-slate-400 mt-1">
                 نبرة أبوية دافئة، واثقة، كأستاذ جامعي يمني بوقفات تعليمية متزنة (ممنوع أي صوت أنثوي).
               </p>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[rgba(212,175,55,0.22)] dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm font-semibold hover:bg-slate-700"
+              className="px-5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#475569] dark:text-slate-300 text-sm font-semibold hover:bg-[#F8FAFC] dark:hover:bg-slate-700"
             >
               إلغاء
             </button>
 
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40"
+              className="px-6 py-2.5 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] dark:bg-gradient-to-r dark:from-amber-500 dark:to-orange-600 text-white dark:text-slate-950 font-bold text-sm shadow-sm"
             >
               حفظ وتطبيق الدكتور
             </button>
