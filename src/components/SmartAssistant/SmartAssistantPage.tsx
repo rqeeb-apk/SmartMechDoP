@@ -50,34 +50,34 @@ export const SmartAssistantPage: React.FC = () => {
     <div className="space-y-6 pb-12">
       
       {/* Header */}
-      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-6 flex items-center justify-between shadow-xl">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
-            <Sparkles className="w-7 h-7 animate-pulse" />
+      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0">
+            <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 animate-pulse" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">مساعد الميكاترونكس الذكي</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">مساعد الميكاترونكس الذكي</h1>
             <p className="text-xs text-slate-400">تحليل وتفسير المسائل الهندسية، مراجعة الأكواد، واستكشاف أعطال الدوائر</p>
           </div>
         </div>
 
         {/* Mode Selector */}
-        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs font-semibold">
+        <div className="grid grid-cols-3 sm:flex items-center gap-1 sm:gap-2 bg-slate-900/90 p-1 sm:p-1.5 rounded-xl border border-slate-800 text-xs font-semibold w-full md:w-auto min-w-0">
           <button
             onClick={() => setMode('general')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${mode === 'general' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400'}`}
+            className={`px-2 sm:px-3 py-1.5 rounded-lg truncate text-center text-[11px] sm:text-xs transition-colors ${mode === 'general' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-white'}`}
           >
             استفسار عام
           </button>
           <button
             onClick={() => setMode('code_review')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${mode === 'code_review' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400'}`}
+            className={`px-2 sm:px-3 py-1.5 rounded-lg truncate text-center text-[11px] sm:text-xs transition-colors ${mode === 'code_review' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-white'}`}
           >
-            فحص الكود C++
+            فحص الكود
           </button>
           <button
             onClick={() => setMode('circuit_troubleshoot')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${mode === 'circuit_troubleshoot' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400'}`}
+            className={`px-2 sm:px-3 py-1.5 rounded-lg truncate text-center text-[11px] sm:text-xs transition-colors ${mode === 'circuit_troubleshoot' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-white'}`}
           >
             أعطال الدوائر
           </button>

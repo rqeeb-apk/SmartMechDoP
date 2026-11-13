@@ -1,4 +1,5 @@
 import { Doctor, LectureData } from '../types';
+import { getStoredUser } from './storage';
 
 export type LectureProgressStage = 
   | 'uploading'
@@ -21,6 +22,92 @@ export interface OptimizedImageResult {
   base64: string;
 }
 
+function getStudentHeaders(): Record<string, string> {
+  try {
+    const user = getStoredUser();
+    const studentId = user?.email || user?.id || 'student';
+    return {
+      'Content-Type': 'application/json',
+      'x-student-id': studentId,
+    };
+  } catch {
+    return {
+      'Content-Type': 'application/json',
+    };
+  }
+}
+
+async function fetchJsonWithRetry<T = any>(
+  url: string,
+  payload: unknown,
+  defaultErrorMsg: string,
+  maxRetries = 2
+): Promise<T> {
+  let lastNetworkError: any = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: getStudentHeaders(),
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const rawText = await response.text();
+      let json: any;
+      try {
+        json = JSON.parse(rawText);
+      } catch (_parseErr) {
+        if (response.status === 413) {
+          throw new Error('حجم الملف المرفوع كبير جداً (413). يرجى اختيار ملف أصغر أو صورة مضغوطة.');
+        }
+        if (response.status === 504 || response.status === 408) {
+          throw new Error('انتهت مهلة الاتصال بالخادم (504). يرجى المحاولة مرة أخرى.');
+        }
+        if (response.status >= 502 && response.status <= 503 && attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+          continue;
+        }
+        throw new Error(rawText.slice(0, 150) || defaultErrorMsg);
+      }
+
+      if (!response.ok || !json.success) {
+        throw new Error(json.error || defaultErrorMsg);
+      }
+
+      return json as T;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      const isNetworkOrAbort =
+        err instanceof TypeError ||
+        err?.name === 'AbortError' ||
+        String(err?.message || '').toLowerCase().includes('failed to fetch') ||
+        String(err?.message || '').toLowerCase().includes('network');
+
+      if (isNetworkOrAbort) {
+        lastNetworkError = err;
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 750 * (attempt + 1)));
+          continue;
+        }
+        throw new Error(
+          'تعذر الاتصال بالخادم حالياً (خطأ في الشبكة أو انقطاع الاتصال المؤقت). تم الاحتفاظ ببياناتك، يرجى الضغط على إعادة المحاولة.'
+        );
+      }
+
+      throw err;
+    }
+  }
+
+  throw lastNetworkError || new Error(defaultErrorMsg);
+}
+
 /**
  * Client-Side Image Upload Optimization Service
  * Resizes large image files down specifically for Gemini Vision API payload (max 800px, 0.78 JPEG quality),
@@ -28,6 +115,14 @@ export interface OptimizedImageResult {
  */
 export async function compressImageFile(file: File): Promise<OptimizedImageResult> {
   const previewUrl = URL.createObjectURL(file);
+
+  const readAsDataUrlFallback = (): Promise<string> =>
+    new Promise((res) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => res((ev.target?.result as string) || '');
+      reader.onerror = () => res('');
+      reader.readAsDataURL(file);
+    });
 
   return new Promise((resolve) => {
     // Non-image fallback
@@ -47,7 +142,7 @@ export async function compressImageFile(file: File): Promise<OptimizedImageResul
 
     const img = new Image();
     img.src = previewUrl;
-    img.onload = () => {
+    img.onload = async () => {
       // Vision Thumbnail Dimensions: Max 800px width/height for fast multimodal analysis
       const visionMaxDim = 800;
       let width = img.width;
@@ -85,19 +180,22 @@ export async function compressImageFile(file: File): Promise<OptimizedImageResul
         return;
       }
 
+      const fallbackDataUrl = await readAsDataUrlFallback();
       resolve({
         originalUrl: previewUrl,
-        optimizedVisionBase64: previewUrl,
-        base64: previewUrl,
+        optimizedVisionBase64: fallbackDataUrl,
+        base64: fallbackDataUrl,
       });
     };
 
-    img.onerror = () =>
+    img.onerror = async () => {
+      const fallbackDataUrl = await readAsDataUrlFallback();
       resolve({
         originalUrl: previewUrl,
-        optimizedVisionBase64: previewUrl,
-        base64: previewUrl,
+        optimizedVisionBase64: fallbackDataUrl,
+        base64: fallbackDataUrl,
       });
+    };
   });
 }
 
@@ -107,22 +205,22 @@ export async function requestLectureExplanation(
   lessonTitle: string,
   userPrompt: string,
   uploadedContent?: string,
-  onProgress?: (stage: LectureProgressStage) => void
+  onProgress?: (stage: LectureProgressStage) => void,
+  uploadedMimeType?: string
 ): Promise<LectureData> {
   if (onProgress) onProgress('uploading');
 
   // Stage 1 -> Stage 2
-  await new Promise((r) => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 150));
   if (onProgress) onProgress('analyzing');
 
   // Stage 2 -> Stage 3
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 200));
   if (onProgress) onProgress('preparing');
 
-  const response = await fetch('/api/gemini/explain', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const json = await fetchJsonWithRetry<{ success: boolean; data: LectureData }>(
+    '/api/gemini/explain',
+    {
       doctorName: doctor.name,
       subject: doctor.subject,
       level: doctor.level,
@@ -130,18 +228,19 @@ export async function requestLectureExplanation(
       lessonTitle,
       userPrompt,
       uploadedContent,
+      uploadedMimeType,
       requestFingerprint: `req_${doctor.id}_${Date.now()}`,
-    }),
-  });
+    },
+    'فشل محرك إلقاء المحاضرة من الدكتور الذكي'
+  );
 
-  const json = await response.json();
-  if (!response.ok || !json.success || !json.data) {
-    throw new Error(json.error || 'فشل محرك إلقاء المحاضرة من الدكتور الذكي');
+  if (!json.data) {
+    throw new Error('لم يتم استلام بيانات المحاضرة من الخادم.');
   }
 
   // Stage 3 -> Stage 4
   if (onProgress) onProgress('whiteboard');
-  await new Promise((r) => setTimeout(r, 250));
+  await new Promise((r) => setTimeout(r, 200));
 
   // Stage 4 -> Stage 5
   if (onProgress) onProgress('started');
@@ -155,20 +254,19 @@ export async function askMechatronicsAssistant(
   codeSnippet?: string,
   imageBase64?: string
 ): Promise<string> {
-  const response = await fetch('/api/gemini/assistant', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const json = await fetchJsonWithRetry<{ success: boolean; answer: string }>(
+    '/api/gemini/assistant',
+    {
       userQuery,
       mode,
       codeSnippet,
       imageBase64,
-    }),
-  });
+    },
+    'فشل الاتصال بمساعد الميكاترونكس الذكي'
+  );
 
-  const json = await response.json();
-  if (!response.ok || !json.success || !json.answer) {
-    throw new Error(json.error || 'فشل الاتصال بمساعد الميكاترونكس الذكي');
+  if (!json.answer) {
+    throw new Error('لم يتم استلام رد من المساعد الذكي.');
   }
 
   return json.answer;
@@ -178,85 +276,51 @@ export async function generateArduinoProjectCode(
   projectDescription: string,
   components: string[]
 ): Promise<{ code: string; explanation: string; pinouts: any[] }> {
-  const response = await fetch('/api/gemini/arduino-gen', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const json = await fetchJsonWithRetry<{
+    success: boolean;
+    data: { code: string; explanation: string; pinouts: any[] };
+  }>(
+    '/api/gemini/arduino-gen',
+    {
       projectDescription,
       components,
-    }),
-  });
+    },
+    'فشل توليد كود الأردوينو'
+  );
 
-  const json = await response.json();
-  if (!response.ok || !json.success || !json.data) {
-    throw new Error(json.error || 'فشل توليد كود الأردوينو');
+  if (!json.data) {
+    throw new Error('تعذر توليد كود الأردوينو.');
   }
 
   return json.data;
 }
 
-// Text to speech using Web Speech API with fallback
+import { professorVoiceEngine } from './professorVoiceEngine';
+
+// Text to speech using centralized Strict Adult Male Professor Voice Engine
 export class DoctorVoiceEngine {
-  private synth: SpeechSynthesis | null = null;
-  private isSpeaking: boolean = false;
-
-  constructor() {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      this.synth = window.speechSynthesis;
-    }
-  }
-
-  public speak(text: string, lang: 'ar' | 'en' = 'ar', rate: number = 1.0, onEnd?: () => void) {
-    if (!this.synth) return;
-
-    this.stop();
-
-    // Clean markdown symbols for natural speech
-    const cleanText = text
-      .replace(/[*#`_~]/g, '')
-      .replace(/\\\(.*?\\\)/g, 'المعادلة')
-      .replace(/\$(.*?)\$/g, 'المعادلة');
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = lang === 'ar' ? 'ar-SA' : 'en-US';
-    utterance.rate = rate;
-    utterance.pitch = 1.0;
-
-    utterance.onend = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
-
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      if (onEnd) onEnd();
-    };
-
-    this.isSpeaking = true;
-    this.synth.speak(utterance);
+  public speak(text: string, lang: 'ar' | 'en' = 'ar', _rate: number = 0.94, onEnd?: () => void) {
+    void professorVoiceEngine.speak(text, {
+      lang,
+      onEnd,
+      onError: onEnd,
+    });
   }
 
   public pause() {
-    if (this.synth && this.synth.speaking) {
-      this.synth.pause();
-    }
+    professorVoiceEngine.pause();
   }
 
   public resume() {
-    if (this.synth && this.synth.paused) {
-      this.synth.resume();
-    }
+    professorVoiceEngine.resume();
   }
 
   public stop() {
-    if (this.synth) {
-      this.synth.cancel();
-      this.isSpeaking = false;
-    }
+    professorVoiceEngine.stop();
   }
 
   public getSpeakingState(): boolean {
-    return this.isSpeaking;
+    return professorVoiceEngine.getSpeakingState();
   }
 }
 

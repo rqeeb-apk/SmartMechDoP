@@ -54,8 +54,8 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
 
   const sampleAvatars = [
     { url: OFFICIAL_LOGO_URL, label: 'الشعار الرسمي لدكتور الميكاترونكس' },
-    { url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop', label: 'دكتورة ميكاترونكس' },
-    { url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop', label: 'دكتور أكاديمي' },
+    { url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop', label: 'دكتور أكاديمي يمني' },
+    { url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop', label: 'أستاذ هندسة الميكاترونكس' },
   ];
 
   return (
@@ -233,16 +233,24 @@ export const DoctorCreatorModal: React.FC<DoctorCreatorModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">سرعة الصوت ({voiceSpeed}x)</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-300">سرعة الصوت ({voiceSpeed}x)</label>
+                <span className="text-[10px] text-amber-300 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+                  صوت ذكر بالغ (40-50 سنة)
+                </span>
+              </div>
               <input
                 type="range"
                 min="0.8"
-                max="1.5"
+                max="1.3"
                 step="0.05"
                 value={voiceSpeed}
                 onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                className="w-full accent-amber-400 mt-2"
+                className="w-full accent-amber-400 mt-1"
               />
+              <p className="text-[10px] text-slate-400 mt-1">
+                نبرة أبوية دافئة، واثقة، كأستاذ جامعي يمني بوقفات تعليمية متزنة (ممنوع أي صوت أنثوي).
+              </p>
             </div>
           </div>
 

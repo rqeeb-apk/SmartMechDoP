@@ -62,7 +62,6 @@ export const ExplainLessonPage: React.FC = () => {
 
   // Audio Speech state
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
@@ -276,10 +275,12 @@ export const ExplainLessonPage: React.FC = () => {
     }
   };
 
-  // Text to Speech
+  // Text to Speech - Strict Adult Male Professor Voice Profile
   const toggleSpeech = (textToRead: string) => {
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      import('../../services/professorVoiceEngine').then(({ professorVoiceEngine }) => {
+        professorVoiceEngine.stop();
+      });
       setIsSpeaking(false);
       return;
     }
@@ -289,16 +290,14 @@ export const ExplainLessonPage: React.FC = () => {
       return;
     }
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(textToRead);
-    utterance.lang = 'ar-SA';
-    utterance.rate = 0.95;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    speechSynthRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setIsSpeaking(true);
+    import('../../services/professorVoiceEngine').then(({ professorVoiceEngine }) => {
+      professorVoiceEngine.speak(textToRead, {
+        lang: 'ar',
+        onStart: () => setIsSpeaking(true),
+        onEnd: () => setIsSpeaking(false),
+        onError: () => setIsSpeaking(false),
+      });
+    });
   };
 
   return (

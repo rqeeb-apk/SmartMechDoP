@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User, ShieldAlert, Sparkles, Moon, Sun, BookOpen, Layers, Calculator, Award, Users, Bot, Cpu, FileText } from 'lucide-react';
+import { User, ShieldAlert, Sparkles, Moon, Sun, BookOpen, Layers, Calculator, Award, Users, Bot, Cpu, FileText, GraduationCap } from 'lucide-react';
 import { UserProfile } from '../types';
 import { OFFICIAL_LOGO_URL } from '../services/storage';
 import { OwnerLoginModal } from './OwnerDashboard/OwnerLoginModal';
@@ -29,19 +29,28 @@ export const Header: React.FC<HeaderProps> = ({
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState<boolean>(false);
   const clickTimerRef = useRef<any>(null);
 
-  const navItems = [
-    { id: 'home', label: 'الرئيسية', icon: Cpu },
-    { id: 'explain_lesson', label: 'اشرح لي الدرس', icon: Sparkles },
-    { id: 'summarize', label: 'لخّص لي', icon: FileText },
-    { id: 'doctor_hall', label: 'قاعة الدكتور الذكي', icon: Bot },
-    { id: 'lab_3d', label: 'المختبر 3D', icon: Layers },
-    { id: 'library', label: 'المكتبة الهندسية', icon: BookOpen },
-    { id: 'assistant', label: 'المساعد الذكي', icon: Bot },
-    { id: 'calculators', label: 'الحاسبات الهندسية', icon: Calculator },
-    { id: 'projects', label: 'مركز المشاريع', icon: Cpu },
-    { id: 'quizzes', label: 'الاختبارات', icon: Award },
-    { id: 'community', label: 'مجتمع المهندسين', icon: Users },
+  // Primary tabs matching the reference image top bar exactly
+  const primaryTabs = [
+    { id: 'home', label: 'الرئيسية', icon: '🏠' },
+    { id: 'lecture_hall', label: 'قاعة المحاضرات', icon: '🎓' },
+    { id: 'doctor_hall', label: 'قاعة الدكتور الذكي', icon: '🏛️' },
+    { id: 'library', label: 'المكتبة الهندسية', icon: '📖' },
+    { id: 'lab_3d', label: 'المختبر 3D', icon: '🛠️' },
+    { id: 'calculators', label: 'الحاسبات الهندسية', icon: '🧮' },
+    { id: 'profile', label: 'حسابي', icon: '👤' },
   ];
+
+  // Secondary tabs preserved for full functionality
+  const secondaryTabs = [
+    { id: 'explain_lesson', label: 'اشرح لي الدرس', icon: '⚡' },
+    { id: 'summarize', label: 'لخّص لي', icon: '📄' },
+    { id: 'assistant', label: 'المساعد الذكي', icon: '🤖' },
+    { id: 'projects', label: 'مركز المشاريع', icon: '⚙️' },
+    { id: 'quizzes', label: 'مركز الاختبارات', icon: '🏆' },
+    { id: 'community', label: 'مجتمع المهندسين', icon: '👥' },
+  ];
+
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   // 20-click tap counter handler with 3s reset timer (100% silent, zero public UI/hints)
   const handleLogoClick = () => {
@@ -78,18 +87,19 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full bg-[#0A192F]/95 backdrop-blur-md border-b border-amber-500/20 text-slate-100 px-4 lg:px-8 py-2.5 transition-colors">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-6">
+      <header className="sticky top-0 z-50 w-full max-w-full overflow-x-hidden bg-[#071326]/98 backdrop-blur-md border-b border-cyan-500/30 text-slate-100 shadow-2xl transition-colors">
+        
+        {/* ROW 1: Logo & Brand + Action Buttons (Mobile-first responsive) */}
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4 w-full min-w-0">
           
-          {/* Zone 1: Brand Logo & Wordmark */}
-          <div className="relative">
+          {/* Right: Circular Official Logo + Brand Wordmark */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
             <button
               onClick={handleLogoClick}
-              className="flex items-center gap-3 text-right hover:opacity-95 transition-opacity shrink-0 group focus:outline-none"
+              className="flex items-center gap-2 sm:gap-3 text-right hover:opacity-95 transition-opacity min-w-0 group focus:outline-none"
               title="دكتور الميكاترونكس الذكي"
             >
-              {/* Logo Frame matching emblem */}
-              <div className="relative w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-amber-500 shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform overflow-hidden">
+              <div className="relative w-9 h-9 sm:w-12 sm:h-12 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/25 group-hover:scale-105 transition-transform overflow-hidden shrink-0">
                 <img
                   src={OFFICIAL_LOGO_URL}
                   alt="شعار دكتور الميكاترونكس الذكي"
@@ -97,118 +107,127 @@ export const Header: React.FC<HeaderProps> = ({
                 />
               </div>
 
-              <div>
-                <span className="text-base sm:text-lg font-extrabold tracking-tight text-white whitespace-nowrap block font-sans">
-                  دكتور <span className="gold-gradient-text">الميكاترونكس</span> الذكي
+              <div className="min-w-0">
+                <span className="text-xs sm:text-lg lg:text-xl font-black tracking-tight text-white block truncate font-sans">
+                  دكتور <span className="text-amber-400 drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">الميكاترونكس</span> الذكي
                 </span>
-                <span className="text-[9px] text-cyan-400 font-bold tracking-widest block font-mono">
+                <span className="text-[8px] sm:text-[9px] text-cyan-400 font-bold tracking-widest hidden sm:block font-mono truncate">
                   DR MECHA SMART · DR-MECHASMART.ONLINE
                 </span>
               </div>
             </button>
           </div>
 
-          {/* Zone 2: Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentTab(item.id)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
-                    isActive
-                      ? 'bg-gradient-to-r from-amber-500/20 to-cyan-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Zone 3: Primary Action & Profile Switcher */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Left: Top Actions [تجربة مجانية 24 ساعة] + [تسجيل الدخول / إنشاء حساب] */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             
-            {/* Live Trial / Subscription Status Badge */}
+            {/* 24-Hour Free Trial Pill */}
             {user.role !== 'owner' && (
-              <div
-                onClick={() => {
-                  if (user.subscription?.status !== 'active') {
-                    // Open redemption modal if trial or expired
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold font-mono border hidden sm:flex items-center gap-1.5 transition-all ${
-                  user.subscription?.status === 'active'
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                    : 'bg-amber-500/15 border-amber-500/30 text-amber-300 animate-pulse'
-                }`}
-              >
-                {user.subscription?.status === 'active' ? (
-                  <span>✅ اشتراك سنوي مفعل (365 يوم)</span>
-                ) : (
-                  <span>⏳ تجربة مجانية 24 ساعة</span>
-                )}
+              <div className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#091830] border border-amber-400/60 text-amber-300 text-[10px] sm:text-[11px] font-extrabold flex items-center gap-1 shadow-md whitespace-nowrap">
+                <span className="text-xs">⏳</span>
+                <span>{user.subscription?.status === 'active' ? '365 يوم' : 'تجربة 24 ساعة'}</span>
               </div>
             )}
 
-            {/* Student Auth Button / Profile Status */}
+            {/* Main Yellow Login / Create Account Button */}
             {user.role !== 'owner' && (
               <button
                 onClick={onOpenAuthModal}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-md shadow-cyan-500/20 transition-all shrink-0"
+                className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-[10px] sm:text-xs shadow-md shadow-amber-500/30 transition-transform active:scale-95 whitespace-nowrap shrink-0"
               >
-                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                <span className="hidden sm:inline">{user.email !== 'student@mechatronics.dr-smart.edu' ? user.name : 'تسجيل الدخول / إنشاء حساب'}</span>
-                <span className="sm:hidden text-[11px]">{user.email !== 'student@mechatronics.dr-smart.edu' ? user.name.split(' ')[0] : 'حسابي / دخول'}</span>
+                <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-slate-950 shrink-0" />
+                <span>{user.email !== 'student@mechatronics.dr-smart.edu' ? (user.name.split(' ')[0] || user.name) : 'دخول / حساب'}</span>
               </button>
             )}
 
-            {/* Dark Mode Toggle */}
+            {/* Dark mode toggle */}
             <button
               onClick={() => setIsDark(!isDark)}
-              className="p-2 rounded-xl bg-slate-800/80 text-slate-300 hover:text-amber-400 hover:bg-slate-700 transition-colors"
+              className="p-1 sm:p-1.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 hover:text-amber-400 transition-colors shrink-0"
               title="تبديل المظهر"
             >
-              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-cyan-400" />}
+              {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-cyan-400" />}
             </button>
 
-            {/* Owner Console Quick Access */}
+            {/* Owner badge */}
             {user.role === 'owner' && (
               <button
                 onClick={toggleRole}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-sm shadow-amber-500/15"
+                className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold border bg-amber-500/20 text-amber-400 border-amber-500/50 shrink-0"
               >
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
-                <span className="hidden sm:inline">لوحة المالك (نشطة)</span>
+                المالك
               </button>
             )}
           </div>
-
         </div>
 
-        {/* Mobile Navigation Strip */}
-        <div className="lg:hidden flex items-center gap-1 overflow-x-auto pt-2 border-t border-slate-800/60 mt-2 pb-1 no-scrollbar">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-            return (
+        {/* ROW 2: Navigation Tabs Bar (Exact Styling & Order from Screenshot, Smooth Horizontal Scroll on Mobile) */}
+        <div className="border-t border-cyan-500/20 bg-[#051020]/90 px-2 sm:px-4 lg:px-8 py-1.5 w-full max-w-full overflow-hidden">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar w-full min-w-0">
+            
+            {/* Primary Navigation Tabs */}
+            <nav className="flex items-center gap-1.5 shrink-0">
+              {primaryTabs.map((tab) => {
+                const isActive = currentTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      if (tab.id === 'profile' && user.email === 'student@mechatronics.dr-smart.edu') {
+                        if (onOpenAuthModal) onOpenAuthModal();
+                      } else {
+                        setCurrentTab(tab.id);
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all shadow-sm ${
+                      isActive
+                        ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-md shadow-amber-500/25 ring-2 ring-amber-300/60'
+                        : 'bg-[#091A33] border border-cyan-500/30 text-slate-200 hover:border-amber-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-sm">{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Secondary Services Dropdown so all 11 functionalities remain 100% accessible */}
+            <div className="relative shrink-0">
               <button
-                key={item.id}
-                onClick={() => setCurrentTab(item.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap shrink-0 ${
-                  isActive ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'text-slate-400'
-                }`}
+                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#091A33] border border-cyan-500/40 text-cyan-300 hover:text-white hover:border-cyan-400 transition-colors"
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
+                <span>المزيد من الخدمات</span>
+                <span className="text-[10px]">▾</span>
               </button>
-            );
-          })}
+
+              {isMoreMenuOpen && (
+                <div
+                  className="absolute left-0 mt-2 w-56 rounded-2xl bg-[#081528] border-2 border-cyan-500/50 shadow-2xl p-2 z-50 space-y-1 animate-in fade-in"
+                  onClick={() => setIsMoreMenuOpen(false)}
+                >
+                  {secondaryTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setCurrentTab(tab.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors text-right ${
+                        currentTab === tab.id
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
+
       </header>
 
       {/* Owner Login Modal Triggered by 20 clicks or button */}

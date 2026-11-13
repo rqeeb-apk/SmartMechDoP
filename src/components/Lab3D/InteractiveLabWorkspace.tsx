@@ -1210,6 +1210,7 @@ export const InteractiveLabWorkspace: React.FC = () => {
             onMouseLeave={handleEndDrag}
             onTouchMove={(e) => {
               if (e.touches && e.touches.length > 0) {
+                if (e.cancelable) e.preventDefault();
                 handleMoveCanvas(e.touches[0].clientX, e.touches[0].clientY);
               }
             }}
@@ -1258,6 +1259,45 @@ export const InteractiveLabWorkspace: React.FC = () => {
                 </button>
               </div>
             )}
+
+            {/* Quick Touch Controls Overlay for Mobile & Tablet */}
+            <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 bg-[#0D1B2A]/90 backdrop-blur-md border border-cyan-500/40 rounded-xl px-2.5 py-1.5 shadow-xl text-[11px]">
+              <span className="text-cyan-400 font-bold text-[10px] hidden sm:inline">📱 اللمس:</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoomLevel((z) => Math.min(1.8, parseFloat((z + 0.15).toFixed(2))));
+                }}
+                className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 font-bold flex items-center justify-center text-slate-200 transition-colors"
+                title="تكبير الزووم"
+              >
+                +
+              </button>
+              <span className="font-mono text-[10px] text-amber-400 font-bold px-1">{Math.round(zoomLevel * 100)}%</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoomLevel((z) => Math.max(0.6, parseFloat((z - 0.15).toFixed(2))));
+                }}
+                className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 font-bold flex items-center justify-center text-slate-200 transition-colors"
+                title="تصغير الزووم"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setZoomLevel(1.0);
+                }}
+                className="px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] text-slate-300 hover:text-white"
+                title="إعادة ضبط الحجم"
+              >
+                100%
+              </button>
+            </div>
 
             {/* Zoom Transform Container */}
             <div
@@ -1473,19 +1513,27 @@ export const InteractiveLabWorkspace: React.FC = () => {
                             e.stopPropagation();
                             handlePinClick(comp.id, pin.id);
                           }}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onTouchEnd={(e) => {
+                            e.stopPropagation();
+                            if (e.cancelable) e.preventDefault();
+                            handlePinClick(comp.id, pin.id);
+                          }}
                           style={{
                             left: `${pin.x}px`,
                             top: `${pin.y}px`,
                             transform: 'translate(-50%, -50%)',
                           }}
-                          className={`absolute z-30 w-4 h-4 rounded-full border-2 transition-all ${
+                          className={`absolute z-30 w-4 h-4 rounded-full border-2 transition-all before:content-[''] before:absolute before:-inset-2.5 before:rounded-full before:bg-transparent ${
                             isWiringStartPin
                               ? 'bg-amber-400 border-white scale-150 ring-4 ring-amber-500/80 animate-bounce'
                               : isPotentialTarget
                               ? 'bg-emerald-500 border-white scale-125 ring-4 ring-emerald-500/50 animate-pulse'
                               : isHovered
                               ? 'bg-cyan-400 border-white scale-150 ring-2 ring-cyan-300'
-                              : 'bg-slate-900 border-cyan-400 hover:scale-150 hover:bg-cyan-400'
+                              : 'bg-slate-900 border-cyan-400 hover:scale-150 hover:bg-cyan-400 active:scale-150 active:bg-cyan-400'
                           }`}
                           title={`منفذ: ${pin.name}`}
                         >

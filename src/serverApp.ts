@@ -1317,18 +1317,38 @@ geminiRouter.post('/explain', async (req: Request, res: Response) => {
   const estimatedTokens = (req as any).estimatedTokens || 500;
 
   try {
-    const { doctorName, subject, level, language, lessonTitle, userPrompt, uploadedContent } = req.body;
+    const { doctorName, subject, level, language, lessonTitle, userPrompt, uploadedContent, uploadedMimeType } = req.body;
 
     const queryContext = `${lessonTitle || ''} ${userPrompt || ''}`;
-    const safeContentChunk = extractRelevantContentChunk(uploadedContent || '', queryContext, 1500);
-    const isBase64Image = uploadedContent && (uploadedContent.startsWith('data:image/') || uploadedContent.length > 2000);
+    const rawUploaded = typeof uploadedContent === 'string' ? uploadedContent : '';
+    const isDataUrl = rawUploaded.startsWith('data:');
+    const isBlobOrInvalidUrl = rawUploaded.startsWith('blob:');
+    const validUploaded = isBlobOrInvalidUrl ? '' : rawUploaded;
+
+    let detectedMime = uploadedMimeType || 'image/jpeg';
+    let cleanBase64 = '';
+    let isBinaryInline = false;
+
+    if (isDataUrl) {
+      const matches = validUploaded.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        detectedMime = matches[1] || detectedMime;
+        cleanBase64 = matches[2] || '';
+        // Gemini inlineData supports image/* and application/pdf directly
+        if (detectedMime.startsWith('image/') || detectedMime === 'application/pdf') {
+          isBinaryInline = true;
+        }
+      }
+    }
+
+    const safeContentChunk = !isDataUrl ? extractRelevantContentChunk(validUploaded, queryContext, 1500) : '';
 
     const promptText = `أنت الدكتور الأكاديمي "${doctorName || 'الدكتور الذكي'}"، خبير هندسي في ${subject || 'الميكاترونكس'}.
 المستوى: ${level || 'متوسط'}.
 اللغة: ${language === 'en' ? 'English' : 'العربية الفصيحة مع المصطلحات الإنجليزية'}.
 
 عنوان الدرس/السؤال: ${lessonTitle || userPrompt || 'مقدمة ميكاترونكس'}
-${safeContentChunk && !isBase64Image ? `نص المستند المرفوق:\n${safeContentChunk}\n` : ''}
+${safeContentChunk ? `نص المستند المرفوق:\n${safeContentChunk}\n` : ''}
 
 يرجى إرجاع الإجابة بتنسيق JSON حصراً كالتالي:
 {
@@ -1354,13 +1374,12 @@ ${safeContentChunk && !isBase64Image ? `نص المستند المرفوق:\n${s
 
     let contentsPayload: any;
 
-    if (isBase64Image) {
-      const cleanBase64 = uploadedContent.replace(/^data:image\/\w+;base64,/, '');
+    if (isBinaryInline && cleanBase64) {
       contentsPayload = {
         parts: [
           {
             inlineData: {
-              mimeType: 'image/jpeg',
+              mimeType: detectedMime,
               data: cleanBase64,
             },
           },
@@ -1378,8 +1397,7 @@ ${safeContentChunk && !isBase64Image ? `نص المستند المرفوق:\n${s
       });
     });
 
-    const jsonText = (text || '{}').trim();
-    const parsed = JSON.parse(jsonText);
+    const parsed = parseJsonSafely(text || '{}');
 
     res.json({
       success: true,
@@ -1460,9 +1478,187 @@ geminiRouter.post('/arduino-gen', async (req: Request, res: Response) => {
       config: { responseMimeType: 'application/json' },
     });
 
-    res.json({ success: true, data: JSON.parse(text || '{}') });
+    res.json({ success: true, data: parseJsonSafely(text || '{}') });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==========================================
+// API: «قاعة المحاضرات والسبورة الذكية» (Interactive Lecture Hall)
+// Friendly Yemeni Professor Persona (San'ani / Adani / Ta'izzi)
+// ==========================================
+geminiRouter.post('/lecture-hall', async (req: Request, res: Response) => {
+  try {
+    const {
+      serviceType = 'explain',
+      dialect = 'sanani',
+      courseSubject = 'electronics',
+      topic = '',
+      question = '',
+      uploadedContent = '',
+      stepIndex = 1,
+      confusionPoint = '',
+    } = req.body || {};
+
+    const dialectGuide: Record<string, string> = {
+      sanani: `تحدث باللهجة الصنعانية الأصيلة والمحببة للطلاب:
+- استخدم عبارات صنعانية طبيعية ومرحبة: "أهلاً وسهلاً بك يا مهندس"، "شوف يا ابني الموضوع بسيط جداً"، "خلّينا نمشي حبة حبة"، "تذكّر المهندس اليمني ما يعرف مستحيل".
+- اضرب أمثلة وتشبيهات من الحياة والبيئة اليمنية في صنعاء (مثل: تشبيه سريان التيار الكهربائي وضغط الجهد بشبكة خزانات ومياه صنعاء، أو تعشيق التروس بتروس المطاحن في سوق الملح، أو التوازن الحركي في بناء ناطحات السحاب الطينية).
+- حافظ على دقة المصطلحات الهندسية بالإنجليزية (Voltage, Current, PWM, PID, Ladder Logic, Op-Amp, Kinematics, Arduino).`,
+      adani: `تحدث باللهجة العدنية الأصيلة المحببة للطلاب:
+- استخدم عبارات عدنية ودودة: "يا بوي ركّز معي"، "الموضوع عسل وسهل"، "خلّنا نفكك الدائرة خطوة خطوة"، "والله إنك مهندس شاطر وبطل"، "ما فيش شي صعب على عيال اليمن".
+- اضرب أمثلة عملية مع الحفاظ التام على الدقة العلمية والمصطلحات الإنجليزية.`,
+      taizzi: `تحدث باللهجة التعزية الأصيلة المحببة للطلاب:
+- استخدم عبارات تعزية مألوفة وذكية: "يا خي اسمعني زين"، "الهندسة عقل وفهم مو بس حفظ"، "بنحلها سوا حبة حبة"، "المهندس اليمني ذكي ومبدع بالفطرة".
+- اضرب أمثلة عملية ذكية وواضحة مع دقة المصطلحات العلمية.`,
+    };
+
+    const courseMap: Record<string, string> = {
+      control: 'التحكم الآلي والأتمتة الصناعية (Automatic Control & PLC)',
+      electronics: 'الإلكترونيات والدوائر الكهربائية (Electronics & Circuits)',
+      mechanics: 'الميكانيكا وعزم التروس (Mechanics & Dynamics)',
+      programming: 'المتحكمات المضمنة والبرمجة (Embedded Systems & Arduino)',
+      robotics: 'هندسة الروبوتات والذكاء الاصطناعي (Robotics & Kinematics)',
+    };
+
+    const currentDialectPrompt = dialectGuide[dialect] || dialectGuide.sanani;
+    const currentCourseName = courseMap[courseSubject] || courseMap.electronics;
+
+    // Check high-speed cache for text requests
+    const cacheKey = computeCacheKey(
+      `lecture_hall_${serviceType}_${dialect}_${courseSubject}`,
+      `${topic}_${question}_${confusionPoint}_${stepIndex}`
+    );
+
+    const isBase64 = typeof uploadedContent === 'string' && (uploadedContent.startsWith('data:') || uploadedContent.length > 500);
+    if (!isBase64) {
+      const cached = aiResponseCache.get(cacheKey);
+      if (cached) {
+        return res.json({ success: true, data: cached, fromCache: true });
+      }
+    }
+
+    let serviceInstruction = '';
+
+    if (serviceType === 'explain') {
+      serviceInstruction = `المهمة: اشرح المفهوم الهندسي بأسلوب الأستاذ اليمني الودود:
+- اشرح المفهوم ببساطة شديدة مع تشبيه واقعي من اليمن.
+- لخص أهم القوانين والمعادلات والنقاط لتظهر على السبورة الذكية.
+- حدد نوع المخطط التعليمي الأنسب للسبورة: (circuit أو gears أو plc أو arduino أو servo أو graph أو mindmap).
+- اختتم حديثك دائماً بالسؤال الودود: "فهمت ولا نعيدها بطريقة ثانية يا مهندس؟"`;
+    } else if (serviceType === 'ask_doctor') {
+      serviceInstruction = `المهمة: إجابة تفاعلية مباشرة مع الطالب كأستاذ يمني جالس معه في القاعة:
+- ابدأ بترحيب ودود مثل: "سؤالك في الصميم يا مهندس"، "خلّينا نفكر مع بعض حبة حبة".
+- أجب بدقة علمية مع التبسيط والرسومات على السبورة.`;
+    } else if (serviceType === 'solve_homework') {
+      serviceInstruction = `المهمة: حل مسألة أو واجب خطوة بخطوة مع توضيح السبب (Why) وراء كل خطوة:
+- قسّم الحل إلى 4 مراحل واضحة:
+  1. استخراج المعطيات والمطلوب (Given & Required).
+  2. تحديد القانون الهندسي وسبب اختياره دون غيره.
+  3. التعويض الحسابي والرياضي خطوة بخطوة.
+  4. النتيجة النهائية بالوحدات الفيزيائية الدقيقة (SI Units).
+- اضبط الخطوة الحالية وفق رقم المرحلة: ${stepIndex}.`;
+    } else if (serviceType === 'quiz_me') {
+      serviceInstruction = `المهمة: صياغة سؤال اختبار ذكي على السبورة لقياس فهم الطالب:
+- سؤال اختيار من متعدد (4 خيارات، خيار واحد صحيح).
+- تعليق يمني مشجع جداً في حال الإجابة الصحيحة: "صح لسانك يا بطل! كفو يا مهندس اليمن 🇾🇪".
+- تعليق يمني لطيف وداعم في حال الإجابة الخاطئة: "ما عليه يا ابني، الغلط هو بداية الفهم الحقيقي. خلّينا نتعلمها سوا".`;
+    } else if (serviceType === 'did_not_understand') {
+      serviceInstruction = `المهمة: زر الطوارئ التعليمية (لم أفهم):
+- أعد الشرح بطريقة مختلفة تماماً وبمستوى أبسط بكثير وتشبيه فيزيائي بديل.
+- ركّز على نقطة الغموض التي حددها الطالب: "${confusionPoint || 'الفكرة الأساسية'}".
+- صمّم خريطة ذهنية (Mindmap) بسيطة ومباشرة للسبورة.`;
+    }
+
+    const systemPrompt = `أنت "دكتور الميكاترونكس الذكي" - الأستاذ الأكاديمي المرموق والمحبوب لطلاب هندسة الميكاترونكس في الجامعات اليمنية (جامعة صنعاء، جامعة عدن، جامعة تعز، جامعة ذمار، وبقية كليات الهندسة).
+
+🎙️ الهوية الصوتية والإلقائية الإلزامية:
+- الصوت والشخصية: أستاذ وأب أكاديمي يمني (ذكر بالغ Adult Male)، عمرك الصوتي بين 40 و 50 سنة.
+- النبرة: دافئة، أبوية، واثقة، ومطمئنة لطلابك ("يا ابني"، "يا مهندس"، "ركز معي حبة حبة").
+- ممنوع منعاً باتاً استخدام أي صيغة أو نبرة أو ضمائر أنثوية لنفسك؛ الخطاب حصراً بصوت وهوية أستاذ ذكر بالغ.
+- الإلقاء والوقفات: وزّع الحديث بوقفات تعليمية طبيعية متزنة (سرعة 1.0x) وفواصل مريحة بين الجمل والفقرات في حقل doctorSpeech.
+${currentDialectPrompt}
+
+المقرر الدراسي الحالي: ${currentCourseName}
+موضوع المحاضرة: ${topic || 'هندسة الميكاترونكس'}
+سؤال أو استفسار الطالب: ${question || 'اشرح لي هذا المفهوم'}
+
+${serviceInstruction}
+
+يجب أن ترجع إجابتك حصراً بصيغة JSON نظيف بالهيكل التالي:
+{
+  "doctorSpeech": "الكلام الصوتي المنطوق بلهجة يمنية طبيعية وودودة يرحب ويشرح...",
+  "boardTitle": "عنوان المفهوم المكتوب بخط عريض أعلى السبورة الذكية",
+  "boardNotes": [
+    "ملاحظة أو فكرة 1 للسبورة",
+    "ملاحظة 2 للسبورة",
+    "قانون أو معادلة رئيسية"
+  ],
+  "boardEquation": "المعادلة الرياضية الرئيسية بصيغة نصية واضحة مثل: V = I * R",
+  "diagramType": "circuit" | "gears" | "plc" | "arduino" | "servo" | "graph" | "mindmap",
+  "diagramTitle": "عنوان المخطط المرسوم على السبورة",
+  "diagramData": {
+    "keyMetrics": ["5V Input", "220Ω Resistor", "20mA LED Current"],
+    "summary": "ملخص توضيحي لحركة المكونات"
+  },
+  "steps": [
+    { "phase": "المرحلة الأولى: استخراج المعطيات", "details": "شرح المعطيات..." },
+    { "phase": "المرحلة الثانية: اختيار القانون", "details": "القانون المطبق..." },
+    { "phase": "المرحلة الثالثة: التعويض والحل", "details": "خطوات التعويض..." },
+    { "phase": "المرحلة الرابعة: النتيجة النهائية", "details": "الناتج مع الوحدة..." }
+  ],
+  "quiz": {
+    "question": "نص سؤال الاختبار الذكي...",
+    "options": ["الخيار أ", "الخيار ب", "الخيار ج", "الخيار د"],
+    "correctIndex": 0,
+    "explanation": "التفسير العلمي السريع للحل..."
+  },
+  "yemeniEncouragement": "تذكّر: المهندس اليمني ما يعرف مستحيل! 🇾🇪",
+  "followupOptions": ["اشرح بمثال عملي إضافي", "أعطني مسألة اختبار", "لم أفهم نقطة معينة"]
+}`;
+
+    let contentsPayload: any;
+    if (isBase64) {
+      let mime = 'image/jpeg';
+      let cleanData = uploadedContent;
+      if (uploadedContent.startsWith('data:')) {
+        const matches = uploadedContent.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mime = matches[1] || mime;
+          cleanData = matches[2];
+        }
+      }
+      contentsPayload = {
+        parts: [
+          { inlineData: { mimeType: mime, data: cleanData } },
+          { text: systemPrompt },
+        ],
+      };
+    } else {
+      contentsPayload = systemPrompt;
+    }
+
+    const rawText = await generateGeminiContentWithRetry({
+      contents: contentsPayload,
+      config: { responseMimeType: 'application/json' },
+      primaryModel: 'gemini-3.1-flash-lite',
+      fallbackModel: 'gemini-flash-latest',
+    });
+
+    const parsedData = parseJsonSafely(rawText);
+
+    if (!isBase64 && parsedData) {
+      aiResponseCache.set(cacheKey, parsedData, 2 * 3600 * 1000);
+    }
+
+    res.json({ success: true, data: parsedData });
+  } catch (error: any) {
+    console.error('[Lecture Hall API Error]:', error);
+    res.status(500).json({
+      success: false,
+      error: error?.message || 'حدث خطأ أثناء معالجة المحاضرة في قاعة المحاضرات.',
+    });
   }
 });
 

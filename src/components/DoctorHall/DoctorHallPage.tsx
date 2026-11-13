@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Doctor, SavedLecture, LectureData } from '../../types';
 import { getStoredDoctors, saveDoctor, saveLecture, getStoredLectures } from '../../services/storage';
 import { requestLectureExplanation, doctorVoice, compressImageFile, LectureProgressStage, PROGRESS_STAGE_LABELS } from '../../services/ai';
+import { readFileAsBase64OrText } from '../../services/explainLessonApi';
 import { DoctorCreatorModal } from './DoctorCreatorModal';
 import { VirtualClassroomView } from './VirtualClassroomView';
 import { Bot, Plus, Play, Pause, Square, Volume2, Sparkles, Upload, HelpCircle, CheckCircle, Award, BookOpen, Layers, RefreshCw, AlertTriangle } from 'lucide-react';
@@ -17,6 +18,7 @@ export const DoctorHallPage: React.FC = () => {
   const [lessonTitle, setLessonTitle] = useState('');
   const [userPrompt, setUserPrompt] = useState('');
   const [uploadedContent, setUploadedContent] = useState('');
+  const [uploadedMimeType, setUploadedMimeType] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [educationalUrl, setEducationalUrl] = useState('');
@@ -54,20 +56,22 @@ export const DoctorHallPage: React.FC = () => {
     if (!file) return;
 
     setUploadedFileName(file.name);
+    setErrorMsg('');
 
-    if (file.type.startsWith('image/')) {
-      const compressed = await compressImageFile(file);
-      // Original high-res preview for user viewing
-      setImagePreviewUrl(compressed.originalUrl);
-      // Only send optimized thumbnail base64 to Gemini Vision
-      setUploadedContent(compressed.optimizedVisionBase64);
-    } else {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const text = evt.target?.result as string;
-        setUploadedContent(text || `محتوى ملف: ${file.name}`);
-      };
-      reader.readAsText(file);
+    try {
+      if (file.type.startsWith('image/')) {
+        const compressed = await compressImageFile(file);
+        setImagePreviewUrl(compressed.originalUrl);
+        setUploadedContent(compressed.optimizedVisionBase64);
+        setUploadedMimeType('image/jpeg');
+      } else {
+        setImagePreviewUrl('');
+        const fileRes = await readFileAsBase64OrText(file);
+        setUploadedContent(fileRes.content || `محتوى ملف: ${file.name}`);
+        setUploadedMimeType(fileRes.mimeType);
+      }
+    } catch {
+      setErrorMsg('تعذر قراءة الملف المرفوع. يرجى التأكد من سلامة الملف أو استخدام صيغة نصية/صورة.');
     }
   };
 
@@ -94,7 +98,8 @@ export const DoctorHallPage: React.FC = () => {
         lessonTitle,
         fullPrompt,
         uploadedContent,
-        (stage) => setCurrentProgressStage(stage)
+        (stage) => setCurrentProgressStage(stage),
+        uploadedMimeType
       );
 
       setLectureData(data);
@@ -171,7 +176,7 @@ export const DoctorHallPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 w-full max-w-full overflow-x-hidden min-w-0">
       
       {/* Active Doctor Selection Header */}
       <div className="bg-[#0D1B2A] border border-[#00f0ff]/20 rounded-2xl p-4 lg:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">

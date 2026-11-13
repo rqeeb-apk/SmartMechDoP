@@ -867,13 +867,13 @@ export const LabWorkspace3D: React.FC<LabWorkspace3DProps> = ({ initialLabType =
   const selectedItem = placedItems.find((i) => i.id === selectedItemId);
 
   return (
-    <div className="space-y-6 pb-12 font-sans select-none">
+    <div className="space-y-6 pb-12 font-sans select-none w-full max-w-full overflow-x-hidden min-w-0">
       
       {/* Top Header & Lab Mode Navigation */}
-      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <div className="bg-[#0D1B2A] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl w-full max-w-full min-w-0">
         
         {/* Lab Switcher Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full min-w-0">
           {[
             { id: 'circuits', label: 'طاولة الدوائر والقطع 3D', icon: Zap },
             { id: 'robotics', label: 'الذراع الروبوتي 4-DOF', icon: Bot },
