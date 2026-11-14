@@ -25,6 +25,8 @@ interface WhiteboardState {
   ctx: CanvasRenderingContext2D | null;
   snapshot: HTMLCanvasElement | null;
   snapshotCtx: CanvasRenderingContext2D | null;
+  baseLayer: HTMLCanvasElement | null;
+  baseLayerCtx: CanvasRenderingContext2D | null;
   rcSnapshot: ReturnType<typeof rough.canvas> | null;
   rcLive: ReturnType<typeof rough.canvas> | null;
   logicalHeight: number;
@@ -39,6 +41,8 @@ const wb: WhiteboardState = {
   ctx: null,
   snapshot: null,
   snapshotCtx: null,
+  baseLayer: null,
+  baseLayerCtx: null,
   rcSnapshot: null,
   rcLive: null,
   logicalHeight: BASE_LOGICAL_HEIGHT,
@@ -132,12 +136,43 @@ function resizeCanvasBuffers(canvasElement: HTMLCanvasElement, targetLogicalHeig
   const snapshotCtx = snapshot.getContext('2d');
   if (!snapshotCtx) return;
 
+  const baseLayer = document.createElement('canvas');
+  baseLayer.width = pixelWidth;
+  baseLayer.height = pixelHeight;
+  const baseLayerCtx = baseLayer.getContext('2d');
+
   wb.canvas = canvasElement;
   wb.ctx = ctx;
   wb.snapshot = snapshot;
   wb.snapshotCtx = snapshotCtx;
+  wb.baseLayer = baseLayer;
+  wb.baseLayerCtx = baseLayerCtx;
   wb.rcLive = rough.canvas(canvasElement);
   wb.rcSnapshot = rough.canvas(snapshot);
+}
+
+export function captureWhiteboardBaseLayer(): void {
+  if (!wb.baseLayerCtx || !wb.baseLayer || !wb.snapshot) return;
+  wb.baseLayerCtx.save();
+  wb.baseLayerCtx.setTransform(1, 0, 0, 1, 0, 0);
+  wb.baseLayerCtx.clearRect(0, 0, wb.baseLayer.width, wb.baseLayer.height);
+  wb.baseLayerCtx.drawImage(wb.snapshot, 0, 0);
+  wb.baseLayerCtx.restore();
+}
+
+export function restoreWhiteboardBaseLayer(): void {
+  if (!wb.snapshotCtx || !wb.snapshot || !wb.baseLayer) return;
+  wb.snapshotCtx.save();
+  wb.snapshotCtx.setTransform(1, 0, 0, 1, 0, 0);
+  wb.snapshotCtx.clearRect(0, 0, wb.snapshot.width, wb.snapshot.height);
+  wb.snapshotCtx.drawImage(wb.baseLayer, 0, 0);
+  wb.snapshotCtx.restore();
+  applyLogicalTransform(wb.snapshotCtx);
+  syncDisplayFromSnapshot();
+}
+
+export function getLogicalHeight(): number {
+  return wb.logicalHeight;
 }
 
 /**
@@ -161,6 +196,7 @@ export function clearBoard(): void {
   if (!wb.snapshotCtx || !wb.ctx) return;
   drawWhiteGridBackground(wb.snapshotCtx);
   syncDisplayFromSnapshot();
+  captureWhiteboardBaseLayer();
 }
 
 /**
@@ -341,6 +377,7 @@ export function endInteractiveStroke(): void {
     wb.snapshotCtx.fill();
     wb.snapshotCtx.restore();
     syncDisplayFromSnapshot();
+    captureWhiteboardBaseLayer();
     return;
   }
 
@@ -353,6 +390,7 @@ export function endInteractiveStroke(): void {
       seed,
     });
     syncDisplayFromSnapshot();
+    captureWhiteboardBaseLayer();
     return;
   }
 
@@ -372,7 +410,11 @@ export function endInteractiveStroke(): void {
       seed,
     });
     syncDisplayFromSnapshot();
+    captureWhiteboardBaseLayer();
+    return;
   }
+
+  captureWhiteboardBaseLayer();
 }
 
 /**
@@ -383,13 +425,38 @@ export async function drawWire(
   y1: number,
   x2: number,
   y2: number,
-  options?: { color?: string; duration?: number; token?: number }
+  options?: { color?: string; duration?: number; token?: number; instant?: boolean; seed?: number }
 ): Promise<void> {
   if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
   const token = options?.token ?? wb.runToken;
   const color = options?.color || '#0F172A';
-  const duration = options?.duration ?? 380;
-  const seed = nextSeed();
+  const duration = options?.duration ?? 360;
+  const seed = options?.seed ?? nextSeed();
+
+  const commitWire = () => {
+    if (!wb.snapshotCtx || !wb.rcSnapshot) return;
+    applyLogicalTransform(wb.snapshotCtx);
+    wb.rcSnapshot.line(x1, y1, x2, y2, {
+      stroke: color,
+      strokeWidth: 2.6,
+      roughness: 1.05,
+      seed,
+    });
+    wb.snapshotCtx.save();
+    wb.snapshotCtx.fillStyle = '#0EA5E9';
+    wb.snapshotCtx.beginPath();
+    wb.snapshotCtx.arc(x1, y1, 3.2, 0, Math.PI * 2);
+    wb.snapshotCtx.arc(x2, y2, 3.2, 0, Math.PI * 2);
+    wb.snapshotCtx.fill();
+    wb.snapshotCtx.restore();
+    syncDisplayFromSnapshot();
+  };
+
+  if (options?.instant) {
+    commitWire();
+    return;
+  }
+
   const state = { t: 0 };
   whiteboardAudioSfx.playPenStroke('wire');
 
@@ -405,7 +472,7 @@ export async function drawWire(
       wb.rcLive.line(x1, y1, cx, cy, {
         stroke: color,
         strokeWidth: 2.6,
-        roughness: 1.1,
+        roughness: 1.05,
         seed,
       });
       wb.ctx.save();
@@ -418,46 +485,41 @@ export async function drawWire(
   });
 
   if (isRunCancelled(token)) return;
-  applyLogicalTransform(wb.snapshotCtx);
-  wb.rcSnapshot.line(x1, y1, x2, y2, {
-    stroke: color,
-    strokeWidth: 2.6,
-    roughness: 1.1,
-    seed,
-  });
-  wb.snapshotCtx.save();
-  wb.snapshotCtx.fillStyle = '#0EA5E9';
-  wb.snapshotCtx.beginPath();
-  wb.snapshotCtx.arc(x1, y1, 3.2, 0, Math.PI * 2);
-  wb.snapshotCtx.arc(x2, y2, 3.2, 0, Math.PI * 2);
-  wb.snapshotCtx.fill();
-  wb.snapshotCtx.restore();
-  syncDisplayFromSnapshot();
+  commitWire();
 }
 
 /**
- * رسم بطارية كهربائية DC عند الإحداثي (x, y)
+ * رسم بطارية كهربائية DC عند الإحداثي (x, y) — مرتبطة مباشرة مع الأيقونة القابلة للسحب والإفلات
  */
 export async function drawBattery(
   x: number,
   y: number,
   label: string = 'V = 12V',
-  options?: { token?: number; duration?: number }
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number; highlight?: boolean }
 ): Promise<void> {
   if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
   const token = options?.token ?? wb.runToken;
-  const duration = options?.duration ?? 500;
-  const seed = nextSeed();
-  const state = { p: 0 };
-  whiteboardAudioSfx.playPenStroke('component');
+  const duration = options?.duration ?? 480;
+  const seed = options?.seed ?? nextSeed();
 
   const renderBattery = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    if (options?.highlight && progress > 0.3) {
+      rc.rectangle(x - 42, y - 46, 84, 92, {
+        stroke: 'rgba(14, 165, 233, 0.55)',
+        strokeWidth: 1.5,
+        fill: 'rgba(224, 242, 254, 0.25)',
+        fillStyle: 'solid',
+        roughness: 0.7,
+        seed: seed + 10,
+      });
+    }
+
     const topProg = Math.min(1, progress * 3);
     if (topProg > 0) {
       rc.line(x, y - 40, x, y - 40 + 30 * topProg, {
         stroke: '#0F172A',
-        strokeWidth: 2.5,
-        roughness: 1.0,
+        strokeWidth: 2.6,
+        roughness: 0.95,
         seed: seed + 1,
       });
     }
@@ -466,8 +528,8 @@ export async function drawBattery(
       const plateP = Math.min(1, (progress - 0.2) / 0.35);
       rc.line(x - 26 * plateP, y - 10, x + 26 * plateP, y - 10, {
         stroke: '#DC2626',
-        strokeWidth: 3.4,
-        roughness: 1.0,
+        strokeWidth: 3.6,
+        roughness: 0.95,
         seed: seed + 2,
       });
     }
@@ -476,8 +538,8 @@ export async function drawBattery(
       const plateP = Math.min(1, (progress - 0.45) / 0.35);
       rc.line(x - 14 * plateP, y + 10, x + 14 * plateP, y + 10, {
         stroke: '#0F172A',
-        strokeWidth: 4.5,
-        roughness: 1.0,
+        strokeWidth: 4.8,
+        roughness: 0.95,
         seed: seed + 3,
       });
     }
@@ -486,15 +548,25 @@ export async function drawBattery(
       const botP = Math.min(1, (progress - 0.65) / 0.35);
       rc.line(x, y + 10, x, y + 10 + 30 * botP, {
         stroke: '#0F172A',
-        strokeWidth: 2.5,
-        roughness: 1.0,
+        strokeWidth: 2.6,
+        roughness: 0.95,
         seed: seed + 4,
       });
     }
 
-    if (progress > 0.75) {
+    if (progress > 0.72) {
       ctx.save();
-      ctx.globalAlpha = Math.min(1, (progress - 0.75) / 0.25);
+      ctx.globalAlpha = Math.min(1, (progress - 0.72) / 0.28);
+      // Terminal connection dots
+      ctx.fillStyle = '#DC2626';
+      ctx.beginPath();
+      ctx.arc(x, y - 40, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0F172A';
+      ctx.beginPath();
+      ctx.arc(x, y + 40, 3.4, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.font = 'bold 16px Cairo, sans-serif';
       ctx.fillStyle = '#DC2626';
       ctx.textAlign = 'center';
@@ -503,7 +575,7 @@ export async function drawBattery(
       ctx.fillText('−', x + 20, y + 26);
 
       if (label) {
-        ctx.font = 'bold 14px "JetBrains Mono", Cairo, sans-serif';
+        ctx.font = 'bold 13px "JetBrains Mono", Cairo, sans-serif';
         ctx.fillStyle = '#0284C7';
         ctx.textAlign = 'right';
         ctx.fillText(label, x - 34, y + 4);
@@ -511,6 +583,16 @@ export async function drawBattery(
       ctx.restore();
     }
   };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderBattery(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('component');
 
   await animate(state, {
     p: 1,
@@ -530,20 +612,18 @@ export async function drawBattery(
 }
 
 /**
- * رسم مقاومة كهربائية متعرجة عند الإحداثي (x, y)
+ * رسم مقاومة كهربائية متعرجة عند الإحداثي (x, y) — مرتبطة مباشرة مع الأيقونة القابلة للسحب والإفلات
  */
 export async function drawResistor(
   x: number,
   y: number,
   label: string = 'R = 100Ω',
-  options?: { token?: number; duration?: number }
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number; highlight?: boolean }
 ): Promise<void> {
   if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
   const token = options?.token ?? wb.runToken;
-  const duration = options?.duration ?? 520;
-  const seed = nextSeed();
-  const state = { p: 0 };
-  whiteboardAudioSfx.playPenStroke('component');
+  const duration = options?.duration ?? 500;
+  const seed = options?.seed ?? nextSeed();
 
   const points: [number, number][] = [
     [x - 50, y],
@@ -559,6 +639,17 @@ export async function drawResistor(
   ];
 
   const renderResistor = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    if (options?.highlight && progress > 0.3) {
+      rc.rectangle(x - 54, y - 24, 108, 48, {
+        stroke: 'rgba(217, 119, 6, 0.55)',
+        strokeWidth: 1.5,
+        fill: 'rgba(254, 243, 199, 0.35)',
+        fillStyle: 'solid',
+        roughness: 0.7,
+        seed: seed + 12,
+      });
+    }
+
     const totalSegments = points.length - 1;
     const exactSeg = progress * totalSegments;
     const fullSegs = Math.floor(exactSeg);
@@ -574,22 +665,41 @@ export async function drawResistor(
     if (activePoints.length >= 2) {
       rc.linearPath(activePoints, {
         stroke: '#D97706',
-        strokeWidth: 2.8,
-        roughness: 1.0,
+        strokeWidth: 2.9,
+        roughness: 0.95,
         seed,
       });
     }
 
-    if (progress > 0.7 && label) {
+    if (progress > 0.7) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, (progress - 0.7) / 0.3);
-      ctx.font = 'bold 14px "JetBrains Mono", Cairo, sans-serif';
-      ctx.fillStyle = '#0F172A';
-      ctx.textAlign = 'center';
-      ctx.fillText(label, x, y - 24);
+      // Terminal pins
+      ctx.fillStyle = '#0EA5E9';
+      ctx.beginPath();
+      ctx.arc(x - 50, y, 3.3, 0, Math.PI * 2);
+      ctx.arc(x + 50, y, 3.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (label) {
+        ctx.font = 'bold 13px "JetBrains Mono", Cairo, sans-serif';
+        ctx.fillStyle = '#0F172A';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, y - 24);
+      }
       ctx.restore();
     }
   };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderResistor(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('component');
 
   await animate(state, {
     p: 1,
@@ -605,6 +715,529 @@ export async function drawResistor(
   if (isRunCancelled(token)) return;
   applyLogicalTransform(wb.snapshotCtx);
   renderResistor(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم مكثف كهربائي (Capacitor) بلوحين متوازيين
+ */
+export async function drawCapacitor(
+  x: number,
+  y: number,
+  label: string = 'C = 100µF',
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
+  const token = options?.token ?? wb.runToken;
+  const seed = options?.seed ?? nextSeed();
+
+  const renderCap = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    const leadP = Math.min(1, progress * 2.2);
+    rc.line(x - 45, y, x - 45 + 37 * leadP, y, { stroke: '#0F172A', strokeWidth: 2.5, seed: seed + 1 });
+    rc.line(x + 45, y, x + 45 - 37 * leadP, y, { stroke: '#0F172A', strokeWidth: 2.5, seed: seed + 2 });
+
+    if (progress > 0.35) {
+      const plateH = 22 * Math.min(1, (progress - 0.35) / 0.45);
+      rc.line(x - 8, y - plateH, x - 8, y + plateH, { stroke: '#0284C7', strokeWidth: 3.6, seed: seed + 3 });
+      rc.line(x + 8, y - plateH, x + 8, y + plateH, { stroke: '#0284C7', strokeWidth: 3.6, seed: seed + 4 });
+    }
+
+    if (progress > 0.72) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (progress - 0.72) / 0.28);
+      ctx.fillStyle = '#0EA5E9';
+      ctx.beginPath();
+      ctx.arc(x - 45, y, 3.2, 0, Math.PI * 2);
+      ctx.arc(x + 45, y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 12px "JetBrains Mono", Cairo, sans-serif';
+      ctx.fillStyle = '#0284C7';
+      ctx.textAlign = 'center';
+      ctx.fillText('+', x - 18, y - 16);
+      ctx.fillStyle = '#0F172A';
+      ctx.fillText('−', x + 18, y - 16);
+      if (label) {
+        ctx.font = 'bold 13px "JetBrains Mono", Cairo, sans-serif';
+        ctx.fillText(label, x, y - 28);
+      }
+      ctx.restore();
+    }
+  };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderCap(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('component');
+  await animate(state, {
+    p: 1,
+    duration: options?.duration ?? 450,
+    ease: 'outCubic',
+    onUpdate: () => {
+      if (isRunCancelled(token) || !wb.rcLive || !wb.ctx) return;
+      syncDisplayFromSnapshot();
+      renderCap(wb.rcLive, wb.ctx, state.p);
+    },
+  });
+  if (isRunCancelled(token)) return;
+  applyLogicalTransform(wb.snapshotCtx);
+  renderCap(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم مصباح دايود باعث للضوء (LED) مع أشعة إضاءة تفاعلية
+ */
+export async function drawLED(
+  x: number,
+  y: number,
+  label: string = 'LED (2.2V)',
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number; lit?: boolean }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
+  const token = options?.token ?? wb.runToken;
+  const seed = options?.seed ?? nextSeed();
+  const isLit = options?.lit ?? true;
+
+  const renderLED = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    rc.line(x - 45, y, x - 14, y, { stroke: '#0F172A', strokeWidth: 2.5, seed: seed + 1 });
+    rc.line(x + 14, y, x + 45, y, { stroke: '#0F172A', strokeWidth: 2.5, seed: seed + 2 });
+
+    if (progress > 0.25) {
+      rc.circle(x, y, 44 * Math.min(1, (progress - 0.25) / 0.4), {
+        stroke: isLit ? '#F59E0B' : '#64748B',
+        fill: isLit ? 'rgba(253, 224, 71, 0.35)' : 'rgba(226, 232, 240, 0.25)',
+        fillStyle: 'solid',
+        strokeWidth: 2.2,
+        seed: seed + 3,
+      });
+      rc.polygon(
+        [
+          [x - 12, y - 12],
+          [x - 12, y + 12],
+          [x + 10, y],
+        ],
+        {
+          stroke: '#0F172A',
+          fill: isLit ? '#FBBF24' : '#94A3B8',
+          fillStyle: 'solid',
+          strokeWidth: 2,
+          seed: seed + 4,
+        }
+      );
+      rc.line(x + 11, y - 13, x + 11, y + 13, { stroke: '#0F172A', strokeWidth: 3, seed: seed + 5 });
+    }
+
+    if (progress > 0.65) {
+      if (isLit) {
+        rc.line(x + 8, y - 24, x + 19, y - 35, { stroke: '#F59E0B', strokeWidth: 2.2, seed: seed + 6 });
+        rc.line(x + 18, y - 19, x + 31, y - 28, { stroke: '#F59E0B', strokeWidth: 2.2, seed: seed + 7 });
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (progress - 0.65) / 0.35);
+      ctx.fillStyle = '#0EA5E9';
+      ctx.beginPath();
+      ctx.arc(x - 45, y, 3.2, 0, Math.PI * 2);
+      ctx.arc(x + 45, y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      if (label) {
+        ctx.font = 'bold 13px "JetBrains Mono", Cairo, sans-serif';
+        ctx.fillStyle = '#B45309';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, y + 36);
+      }
+      ctx.restore();
+    }
+  };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderLED(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('component');
+  await animate(state, {
+    p: 1,
+    duration: options?.duration ?? 480,
+    ease: 'outCubic',
+    onUpdate: () => {
+      if (isRunCancelled(token) || !wb.rcLive || !wb.ctx) return;
+      syncDisplayFromSnapshot();
+      renderLED(wb.rcLive, wb.ctx, state.p);
+    },
+  });
+  if (isRunCancelled(token)) return;
+  applyLogicalTransform(wb.snapshotCtx);
+  renderLED(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم محرك كهربائي DC / Servo Motor مع محور دوران وسهم حركة
+ */
+export async function drawMotor(
+  x: number,
+  y: number,
+  label: string = 'DC Motor',
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
+  const token = options?.token ?? wb.runToken;
+  const seed = options?.seed ?? nextSeed();
+
+  const renderMotor = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    rc.line(x - 52, y, x - 26, y, { stroke: '#0F172A', strokeWidth: 2.5, seed: seed + 1 });
+    rc.line(x + 26, y, x + 52, y, { stroke: '#0F172A', strokeWidth: 2.5, seed: seed + 2 });
+
+    rc.circle(x, y, 52 * Math.max(0.2, progress), {
+      stroke: '#0284C7',
+      fill: 'rgba(224, 242, 254, 0.6)',
+      fillStyle: 'hachure',
+      hachureGap: 7,
+      strokeWidth: 2.6,
+      seed: seed + 3,
+    });
+
+    if (progress > 0.6) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (progress - 0.6) / 0.4);
+      ctx.font = '900 20px "JetBrains Mono", sans-serif';
+      ctx.fillStyle = '#0F172A';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('M', x, y);
+
+      // Rotation arc above motor
+      ctx.strokeStyle = '#059669';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y - 34, 14, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+
+      ctx.fillStyle = '#0EA5E9';
+      ctx.beginPath();
+      ctx.arc(x - 52, y, 3.2, 0, Math.PI * 2);
+      ctx.arc(x + 52, y, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (label) {
+        ctx.font = 'bold 13px "JetBrains Mono", Cairo, sans-serif';
+        ctx.fillStyle = '#0F172A';
+        ctx.fillText(label, x, y + 40);
+      }
+      ctx.restore();
+    }
+  };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderMotor(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('box');
+  await animate(state, {
+    p: 1,
+    duration: options?.duration ?? 500,
+    ease: 'outBack',
+    onUpdate: () => {
+      if (isRunCancelled(token) || !wb.rcLive || !wb.ctx) return;
+      syncDisplayFromSnapshot();
+      renderMotor(wb.rcLive, wb.ctx, state.p);
+    },
+  });
+  if (isRunCancelled(token)) return;
+  applyLogicalTransform(wb.snapshotCtx);
+  renderMotor(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم راسم إشارات / موجات (Sine / PWM / PID Step Response) لتبسيط التحكم والإلكترونيات
+ */
+export async function drawWave(
+  x: number,
+  y: number,
+  w: number = 240,
+  h: number = 110,
+  waveType: string = 'sine',
+  label: string = 'Signal Wave',
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
+  const token = options?.token ?? wb.runToken;
+  const seed = options?.seed ?? nextSeed();
+  const kind = (waveType || 'sine').toLowerCase();
+
+  const buildWavePoints = (progress: number): [number, number][] => {
+    const pts: [number, number][] = [];
+    const steps = 64;
+    const activeSteps = Math.max(2, Math.floor(steps * progress));
+    const padX = 16;
+    const drawW = Math.max(40, w - padX * 2);
+    const midY = y + h * 0.52;
+    const amp = h * 0.28;
+
+    for (let i = 0; i <= activeSteps; i++) {
+      const t = i / steps;
+      const px = x + padX + t * drawW;
+      let py = midY;
+      if (kind.includes('pwm') || kind.includes('square')) {
+        const cycle = (t * 3) % 1;
+        py = cycle < 0.45 ? midY - amp : midY + amp;
+      } else if (kind.includes('step') || kind.includes('pid')) {
+        const target = midY - amp * 0.65;
+        const base = midY + amp * 0.65;
+        const damped = Math.exp(-4.5 * t) * Math.cos(14 * t);
+        py = target + (base - target) * damped;
+      } else {
+        py = midY - Math.sin(t * Math.PI * 4) * amp;
+      }
+      pts.push([px, py]);
+    }
+    return pts;
+  };
+
+  const renderWave = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    rc.rectangle(x, y, w, h, {
+      stroke: '#0EA5E9',
+      strokeWidth: 2,
+      fill: 'rgba(240, 249, 255, 0.72)',
+      fillStyle: 'solid',
+      roughness: 0.8,
+      seed,
+    });
+    // Axis crosshair
+    ctx.save();
+    ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x + 12, y + h * 0.52);
+    ctx.lineTo(x + w - 12, y + h * 0.52);
+    ctx.stroke();
+    ctx.restore();
+
+    const pts = buildWavePoints(progress);
+    if (pts.length >= 2) {
+      rc.linearPath(pts, {
+        stroke: kind.includes('step') ? '#059669' : '#0284C7',
+        strokeWidth: 2.6,
+        roughness: 0.6,
+        seed: seed + 5,
+      });
+    }
+
+    if (label && progress > 0.5) {
+      ctx.save();
+      ctx.font = 'bold 12px "JetBrains Mono", Cairo, sans-serif';
+      ctx.fillStyle = '#0F172A';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + w / 2, y + h + 16);
+      ctx.restore();
+    }
+  };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderWave(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('wire');
+  await animate(state, {
+    p: 1,
+    duration: options?.duration ?? 580,
+    ease: 'outCubic',
+    onUpdate: () => {
+      if (isRunCancelled(token) || !wb.rcLive || !wb.ctx) return;
+      syncDisplayFromSnapshot();
+      renderWave(wb.rcLive, wb.ctx, state.p);
+    },
+  });
+  if (isRunCancelled(token)) return;
+  applyLogicalTransform(wb.snapshotCtx);
+  renderWave(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم حساس (Ultrasonic / IR / Temperature Sensor) مع موجات استشعار
+ */
+export async function drawSensor(
+  x: number,
+  y: number,
+  label: string = 'Ultrasonic Sensor',
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
+  const token = options?.token ?? wb.runToken;
+  const seed = options?.seed ?? nextSeed();
+
+  const renderSensor = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    rc.rectangle(x - 42, y - 24, 84, 48, {
+      stroke: '#059669',
+      fill: 'rgba(209, 250, 229, 0.55)',
+      fillStyle: 'hachure',
+      strokeWidth: 2.2,
+      seed,
+    });
+    if (progress > 0.35) {
+      rc.circle(x - 18, y, 22, { stroke: '#0F172A', strokeWidth: 2, seed: seed + 1 });
+      rc.circle(x + 18, y, 22, { stroke: '#0F172A', strokeWidth: 2, seed: seed + 2 });
+    }
+    if (progress > 0.65) {
+      ctx.save();
+      ctx.strokeStyle = '#0EA5E9';
+      ctx.lineWidth = 2;
+      [10, 18, 26].forEach((r) => {
+        ctx.beginPath();
+        ctx.arc(x, y - 26, r, Math.PI * 1.2, Math.PI * 1.8);
+        ctx.stroke();
+      });
+      if (label) {
+        ctx.font = 'bold 12px Cairo, sans-serif';
+        ctx.fillStyle = '#0F172A';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, y + 38);
+      }
+      ctx.restore();
+    }
+  };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderSensor(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('box');
+  await animate(state, {
+    p: 1,
+    duration: options?.duration ?? 460,
+    ease: 'outBack',
+    onUpdate: () => {
+      if (isRunCancelled(token) || !wb.rcLive || !wb.ctx) return;
+      syncDisplayFromSnapshot();
+      renderSensor(wb.rcLive, wb.ctx, state.p);
+    },
+  });
+  if (isRunCancelled(token)) return;
+  applyLogicalTransform(wb.snapshotCtx);
+  renderSensor(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم ترس ميكانيكي (Gear) لشرح أنظمة النقل والعزم الميكانيكي
+ */
+export async function drawGear(
+  x: number,
+  y: number,
+  radius: number = 32,
+  label: string = 'Gear',
+  options?: { token?: number; duration?: number; instant?: boolean; seed?: number }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
+  const token = options?.token ?? wb.runToken;
+  const seed = options?.seed ?? nextSeed();
+
+  const renderGear = (rc: ReturnType<typeof rough.canvas>, ctx: CanvasRenderingContext2D, progress: number) => {
+    const teeth = 10;
+    const pts: [number, number][] = [];
+    const rInner = radius * 0.78;
+    const rOuter = radius;
+    const angleLimit = Math.PI * 2 * Math.max(0.2, progress);
+    for (let i = 0; i <= teeth * 4; i++) {
+      const a = (i / (teeth * 4)) * Math.PI * 2;
+      if (a > angleLimit) break;
+      const r = i % 4 < 2 ? rOuter : rInner;
+      pts.push([x + Math.cos(a) * r, y + Math.sin(a) * r]);
+    }
+    if (pts.length >= 3) {
+      rc.linearPath(pts, { stroke: '#475569', strokeWidth: 2.4, roughness: 0.9, seed });
+    }
+    rc.circle(x, y, radius * 0.55, { stroke: '#0EA5E9', strokeWidth: 2.2, seed: seed + 2 });
+    if (label && progress > 0.7) {
+      ctx.save();
+      ctx.font = 'bold 12px Cairo, sans-serif';
+      ctx.fillStyle = '#0F172A';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, y + radius + 18);
+      ctx.restore();
+    }
+  };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderGear(wb.rcSnapshot, wb.snapshotCtx, 1);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { p: 0 };
+  whiteboardAudioSfx.playPenStroke('component');
+  await animate(state, {
+    p: 1,
+    duration: options?.duration ?? 520,
+    ease: 'outCubic',
+    onUpdate: () => {
+      if (isRunCancelled(token) || !wb.rcLive || !wb.ctx) return;
+      syncDisplayFromSnapshot();
+      renderGear(wb.rcLive, wb.ctx, state.p);
+    },
+  });
+  if (isRunCancelled(token)) return;
+  applyLogicalTransform(wb.snapshotCtx);
+  renderGear(wb.rcSnapshot, wb.snapshotCtx, 1);
+  syncDisplayFromSnapshot();
+}
+
+/**
+ * رسم بطاقة ملاحظة ذهبية مميزة داخل الرسم الهندسي لتثبيت المعلومة
+ */
+export async function drawCallout(
+  x: number,
+  y: number,
+  text: string = 'ملاحظة هندسية',
+  options?: { token?: number; instant?: boolean; seed?: number }
+): Promise<void> {
+  if (!wb.ctx || !wb.rcSnapshot || !wb.snapshotCtx) return;
+  const seed = options?.seed ?? nextSeed();
+  const clean = String(text || '').trim().slice(0, 56);
+  if (!clean) return;
+  const w = Math.max(170, Math.min(340, clean.length * 9.5 + 32));
+  const h = 38;
+
+  applyLogicalTransform(wb.snapshotCtx);
+  wb.rcSnapshot.rectangle(x - w / 2, y - h / 2, w, h, {
+    stroke: '#D97706',
+    fill: 'rgba(254, 243, 199, 0.72)',
+    fillStyle: 'solid',
+    strokeWidth: 2,
+    roughness: 1.0,
+    seed,
+  });
+  wb.snapshotCtx.save();
+  wb.snapshotCtx.font = 'bold 13px Cairo, sans-serif';
+  wb.snapshotCtx.fillStyle = '#92400E';
+  wb.snapshotCtx.direction = 'rtl';
+  wb.snapshotCtx.textAlign = 'center';
+  wb.snapshotCtx.textBaseline = 'middle';
+  wb.snapshotCtx.fillText(`💡 ${clean}`, x, y);
+  wb.snapshotCtx.restore();
   syncDisplayFromSnapshot();
 }
 
@@ -677,17 +1310,17 @@ export async function drawArrow(
   x2: number,
   y2: number,
   label: string = '',
-  options?: { color?: string; token?: number }
+  options?: { color?: string; token?: number; instant?: boolean; seed?: number }
 ): Promise<void> {
   if (!wb.ctx || !wb.rcLive || !wb.snapshotCtx || !wb.rcSnapshot) return;
   const token = options?.token ?? wb.runToken;
   const color = options?.color || '#0EA5E9';
-  const seed = nextSeed();
+  const seed = options?.seed ?? nextSeed();
   const angle = Math.atan2(y2 - y1, x2 - x1);
   const headLen = 12;
 
-  await drawWire(x1, y1, x2, y2, { color, duration: 320, token });
-  if (isRunCancelled(token)) return;
+  await drawWire(x1, y1, x2, y2, { color, duration: 320, token, instant: options?.instant, seed });
+  if (!options?.instant && isRunCancelled(token)) return;
 
   applyLogicalTransform(wb.snapshotCtx);
   wb.rcSnapshot.line(
@@ -695,14 +1328,14 @@ export async function drawArrow(
     y2,
     x2 - headLen * Math.cos(angle - Math.PI / 6),
     y2 - headLen * Math.sin(angle - Math.PI / 6),
-    { stroke: color, strokeWidth: 2.5, seed }
+    { stroke: color, strokeWidth: 2.5, seed: seed + 1 }
   );
   wb.rcSnapshot.line(
     x2,
     y2,
     x2 - headLen * Math.cos(angle + Math.PI / 6),
     y2 - headLen * Math.sin(angle + Math.PI / 6),
-    { stroke: color, strokeWidth: 2.5, seed: seed + 1 }
+    { stroke: color, strokeWidth: 2.5, seed: seed + 2 }
   );
   if (label) {
     wb.snapshotCtx.save();
@@ -722,7 +1355,7 @@ export async function drawText(
   text: string,
   x: number,
   y: number,
-  options?: { color?: string; size?: number; token?: number; align?: CanvasTextAlign }
+  options?: { color?: string; size?: number; token?: number; align?: CanvasTextAlign; instant?: boolean }
 ): Promise<void> {
   if (!wb.ctx || !wb.snapshotCtx) return;
   const token = options?.token ?? wb.runToken;
@@ -731,10 +1364,6 @@ export async function drawText(
   const align = options?.align || 'center';
   const cleanText = String(text || '').trim();
   if (!cleanText) return;
-
-  const state = { chars: 0 };
-  const duration = Math.min(720, Math.max(240, cleanText.length * 20));
-  whiteboardAudioSfx.playPenStroke('text');
 
   const renderLabel = (ctx: CanvasRenderingContext2D, partial: string) => {
     ctx.save();
@@ -745,6 +1374,17 @@ export async function drawText(
     ctx.fillText(partial, x, y);
     ctx.restore();
   };
+
+  if (options?.instant) {
+    applyLogicalTransform(wb.snapshotCtx);
+    renderLabel(wb.snapshotCtx, cleanText);
+    syncDisplayFromSnapshot();
+    return;
+  }
+
+  const state = { chars: 0 };
+  const duration = Math.min(720, Math.max(240, cleanText.length * 20));
+  whiteboardAudioSfx.playPenStroke('text');
 
   await animate(state, {
     chars: cleanText.length,
@@ -993,6 +1633,35 @@ async function executeDrawCommand(rawCommand: string, token: number, maxDrawY: n
     case 'RESISTOR':
       await drawResistor(num(0, 450), clampY(num(1, 120)), str(2, 'R = 100Ω'), { token });
       break;
+    case 'CAPACITOR':
+      await drawCapacitor(num(0, 520), clampY(num(1, 160)), str(2, 'C = 100µF'), { token });
+      break;
+    case 'LED':
+      await drawLED(num(0, 580), clampY(num(1, 180)), str(2, 'LED'), { token });
+      break;
+    case 'MOTOR':
+      await drawMotor(num(0, 620), clampY(num(1, 200)), str(2, 'DC Motor'), { token });
+      break;
+    case 'WAVE':
+      await drawWave(
+        num(0, 560),
+        clampY(num(1, 110)),
+        num(2, 230),
+        num(3, 110),
+        str(4, 'sine'),
+        str(5, 'Wave'),
+        { token }
+      );
+      break;
+    case 'SENSOR':
+      await drawSensor(num(0, 200), clampY(num(1, 170)), str(2, 'Sensor'), { token });
+      break;
+    case 'GEAR':
+      await drawGear(num(0, 450), clampY(num(1, 190)), num(2, 34), str(3, 'Gear'), { token });
+      break;
+    case 'CALLOUT':
+      await drawCallout(num(0, 450), clampY(num(1, 325)), str(2, 'فكرة هندسية'), { token });
+      break;
     case 'TEXT':
       await drawText(str(0, ''), num(1, 450), clampY(num(2, 42)), {
         color: str(3) || '#0F172A',
@@ -1044,7 +1713,9 @@ export async function processAIResponse(
   }
 
   const hasDrawCommands = sequence.some(
-    (s) => s.type === 'DRAW' && /\b(WIRE|BATTERY|RESISTOR|BOX|ARROW)\s*\(/i.test(s.payload)
+    (s) =>
+      s.type === 'DRAW' &&
+      /\b(WIRE|BATTERY|RESISTOR|CAPACITOR|LED|MOTOR|WAVE|SENSOR|GEAR|CALLOUT|BOX|ARROW)\s*\(/i.test(s.payload)
   );
 
   // Measure total text lines beforehand so the white canvas fits all explanation/solution lines cleanly
@@ -1113,6 +1784,7 @@ export async function processAIResponse(
   }
 
   if (!isRunCancelled(token)) {
+    captureWhiteboardBaseLayer();
     callbacks?.onComplete?.();
   }
 }
@@ -1160,24 +1832,32 @@ export function buildFallbackWhiteboardScript(params: {
       lines.push(`BOX(630, 125, 190, 78, "${n3}")`);
     }
   } else if (diagram === 'circuit' || diagram === 'arduino') {
-    lines.push(`BATTERY(180, 200, "V = 12V")`);
-    lines.push(`WIRE(180, 160, 180, 105, "#0F172A")`);
-    lines.push(`WIRE(180, 105, 400, 105, "#0F172A")`);
-    lines.push(`RESISTOR(450, 105, "R = 220Ω")`);
-    lines.push(`WIRE(500, 105, 720, 105, "#0F172A")`);
-    lines.push(`WIRE(720, 105, 720, 290, "#0F172A")`);
-    lines.push(`ARROW(545, 78, 665, 78, "I (Current)", "#0EA5E9")`);
-    lines.push(`WIRE(720, 290, 180, 290, "#0F172A")`);
-    lines.push(`WIRE(180, 290, 180, 240, "#0F172A")`);
+    lines.push(`BATTERY(160, 200, "V = 12V")`);
+    lines.push(`WIRE(160, 160, 160, 105, "#0F172A")`);
+    lines.push(`WIRE(160, 105, 340, 105, "#0F172A")`);
+    lines.push(`RESISTOR(390, 105, "R = 220Ω")`);
+    lines.push(`WIRE(440, 105, 575, 105, "#0F172A")`);
+    lines.push(`LED(620, 105, "LED")`);
+    lines.push(`WIRE(665, 105, 740, 105, "#0F172A")`);
+    lines.push(`WIRE(740, 105, 740, 290, "#0F172A")`);
+    lines.push(`ARROW(460, 72, 560, 72, "I (Current)", "#0EA5E9")`);
+    lines.push(`WIRE(740, 290, 160, 290, "#0F172A")`);
+    lines.push(`WIRE(160, 290, 160, 240, "#0F172A")`);
+  } else if (diagram === 'control' || diagram === 'pid') {
+    lines.push(`BOX(80, 130, 150, 70, "Setpoint (الهدف)")`);
+    lines.push(`ARROW(235, 165, 295, 165, "Error", "#0EA5E9")`);
+    lines.push(`BOX(300, 130, 160, 70, "PID Controller")`);
+    lines.push(`ARROW(465, 165, 525, 165, "PWM", "#0EA5E9")`);
+    lines.push(`WAVE(540, 105, 260, 115, "step", "استجابة النظام PID")`);
   } else {
-    lines.push(`BOX(110, 130, 180, 78, "المدخلات (Input)")`);
-    lines.push(`ARROW(295, 169, 360, 169, "Signal", "#0EA5E9")`);
-    lines.push(`BOX(365, 130, 190, 78, "المعالجة والتحكم")`);
-    lines.push(`ARROW(560, 169, 625, 169, "Output", "#0EA5E9")`);
-    lines.push(`BOX(630, 130, 170, 78, "المخرج (Actuator)")`);
+    lines.push(`SENSOR(145, 165, "حساس ذكي")`);
+    lines.push(`ARROW(200, 165, 290, 165, "إشارة", "#0EA5E9")`);
+    lines.push(`BOX(295, 128, 190, 74, "المتحكم الدقيق (MCU)")`);
+    lines.push(`ARROW(490, 165, 595, 165, "PWM", "#0EA5E9")`);
+    lines.push(`MOTOR(655, 165, "محرك DC")`);
   }
 
-  lines.push(`TEXT("${safeEq}", 450, 342, "#0284C7", 19)\n[/DRAW]`);
+  lines.push(`CALLOUT(450, 342, "${safeEq}")\n[/DRAW]`);
 
   if (params.notes && params.notes.length > 0) {
     lines.push(`[TEXT]${params.notes.map((n, i) => `${i + 1}. ${n}`).join('\n')}[/TEXT]`);
@@ -1209,6 +1889,13 @@ if (typeof window !== 'undefined') {
   (window as any).drawWire = drawWire;
   (window as any).drawBattery = drawBattery;
   (window as any).drawResistor = drawResistor;
+  (window as any).drawCapacitor = drawCapacitor;
+  (window as any).drawLED = drawLED;
+  (window as any).drawMotor = drawMotor;
+  (window as any).drawWave = drawWave;
+  (window as any).drawSensor = drawSensor;
+  (window as any).drawGear = drawGear;
+  (window as any).drawCallout = drawCallout;
   (window as any).drawText = drawText;
   (window as any).drawBox = drawBox;
   (window as any).drawArrow = drawArrow;
