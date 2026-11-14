@@ -11,6 +11,8 @@ import { processUploadedMedia, ProcessedMediaResult } from '../../services/media
 import { yemeniDoctorVoice, YemeniDialect } from '../../services/lectureHallApi';
 import { CameraCaptureModal } from '../common/CameraCaptureModal';
 import { SmartBoardCanvas } from '../LectureHall/SmartBoardCanvas';
+import { AnimatedWhiteboard } from '../LectureHall/AnimatedWhiteboard';
+import { buildFallbackWhiteboardScript } from '../../services/whiteboardEngine';
 
 const QUESTION_TYPE_META: Record<
   QuestionFormatType,
@@ -56,7 +58,8 @@ export const SolveQuestionsPage: React.FC = () => {
   const [solutionData, setSolutionData] = useState<SolveQuestionsResponse | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | QuestionFormatType>('all');
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showSmartBoard, setShowSmartBoard] = useState(true);
+  const [showSmartBoard, setShowSmartBoard] = useState(false);
+  const [showDetailedCards, setShowDetailedCards] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -89,11 +92,19 @@ export const SolveQuestionsPage: React.FC = () => {
     });
   };
 
-  const handleSolveSubmit = async () => {
+  const handleSolveSubmit = async (
+    overrideText?: string,
+    overrideMedia?: ProcessedMediaResult
+  ) => {
+    const activeMedia = overrideMedia ?? processedMedia;
+    if (overrideMedia) {
+      setProcessedMedia(overrideMedia);
+    }
+    const effectiveQuestionsText = typeof overrideText === 'string' ? overrideText : questionsText;
     const hasMedia = Boolean(
-      processedMedia?.content || (processedMedia?.videoFrames && processedMedia.videoFrames.length > 0)
+      activeMedia?.content || (activeMedia?.videoFrames && activeMedia.videoFrames.length > 0)
     );
-    if (!questionsText.trim() && !hasMedia) {
+    if (!effectiveQuestionsText.trim() && !hasMedia) {
       setErrorMsg('يرجى كتابة الأسئلة أو رفع ورقة الأسئلة (صورة / PDF / ملف / فيديو) ثم الضغط على «حل».');
       return;
     }
@@ -106,12 +117,12 @@ export const SolveQuestionsPage: React.FC = () => {
 
     try {
       const result = await requestSolveQuestions({
-        questionsText,
+        questionsText: effectiveQuestionsText,
         extraNotes: extraNotes.trim() || undefined,
-        uploadedContent: processedMedia?.content,
-        uploadedMimeType: processedMedia?.mimeType,
-        videoFrames: processedMedia?.videoFrames,
-        fileName: processedMedia?.fileName,
+        uploadedContent: activeMedia?.content,
+        uploadedMimeType: activeMedia?.mimeType,
+        videoFrames: activeMedia?.videoFrames,
+        fileName: activeMedia?.fileName,
         dialect,
       });
 
@@ -332,7 +343,7 @@ export const SolveQuestionsPage: React.FC = () => {
 
           <button
             type="button"
-            onClick={handleSolveSubmit}
+            onClick={() => handleSolveSubmit()}
             disabled={isLoading || isReadingMedia}
             className={`px-10 py-3.5 rounded-2xl text-sm font-black flex items-center justify-center gap-2 shadow-lg transition-all shrink-0 cursor-pointer ${
               isLoading || isReadingMedia
@@ -353,7 +364,7 @@ export const SolveQuestionsPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={handleSolveSubmit}
+              onClick={() => handleSolveSubmit()}
               className="px-3 py-1.5 rounded-lg bg-rose-600 dark:bg-rose-500/25 text-white font-bold flex items-center gap-1"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -362,6 +373,77 @@ export const SolveQuestionsPage: React.FC = () => {
           </div>
         )}
       </section>
+
+      {/* Split-Screen Animated Whiteboard for «حل أسئلتي» */}
+      <AnimatedWhiteboard
+        title={solutionData?.examTitle || 'السبورة البيضاء المتحركة · خدمة حل أسئلتي'}
+        whiteboardScript={
+          solutionData
+            ? (() => {
+                const base = solutionData.whiteboardScript;
+                const qBlocks = (solutionData.questions || [])
+                  .slice(0, 12)
+                  .map(
+                    (q) =>
+                      `[TEXT]سؤال #${q.questionNumber}: ${q.questionText}\n✅ الحل: ${q.finalAnswerSummary}\n💡 السبب: ${q.reasonAndExplanation}${
+                        q.steps && q.steps.length ? `\nالخطوات: ${q.steps.join(' ← ')}` : ''
+                      }[/TEXT]`
+                  )
+                  .join('\n');
+                if (base && /\[DRAW\]/i.test(base)) {
+                  return base.includes('سؤال #') || !qBlocks ? base : `${base}\n${qBlocks}`;
+                }
+                return buildFallbackWhiteboardScript({
+                  title: solutionData.examTitle || 'ملخص حل ورقة الأسئلة',
+                  equation: solutionData.boardKeyFormula,
+                  notes: solutionData.boardSummaryNotes,
+                  speech: solutionData.doctorOverviewSpeech,
+                  diagramType: solutionData.diagramType,
+                  questions: solutionData.questions,
+                });
+              })()
+            : buildFallbackWhiteboardScript({
+                title: 'خدمة حل أسئلتي · استعد للحل بالخطوات',
+                equation: 'V = I × R  |  P = V × I',
+                notes: ['اكتب سؤالك بالأسفل أو ارفع ورقة الأسئلة لنكتب الحل والسبب ونرسم الدائرة داخل السبورة'],
+                speech:
+                  'مرحباً بك يا مهندس في خدمة «حل أسئلتي»! اكتب سؤالك أو أرفق ورقة الأسئلة في شريط الإدخال بالأسفل واضغط «إرسال»، وسيُكتب الحل والسبب العلمي مباشرة بالأنيميشن داخل هذه السبورة البيضاء.',
+                diagramType: 'circuit',
+              })
+        }
+        explanationText={
+          solutionData?.doctorOverviewSpeech ||
+          'اكتب سؤالك هنا أو ارفع ورقة الأسئلة بالأعلى ليشرح لك دكتور الميكاترونكس الحل النهائي والسبب العلمي مع رسم توضيحي متحرك على السبورة البيضاء.'
+        }
+        isLoading={isLoading}
+        isSpeaking={isSpeaking}
+        placeholder="اطرح سؤالك أو أرفق ورقة الأسئلة (صورة/فيديو/ملف) لحلها ورسمها على السبورة البيضاء..."
+        onSendQuestion={(q) => {
+          setQuestionsText(q);
+          handleSolveSubmit(q);
+        }}
+        onSendMultimodal={({ question, media }) => {
+          if (question) setQuestionsText(question);
+          handleSolveSubmit(question || '', media);
+        }}
+        onToggleSpeak={
+          solutionData?.doctorOverviewSpeech
+            ? () => {
+                if (isSpeaking) {
+                  yemeniDoctorVoice.stop();
+                  setIsSpeaking(false);
+                } else {
+                  yemeniDoctorVoice.speak(
+                    solutionData.doctorOverviewSpeech,
+                    () => setIsSpeaking(true),
+                    () => setIsSpeaking(false),
+                    () => setIsSpeaking(false)
+                  );
+                }
+              }
+            : undefined
+        }
+      />
 
       {/* Solution Results Dashboard */}
       {solutionData && (
@@ -403,10 +485,18 @@ export const SolveQuestionsPage: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => setShowSmartBoard(!showSmartBoard)}
+                  onClick={() => setShowDetailedCards(!showDetailedCards)}
                   className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#0F172A] dark:text-cyan-300 text-xs font-bold border border-[rgba(212,175,55,0.35)] dark:border-slate-700 cursor-pointer"
                 >
-                  {showSmartBoard ? 'إخفاء السبورة' : 'عرض السبورة الذكية'}
+                  {showDetailedCards ? 'إخفاء البطاقات التفصيلية' : `عرض بطاقات جميع الأسئلة (${solutionData.questions?.length || 0})`}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowSmartBoard(!showSmartBoard)}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-[#F8FAFC] dark:hover:bg-slate-700 text-[#475569] dark:text-slate-300 text-xs font-bold border border-[rgba(212,175,55,0.35)] dark:border-slate-700 cursor-pointer"
+                >
+                  {showSmartBoard ? 'إخفاء السبورة الهندسية' : 'عرض السبورة الهندسية'}
                 </button>
 
                 <button
@@ -420,12 +510,8 @@ export const SolveQuestionsPage: React.FC = () => {
               </div>
             </div>
 
-            {solutionData.doctorOverviewSpeech && (
-              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-950/70 border border-[rgba(212,175,55,0.3)] dark:border-amber-500/25 text-xs sm:text-sm text-[#0F172A] dark:text-slate-200 leading-relaxed">
-                {solutionData.doctorOverviewSpeech}
-              </div>
-            )}
-
+            {showDetailedCards && (
+              <>
             {/* Format Filter Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
               <button
@@ -473,6 +559,8 @@ export const SolveQuestionsPage: React.FC = () => {
                 ))}
               </div>
             )}
+              </>
+            )}
           </section>
 
           {/* Optional Smart Board Summary */}
@@ -484,7 +572,8 @@ export const SolveQuestionsPage: React.FC = () => {
             />
           )}
 
-          {/* Individual Question Cards (1..30+) */}
+          {/* Individual Question Cards (1..30+) when expanded */}
+          {showDetailedCards && (
           <div className="space-y-4">
             {filteredQuestions.map((q) => {
               const typeMeta = QUESTION_TYPE_META[q.questionType] || QUESTION_TYPE_META.direct;
@@ -574,6 +663,7 @@ export const SolveQuestionsPage: React.FC = () => {
               );
             })}
           </div>
+          )}
         </div>
       )}
 

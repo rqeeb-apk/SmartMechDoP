@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { streamText } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import dotenv from 'dotenv';
+import zlib from 'zlib';
 import { SEEDED_ACTIVATION_CODES } from './data/activationCodesSeed.ts';
 
 dotenv.config();
@@ -1369,10 +1370,45 @@ function buildMultimodalPayload(params: {
             },
           });
         } else {
-          // Decode base64 text-like docs cleanly
+          // Handle Office OOXML (.docx / .pptx) or plain base64 text cleanly
           try {
-            const decoded = Buffer.from(matches[2], 'base64').toString('utf8');
-            plainTextAttach = decoded.slice(0, 12000);
+            const buf = Buffer.from(matches[2], 'base64');
+            if (buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b) {
+              // Extract readable text from PKZIP XML entries (word/document.xml, ppt/slides/slide*.xml)
+              const extractedChunks: string[] = [];
+              let offset = 0;
+              while (offset + 30 < buf.length && extractedChunks.length < 30) {
+                if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+                const method = buf.readUInt16LE(offset + 8);
+                const compSize = buf.readUInt32LE(offset + 18);
+                const nameLen = buf.readUInt16LE(offset + 26);
+                const extraLen = buf.readUInt16LE(offset + 28);
+                const entryName = buf.toString('utf8', offset + 30, offset + 30 + nameLen);
+                const dataStart = offset + 30 + nameLen + extraLen;
+                const dataEnd = compSize > 0 ? Math.min(buf.length, dataStart + compSize) : dataStart;
+                if (
+                  dataEnd > dataStart &&
+                  /(document\.xml|slides\/slide\d+\.xml)$/i.test(entryName)
+                ) {
+                  try {
+                    const rawXml =
+                      method === 8
+                        ? zlib.inflateRawSync(buf.subarray(dataStart, dataEnd)).toString('utf8')
+                        : buf.subarray(dataStart, dataEnd).toString('utf8');
+                    const cleanXmlText = rawXml
+                      .replace(/<[^>]+>/g, ' ')
+                      .replace(/\s+/g, ' ')
+                      .trim();
+                    if (cleanXmlText) extractedChunks.push(cleanXmlText);
+                  } catch {}
+                }
+                if (compSize === 0) break;
+                offset = dataEnd;
+              }
+              plainTextAttach = extractedChunks.join('\n').slice(0, 12000);
+            } else {
+              plainTextAttach = buf.toString('utf8').slice(0, 12000);
+            }
           } catch {}
         }
       }
@@ -1723,7 +1759,8 @@ ${serviceInstruction}
     "explanation": "تفسير الإجابة..."
   },
   "yemeniEncouragement": "تذكّر: المهندس اليمني ما يعرف مستحيل! 🇾🇪",
-  "followupOptions": ["اشرح بمثال عملي إضافي", "أعطني مسألة اختبار", "لخّص أهم القوانين"]
+  "followupOptions": ["اشرح بمثال عملي إضافي", "أعطني مسألة اختبار", "لخّص أهم القوانين"],
+  "whiteboardScript": "سكربت السبورة البيضاء المتحركة بنمط [TEXT]...[/TEXT] و [DRAW]...[/DRAW] بالتتابع الزمني. قواعد الرسم الإلزامية: مساحة الإحداثيات X من 60 إلى 840 (المنتصف 450) و Y من 40 إلى 390 (المنتصف 210). البطارية العمودية BATTERY(x,y,\"12V\") طرفاها عند (x, y-40) للأعلى و (x, y+40) للأسفل. المقاومة الأفقية RESISTOR(x,y,\"R=100Ω\") طرفاها عند (x-50, y) يساراً و (x+50, y) يميناً. الأوامر المسموحة حصراً داخل [DRAW]: CLEAR()، TEXT(\"النص أو المعادلة\", x, y, \"#0F172A\", 18)، BATTERY(x, y, \"V=12V\")، RESISTOR(x, y, \"R=100Ω\")، WIRE(x1, y1, x2, y2, \"#0F172A\")، BOX(x, y, w, h, \"عنوان\")، ARROW(x1, y1, x2, y2, \"نص\", \"#0EA5E9\"). صل الأسلاك بدقة مع أطراف العناصر.\nمثال:\n[TEXT]أهلاً بك يا مهندس، نرسم الآن مصدر الجهد (البطارية 12 فولت) ثم السلك العلوي.[/TEXT]\n[DRAW]\nTEXT(\"الدائرة الكهربائية الأساسية\", 450, 38, \"#0F172A\", 20)\nBATTERY(180, 220, \"12V\")\nWIRE(180, 180, 180, 120, \"#0F172A\")\nWIRE(180, 120, 400, 120, \"#0F172A\")\n[/DRAW]\n[TEXT]نضيف المقاومة 100 أوم ونغلق الدائرة نحو القطب السالب لحساب التيار I = V / R.[/TEXT]\n[DRAW]\nRESISTOR(450, 120, \"R = 100Ω\")\nWIRE(500, 120, 720, 120, \"#0F172A\")\nWIRE(720, 120, 720, 310, \"#0F172A\")\nWIRE(720, 310, 180, 310, \"#0F172A\")\nWIRE(180, 310, 180, 260, \"#0F172A\")\nTEXT(\"I = V / R = 12 / 100 = 0.12 A\", 450, 365, \"#0284C7\", 19)\n[/DRAW]"
 }`;
 
     const { contentsPayload, useWebTools } = buildMultimodalPayload({
@@ -1744,6 +1781,56 @@ ${serviceInstruction}
     });
 
     const parsedData = parseJsonSafely(rawText);
+    if (parsedData) {
+      const existingScript = String(parsedData.whiteboardScript || '');
+      const hasDraw = /\[DRAW\]/i.test(existingScript);
+      const steps: Array<{ phase?: string; details?: string }> = Array.isArray(parsedData.steps) ? parsedData.steps : [];
+      const notes: string[] = Array.isArray(parsedData.boardNotes) ? parsedData.boardNotes : [];
+
+      if (!hasDraw) {
+        const title = String(parsedData.boardTitle || parsedData.diagramTitle || 'شرح الدرس التفاعلي').replace(/"/g, "'").slice(0, 52);
+        const eq = String(parsedData.boardEquation || 'Understanding = Concept + Practice').replace(/"/g, "'").slice(0, 52);
+        const nodes: Array<{ label?: string }> = Array.isArray(parsedData?.diagramData?.nodes) ? parsedData.diagramData.nodes : [];
+
+        const drawParts: string[] = [];
+        drawParts.push(`[TEXT]${parsedData.doctorSpeech || title}[/TEXT]`);
+        drawParts.push(`[DRAW]\nTEXT("${title}", 450, 36, "#0F172A", 20)`);
+        if (nodes.length >= 2) {
+          drawParts.push(`BOX(90, 125, 190, 78, "${String(nodes[0]?.label || 'المدخلات').replace(/"/g, "'").slice(0, 22)}")`);
+          drawParts.push(`ARROW(286, 164, 354, 164, "تحليل", "#0EA5E9")`);
+          drawParts.push(`BOX(360, 125, 190, 78, "${String(nodes[1]?.label || 'المعالجة').replace(/"/g, "'").slice(0, 22)}")`);
+          if (nodes[2]) {
+            drawParts.push(`ARROW(556, 164, 624, 164, "نتيجة", "#0EA5E9")`);
+            drawParts.push(`BOX(630, 125, 190, 78, "${String(nodes[2]?.label || 'المخرج').replace(/"/g, "'").slice(0, 22)}")`);
+          }
+        } else {
+          drawParts.push(`BATTERY(180, 200, "12V")`);
+          drawParts.push(`WIRE(180, 160, 180, 105, "#0F172A")`);
+          drawParts.push(`WIRE(180, 105, 400, 105, "#0F172A")`);
+          drawParts.push(`RESISTOR(450, 105, "R")`);
+          drawParts.push(`WIRE(500, 105, 720, 105, "#0F172A")`);
+          drawParts.push(`WIRE(720, 105, 720, 290, "#0F172A")`);
+          drawParts.push(`WIRE(720, 290, 180, 290, "#0F172A")`);
+          drawParts.push(`WIRE(180, 290, 180, 240, "#0F172A")`);
+        }
+        drawParts.push(`TEXT("${eq}", 450, 342, "#0284C7", 19)\n[/DRAW]`);
+        if (notes.length > 0) {
+          drawParts.push(`[TEXT]${notes.map((n, i) => `${i + 1}. ${n}`).join('\n')}[/TEXT]`);
+        }
+        for (const st of steps) {
+          if (st?.phase || st?.details) {
+            drawParts.push(`[TEXT]${st.phase ? st.phase + ': ' : ''}${st.details || ''}[/TEXT]`);
+          }
+        }
+        parsedData.whiteboardScript = drawParts.join('\n');
+      } else if (steps.length > 0 && !existingScript.includes(steps[0]?.phase || '')) {
+        const extraSteps = steps
+          .filter((st) => st?.phase || st?.details)
+          .map((st) => `[TEXT]${st.phase ? st.phase + ': ' : ''}${st.details || ''}[/TEXT]`)
+          .join('\n');
+        parsedData.whiteboardScript = `${existingScript}\n${extraSteps}`;
+      }
+    }
 
     if (!hasMedia && parsedData) {
       aiResponseCache.set(cacheKey, parsedData, 2 * 3600 * 1000);
@@ -1755,6 +1842,61 @@ ${serviceInstruction}
     res.status(500).json({
       success: false,
       error: error?.message || 'حدث خطأ أثناء معالجة المحاضرة في قاعة المحاضرات.',
+    });
+  }
+});
+
+// ==========================================
+// API: «السبورة البيضاء المتحركة المباشرة» ([TEXT] & [DRAW] System Prompt)
+// ==========================================
+geminiRouter.post('/whiteboard', async (req: Request, res: Response) => {
+  try {
+    const { question = '', dialect = 'sanani' } = req.body || {};
+    if (!String(question).trim()) {
+      return res.status(400).json({ success: false, error: 'يرجى كتابة السؤال أولاً.' });
+    }
+
+    const dialectNote =
+      dialect === 'adani' ? 'العدنية' : dialect === 'taizzi' ? 'التعزية' : 'الصنعانية';
+
+    const whiteboardSystemPrompt = `أنت أستاذ جامعي يمني خبير في هندسة الميكاترونكس والدوائر الكهربائية (صوت وشخصية ذكر بالغ 40-50 سنة بلهجة ${dialectNote} دافئة وواثقة)، وتستخدم "سبورة بيضاء متحركة" للشرح في خدمتي "اشرح لي" و"حل أسئلتي".
+
+يجب عليك الالتزام الصارم بتنسيق الرد التالي فقط دون أي مقدمات خارج الوسوم، حيث تفصل بين الشرح المكتوب وأوامر الرسم الهندسي بالتتابع الزمني:
+
+1. ضع كل فقرة شرح أو خطوة حل باللهجة اليمنية الواضحة والدافئة داخل الوسم:
+[TEXT] ... [/TEXT]
+
+2. ضع أوامر الرسم المناسبة لكل خطوة مباشرة بعدها داخل الوسم:
+[DRAW] ... [/DRAW]
+
+3. مساحة الإحداثيات المتاحة على السبورة هي:
+- العرض X: من 60 إلى 840 (المنتصف 450)
+- الارتفاع Y: من 40 إلى 390 (المنتصف 210)
+- البطارية العمودية تتصل طرفاها عند (x, y - 40) للأعلى و (x, y + 40) للأسفل.
+- المقاومة الأفقية تتصل طرفاها عند (x - 50, y) لليسار و (x + 50, y) لليمين.
+
+4. الأوامر المسموح بها حصراً داخل [DRAW]:
+- CLEAR()
+- TEXT("النص أو المعادلة", x, y, "#0F172A", 18)
+- BATTERY(x, y, "V=12V")
+- RESISTOR(x, y, "R=100Ω")
+- WIRE(x1, y1, x2, y2, "#0F172A")
+- BOX(x, y, w, h, "عنوان")
+- ARROW(x1, y1, x2, y2, "نص", "#0EA5E9")
+
+سؤال الطالب: ${question}`;
+
+    const rawText = await generateGeminiContentWithRetry({
+      contents: [{ role: 'user', parts: [{ text: whiteboardSystemPrompt }] }],
+      config: { maxOutputTokens: 4096 },
+    });
+
+    res.json({ success: true, responseText: rawText });
+  } catch (error: any) {
+    console.error('[Whiteboard API Error]:', error);
+    res.status(500).json({
+      success: false,
+      error: error?.message || 'حدث خطأ أثناء الاتصال بالسبورة البيضاء.',
     });
   }
 });
@@ -1820,6 +1962,7 @@ ${fileName ? `\nاسم الملف المرفق: ${fileName}` : ''}
   ],
   "boardKeyFormula": "أهم قانون رئيسي في الورقة",
   "diagramType": "circuit",
+  "whiteboardScript": "سكربت السبورة البيضاء المتحركة لملخص حل الأسئلة يفصل بين [TEXT]...[/TEXT] وأوامر الرسم [DRAW]...[/DRAW] في مساحة X: 60..840, Y: 40..410 باستخدام الأوامر: CLEAR()، WIRE(x1,y1,x2,y2,\"#0F172A\")، BATTERY(x,y,\"12V\")، RESISTOR(x,y,\"R\")، BOX(x,y,w,h,\"نص\")، ARROW(x1,y1,x2,y2,\"نص\",\"#0EA5E9\")، TEXT(\"نص\",x,y,\"#0F172A\",18).",
   "questions": [
     {
       "questionNumber": 1,
@@ -1855,6 +1998,41 @@ ${fileName ? `\nاسم الملف المرفق: ${fileName}` : ''}
     const parsedData = parseJsonSafely(rawText || '{}');
     if (Array.isArray(parsedData.questions)) {
       parsedData.totalQuestionsFound = parsedData.questions.length;
+    }
+
+    if (parsedData) {
+      const existingScript = String(parsedData.whiteboardScript || '');
+      const hasDraw = /\[DRAW\]/i.test(existingScript);
+      const qList: Array<{
+        questionNumber?: number;
+        questionText?: string;
+        finalAnswerSummary?: string;
+        reasonAndExplanation?: string;
+        steps?: string[];
+        keyFormula?: string;
+      }> = Array.isArray(parsedData.questions) ? parsedData.questions : [];
+
+      const qBlocks = qList.slice(0, 12).map((q, idx) => {
+        const num = q.questionNumber || idx + 1;
+        const stepsTxt = Array.isArray(q.steps) && q.steps.length > 0 ? `\nالخطوات: ${q.steps.join(' ← ')}` : '';
+        return `[TEXT]سؤال #${num}: ${q.questionText || ''}\n✅ الحل: ${q.finalAnswerSummary || ''}\n💡 السبب: ${q.reasonAndExplanation || ''}${stepsTxt}[/TEXT]`;
+      });
+
+      if (!hasDraw) {
+        const title = String(parsedData.examTitle || 'ملخص حل الأسئلة').replace(/"/g, "'").slice(0, 50);
+        const eq = String(parsedData.boardKeyFormula || qList[0]?.keyFormula || 'Solution = Logic + Formula').replace(/"/g, "'").slice(0, 52);
+        parsedData.whiteboardScript = [
+          `[TEXT]${parsedData.doctorOverviewSpeech || title}[/TEXT]`,
+          `[DRAW]\nTEXT("${title}", 450, 36, "#0F172A", 20)`,
+          `BOX(100, 125, 200, 78, "استخراج السؤال")\nARROW(308, 164, 368, 164, "تحليل", "#0EA5E9")`,
+          `BOX(374, 125, 200, 78, "تطبيق القانون")\nARROW(582, 164, 642, 164, "الحل", "#0EA5E9")`,
+          `BOX(648, 125, 175, 78, "النتيجة والسبب")`,
+          `TEXT("${eq}", 450, 342, "#0284C7", 19)\n[/DRAW]`,
+          ...qBlocks,
+        ].join('\n');
+      } else if (qBlocks.length > 0 && !existingScript.includes('سؤال #')) {
+        parsedData.whiteboardScript = `${existingScript}\n${qBlocks.join('\n')}`;
+      }
     }
 
     res.json({ success: true, data: parsedData });

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  PenTool, Eraser, Trash2, Radio, Sparkles, Play, Pause, RotateCcw, Zap, Lightbulb, Factory
+  PenTool, Eraser, Trash2, Radio, Sparkles, Play, Pause, RotateCcw, Zap, Lightbulb, Factory, Volume2, VolumeX
 } from 'lucide-react';
 import { LectureHallResponseData } from '../../services/lectureHallApi';
+import { whiteboardAudioSfx } from '../../services/whiteboardAudioSfx';
 
 interface SmartBoardCanvasProps {
   lectureData: LectureHallResponseData | null;
@@ -32,6 +33,7 @@ export const SmartBoardCanvas: React.FC<SmartBoardCanvasProps> = ({
   const [currentTick, setCurrentTick] = useState(0);
   const [revealStep, setRevealStep] = useState<number>(4);
   const [isAutoAnimating, setIsAutoAnimating] = useState<boolean>(true);
+  const [penSfxEnabled, setPenSfxEnabled] = useState<boolean>(() => whiteboardAudioSfx.isEnabled());
 
   // Continuous physics & signal loop
   useEffect(() => {
@@ -48,10 +50,20 @@ export const SmartBoardCanvas: React.FC<SmartBoardCanvasProps> = ({
     if (!lectureData) return;
     setRevealStep(1);
     setIsAutoAnimating(true);
+    whiteboardAudioSfx.playPenStroke('text');
 
-    const t1 = setTimeout(() => setRevealStep(2), 450);
-    const t2 = setTimeout(() => setRevealStep(3), 950);
-    const t3 = setTimeout(() => setRevealStep(4), 1450);
+    const t1 = setTimeout(() => {
+      setRevealStep(2);
+      whiteboardAudioSfx.playPenStroke('component');
+    }, 450);
+    const t2 = setTimeout(() => {
+      setRevealStep(3);
+      whiteboardAudioSfx.playPenStroke('box');
+    }, 950);
+    const t3 = setTimeout(() => {
+      setRevealStep(4);
+      whiteboardAudioSfx.playPenStroke('wire');
+    }, 1450);
 
     return () => {
       clearTimeout(t1);
@@ -62,9 +74,19 @@ export const SmartBoardCanvas: React.FC<SmartBoardCanvasProps> = ({
 
   const replayBoardAnimation = () => {
     setRevealStep(1);
-    setTimeout(() => setRevealStep(2), 450);
-    setTimeout(() => setRevealStep(3), 950);
-    setTimeout(() => setRevealStep(4), 1450);
+    whiteboardAudioSfx.playPenStroke('text');
+    setTimeout(() => {
+      setRevealStep(2);
+      whiteboardAudioSfx.playPenStroke('component');
+    }, 450);
+    setTimeout(() => {
+      setRevealStep(3);
+      whiteboardAudioSfx.playPenStroke('box');
+    }, 950);
+    setTimeout(() => {
+      setRevealStep(4);
+      whiteboardAudioSfx.playPenStroke('wire');
+    }, 1450);
   };
 
   // Handle Freehand Canvas Drawing
@@ -81,6 +103,7 @@ export const SmartBoardCanvas: React.FC<SmartBoardCanvasProps> = ({
     }
 
     setIsDrawing(true);
+    whiteboardAudioSfx.playPenStroke(activeTool === 'eraser' ? 'clear' : 'wire');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.beginPath();
@@ -168,6 +191,17 @@ export const SmartBoardCanvas: React.FC<SmartBoardCanvasProps> = ({
 
         {/* Toolbar Controls */}
         <div className="flex items-center gap-1 bg-[#0D1E38] p-1 rounded-xl border border-slate-700/80 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setPenSfxEnabled(whiteboardAudioSfx.toggle())}
+            className={`p-1.5 rounded-lg text-[10px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer ${
+              penSfxEnabled ? 'text-emerald-300 bg-emerald-500/15' : 'text-slate-400 hover:text-white'
+            }`}
+            title={penSfxEnabled ? 'كتم صوت القلم عند الرسم' : 'تفعيل صوت القلم عند الرسم'}
+          >
+            {penSfxEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+          </button>
+
           <button
             type="button"
             onClick={replayBoardAnimation}

@@ -54,6 +54,7 @@ export interface LectureHallResponseData {
   };
   yemeniEncouragement?: string;
   followupOptions?: string[];
+  whiteboardScript?: string;
   fromCache?: boolean;
 }
 

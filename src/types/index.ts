@@ -366,6 +366,7 @@ export interface SolveQuestionsResponse {
   boardSummaryNotes: string[];
   boardKeyFormula?: string;
   diagramType: 'circuit' | 'gears' | 'plc' | 'arduino' | 'servo' | 'graph' | 'mindmap';
+  whiteboardScript?: string;
   questions: SolvedQuestionItem[];
 }
 

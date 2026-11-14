@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, CheckCircle2, AlertOctagon, Mic, MicOff, Upload, FileText, Download,
   BookOpen, Award, Check, X, Video, Image as ImageIcon, Link2, Type, MessageSquare,
@@ -6,7 +6,9 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { SmartBoardCanvas } from './SmartBoardCanvas';
+import { AnimatedWhiteboard } from './AnimatedWhiteboard';
 import { YemeniDoctorAvatar } from './YemeniDoctorAvatar';
+import { buildFallbackWhiteboardScript } from '../../services/whiteboardEngine';
 import {
   requestLectureHall,
   yemeniDoctorVoice,
@@ -28,7 +30,7 @@ const DEFAULT_WELCOME: LectureHallResponseData = {
     'شرح مبسّط باللهجة اليمنية وأمثلة من الحياة والهندسة',
     'رسومات تفاعلية متحركة على السبورة لتسريع الفهم',
   ],
-  boardEquation: 'Understanding = Visual Animation + Yemeni Intuition + Engineering Math',
+  boardEquation: 'V = I × R  |  I = 12V / 100Ω = 0.12 A',
   diagramType: 'circuit',
   diagramTitle: 'السبورة الذكية التفاعلية للميكاترونكس',
   yemeniEncouragement: 'تذكّر: المهندس اليمني ما يعرف مستحيل! 🇾🇪',
@@ -37,6 +39,23 @@ const DEFAULT_WELCOME: LectureHallResponseData = {
     'كيف يعمل محرك السيرفو وPWM؟',
     'اشرح لي دائرة الترانزستور كمفتاح إلكتروني',
   ],
+  whiteboardScript: `[TEXT]أهلاً وسهلاً بك يا مهندس في قاعة المحاضرات! لنبدأ بمثال تفاعلي لقانون أوم: نرسم مصدر الجهد (بطارية 12 فولت) والأسلاك المتصلة.[/TEXT]
+[DRAW]
+TEXT("الدائرة البسيطة لقانون أوم · السبورة البيضاء", 450, 38, "#0F172A", 20)
+BATTERY(180, 220, "12V")
+WIRE(180, 180, 180, 120, "#0F172A")
+WIRE(180, 120, 400, 120, "#0F172A")
+[/DRAW]
+[TEXT]الآن نضع المقاومة بقيمة 100 أوم ونغلق الدائرة نحو القطب السالب للبطارية، وبذلك يمر التيار الكهربائي I = V / R.[/TEXT]
+[DRAW]
+RESISTOR(450, 120, "R = 100Ω")
+WIRE(500, 120, 720, 120, "#0F172A")
+WIRE(720, 120, 720, 310, "#0F172A")
+ARROW(540, 92, 665, 92, "I = 0.12 A", "#0EA5E9")
+WIRE(720, 310, 180, 310, "#0F172A")
+WIRE(180, 310, 180, 260, "#0F172A")
+TEXT("I = V / R = 12 / 100 = 0.12 A", 450, 370, "#0284C7", 19)
+[/DRAW]`,
 };
 
 export const LectureHallPage: React.FC = () => {
@@ -63,6 +82,9 @@ export const LectureHallPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [lectureData, setLectureData] = useState<LectureHallResponseData>(DEFAULT_WELCOME);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [boardViewMode, setBoardViewMode] = useState<'animated_white' | 'dark_smart'>('animated_white');
+  const [showExternalSteps, setShowExternalSteps] = useState(false);
+  const whiteboardSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Quiz State
   const [selectedQuizAnswer, setSelectedQuizAnswer] = useState<number | null>(null);
@@ -164,9 +186,17 @@ export const LectureHallPage: React.FC = () => {
     }
   };
 
-  const handleSubmitService = async (overridePrompt?: string, customStepIndex?: number) => {
+  const handleSubmitService = async (
+    overridePrompt?: string,
+    customStepIndex?: number,
+    overrideMedia?: ProcessedMediaResult
+  ) => {
+    const activeMedia = overrideMedia ?? processedMedia;
+    if (overrideMedia) {
+      setProcessedMedia(overrideMedia);
+    }
     const promptToSend = overridePrompt ?? inputText;
-    const hasMedia = Boolean(processedMedia?.content || (processedMedia?.videoFrames && processedMedia.videoFrames.length > 0));
+    const hasMedia = Boolean(activeMedia?.content || (activeMedia?.videoFrames && activeMedia.videoFrames.length > 0));
     const hasSocial = Boolean(socialUrl.trim());
 
     if (!promptToSend.trim() && !hasMedia && !hasSocial && !extraDetails.trim() && activeService !== 'quiz_me') {
@@ -186,14 +216,14 @@ export const LectureHallPage: React.FC = () => {
         serviceType: activeService,
         dialect: activeDialect,
         courseSubject: activeCourse,
-        topic: (promptToSend || processedMedia?.fileName || socialUrl || extraDetails).slice(0, 90),
+        topic: (promptToSend || activeMedia?.fileName || socialUrl || extraDetails).slice(0, 90),
         question: promptToSend,
         extraDetails: extraDetails.trim() || undefined,
         socialUrl: socialUrl.trim() || undefined,
-        uploadedContent: processedMedia?.content,
-        uploadedMimeType: processedMedia?.mimeType,
-        videoFrames: processedMedia?.videoFrames,
-        fileName: processedMedia?.fileName,
+        uploadedContent: activeMedia?.content,
+        uploadedMimeType: activeMedia?.mimeType,
+        videoFrames: activeMedia?.videoFrames,
+        fileName: activeMedia?.fileName,
         stepIndex: customStepIndex || currentStepIndex,
         confusionPoint:
           activeService === 'did_not_understand'
@@ -206,6 +236,7 @@ export const LectureHallPage: React.FC = () => {
       });
 
       setLectureData(result);
+      whiteboardSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
       if (result.doctorSpeech) {
         yemeniDoctorVoice.speak(
@@ -596,13 +627,83 @@ ${lectureData.steps ? `خطوات الفهم المستخرجة:\n${lectureData.
         </section>
       )}
 
-      {/* SECTION 4: Animated Smart Board Canvas */}
-      <SmartBoardCanvas
-        lectureData={lectureData}
-        isSpeaking={isSpeaking}
-        activeDialect={activeDialect}
-        onClearBoard={() => {}}
-      />
+      {/* SECTION 4: Split-Screen Animated Whiteboard (Rough.js + Anime.js) + Dark Smart Board Switcher */}
+      <div ref={whiteboardSectionRef} className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-black text-[#0F172A] dark:text-amber-300">
+            وضع العرض التفاعلي على السبورة:
+          </span>
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 shadow-sm text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setBoardViewMode('animated_white')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                boardViewMode === 'animated_white'
+                  ? 'bg-[#0EA5E9] text-white font-black shadow-sm'
+                  : 'text-[#475569] dark:text-slate-300 hover:text-[#0F172A]'
+              }`}
+            >
+              السبورة البيضاء المتحركة (Rough.js)
+            </button>
+            <button
+              type="button"
+              onClick={() => setBoardViewMode('dark_smart')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                boardViewMode === 'dark_smart'
+                  ? 'bg-[#0EA5E9] text-white font-black shadow-sm'
+                  : 'text-[#475569] dark:text-slate-300 hover:text-[#0F172A]'
+              }`}
+            >
+              السبورة الذكية الهندسية
+            </button>
+          </div>
+        </div>
+
+        {boardViewMode === 'animated_white' ? (
+          <AnimatedWhiteboard
+            title={lectureData.boardTitle || 'السبورة البيضاء المتحركة · قسم اشرح لي'}
+            whiteboardScript={(() => {
+              const base = lectureData.whiteboardScript;
+              if (base && /\[DRAW\]/i.test(base)) {
+                const missingSteps = (lectureData.steps || [])
+                  .filter((st) => st.phase && !base.includes(st.phase))
+                  .map((st) => `[TEXT]${st.phase}: ${st.details}[/TEXT]`)
+                  .join('\n');
+                return missingSteps ? `${base}\n${missingSteps}` : base;
+              }
+              return buildFallbackWhiteboardScript({
+                title: lectureData.boardTitle,
+                equation: lectureData.boardEquation,
+                notes: lectureData.boardNotes,
+                speech: lectureData.doctorSpeech,
+                diagramType: lectureData.diagramType,
+                nodes: lectureData.diagramData?.nodes,
+                steps: lectureData.steps,
+              });
+            })()}
+            explanationText={lectureData.doctorSpeech}
+            isLoading={isLoading}
+            isSpeaking={isSpeaking}
+            placeholder="اكتب سؤالك أو أرفق صورة/فيديو/ملف ليشرحه الدكتور بالأنيميشن على السبورة البيضاء..."
+            onSendQuestion={(q) => {
+              setInputText(q);
+              handleSubmitService(q);
+            }}
+            onSendMultimodal={({ question, media }) => {
+              if (question) setInputText(question);
+              handleSubmitService(question || 'حلل المحتوى المرفق واشرحه خطوة بخطوة على السبورة البيضاء', undefined, media);
+            }}
+            onToggleSpeak={handleToggleSpeech}
+          />
+        ) : (
+          <SmartBoardCanvas
+            lectureData={lectureData}
+            isSpeaking={isSpeaking}
+            activeDialect={activeDialect}
+            onClearBoard={() => {}}
+          />
+        )}
+      </div>
 
       {/* SECTION 5: Yemeni Adult Male Doctor Avatar & Complete Audio Speech */}
       <YemeniDoctorAvatar
@@ -614,16 +715,24 @@ ${lectureData.steps ? `خطوات الفهم المستخرجة:\n${lectureData.
         dialect={activeDialect}
       />
 
-      {/* SECTION 6: Extracted Complete Step-by-Step Explanation */}
+      {/* Optional Toggleable Print/Copy Steps Drawer (Explanation is written inside the Whiteboard above) */}
       {lectureData?.steps && lectureData.steps.length > 0 && (
-        <section className="champagne-card dark:bg-[#0A1628] dark:border dark:border-emerald-500/40 rounded-3xl p-4 sm:p-5 space-y-4">
+        <section className="champagne-card dark:bg-[#0A1628] dark:border dark:border-emerald-500/40 rounded-3xl p-3.5 sm:p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-base sm:text-lg font-black text-[#0F172A] dark:text-emerald-300 flex items-center gap-2">
-              <span className="w-8 h-8 rounded-xl sky-icon-box flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-5 h-5" />
+            <button
+              type="button"
+              onClick={() => setShowExternalSteps((prev) => !prev)}
+              className="text-xs sm:text-sm font-black text-[#0F172A] dark:text-emerald-300 flex items-center gap-2 cursor-pointer"
+            >
+              <span className="w-7 h-7 rounded-xl sky-icon-box flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
               </span>
-              <span>الشرح التفصيلي المستخرج خطوة بخطوة</span>
-            </h3>
+              <span>
+                {showExternalSteps
+                  ? 'إخفاء النسخة النصية للخطوات'
+                  : `عرض الخطوات المستخرجة كبطاقات للطباعة (${lectureData.steps.length})`}
+              </span>
+            </button>
             {activeService === 'solve_homework' && (
               <button
                 onClick={() => {
@@ -639,17 +748,19 @@ ${lectureData.steps ? `خطوات الفهم المستخرجة:\n${lectureData.
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {lectureData.steps.map((st, i) => (
-              <div
-                key={i}
-                className="p-3.5 rounded-2xl champagne-subcard dark:bg-slate-900/80 dark:border-slate-800 hover:border-[#0EA5E9] dark:hover:border-amber-400/50 text-right space-y-1.5 transition-colors"
-              >
-                <div className="text-xs font-black text-[#0284C7] dark:text-amber-300">{st.phase}</div>
-                <div className="text-xs text-[#475569] dark:text-slate-200 leading-relaxed">{st.details}</div>
-              </div>
-            ))}
-          </div>
+          {showExternalSteps && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+              {lectureData.steps.map((st, i) => (
+                <div
+                  key={i}
+                  className="p-3.5 rounded-2xl champagne-subcard dark:bg-slate-900/80 dark:border-slate-800 hover:border-[#0EA5E9] dark:hover:border-amber-400/50 text-right space-y-1.5 transition-colors"
+                >
+                  <div className="text-xs font-black text-[#0284C7] dark:text-amber-300">{st.phase}</div>
+                  <div className="text-xs text-[#475569] dark:text-slate-200 leading-relaxed">{st.details}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
