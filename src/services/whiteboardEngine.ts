@@ -16,6 +16,7 @@ interface InteractiveStrokeState {
   lastY: number;
   points: [number, number][];
   color: string;
+  strokeSize: number;
   seed: number;
 }
 
@@ -27,6 +28,7 @@ interface WhiteboardState {
   rcSnapshot: ReturnType<typeof rough.canvas> | null;
   rcLive: ReturnType<typeof rough.canvas> | null;
   logicalHeight: number;
+  boardFontSize: number;
   runToken: number;
   seedCounter: number;
   interactive: InteractiveStrokeState;
@@ -40,6 +42,7 @@ const wb: WhiteboardState = {
   rcSnapshot: null,
   rcLive: null,
   logicalHeight: BASE_LOGICAL_HEIGHT,
+  boardFontSize: 16,
   runToken: 0,
   seedCounter: 100,
   interactive: {
@@ -51,6 +54,7 @@ const wb: WhiteboardState = {
     lastY: 0,
     points: [],
     color: '#0F172A',
+    strokeSize: 3,
     seed: 100,
   },
 };
@@ -184,16 +188,29 @@ export function clientToLogicalPoint(
 }
 
 /**
+ * ضبط حجم خط الشرح المكتوب داخل السبورة البيضاء
+ */
+export function setBoardFontSize(sizePx: number): void {
+  wb.boardFontSize = Math.max(13, Math.min(24, Math.round(sizePx)));
+}
+
+export function getBoardFontSize(): number {
+  return wb.boardFontSize;
+}
+
+/**
  * بدء رسم يدوي على السبورة حسب الوضع المختار (Pencil / Line / Shape / Erase)
  */
 export function startInteractiveStroke(
   mode: WhiteboardDrawMode,
   x: number,
   y: number,
-  color: string = '#0F172A'
+  color: string = '#0F172A',
+  strokeSize: number = 3
 ): void {
   if (!wb.ctx || !wb.snapshotCtx) return;
   const seed = nextSeed();
+  const safeSize = Math.max(1.5, Math.min(18, strokeSize));
   wb.interactive = {
     active: true,
     mode,
@@ -203,6 +220,7 @@ export function startInteractiveStroke(
     lastY: y,
     points: [[x, y]],
     color,
+    strokeSize: safeSize,
     seed,
   };
 
@@ -220,7 +238,7 @@ export function startInteractiveStroke(
  */
 export function moveInteractiveStroke(x: number, y: number): void {
   if (!wb.interactive.active || !wb.ctx || !wb.rcLive || !wb.snapshotCtx) return;
-  const { mode, startX, startY, lastX, lastY, color, seed } = wb.interactive;
+  const { mode, startX, startY, lastX, lastY, color, strokeSize, seed } = wb.interactive;
 
   if (mode === 'pencil') {
     wb.interactive.points.push([x, y]);
@@ -230,7 +248,7 @@ export function moveInteractiveStroke(x: number, y: number): void {
     applyLogicalTransform(wb.ctx);
     wb.ctx.save();
     wb.ctx.strokeStyle = color;
-    wb.ctx.lineWidth = 2.6;
+    wb.ctx.lineWidth = strokeSize;
     wb.ctx.lineCap = 'round';
     wb.ctx.lineJoin = 'round';
     wb.ctx.beginPath();
@@ -242,7 +260,7 @@ export function moveInteractiveStroke(x: number, y: number): void {
     applyLogicalTransform(wb.snapshotCtx);
     wb.snapshotCtx.save();
     wb.snapshotCtx.strokeStyle = color;
-    wb.snapshotCtx.lineWidth = 2.6;
+    wb.snapshotCtx.lineWidth = strokeSize;
     wb.snapshotCtx.lineCap = 'round';
     wb.snapshotCtx.lineJoin = 'round';
     wb.snapshotCtx.beginPath();
@@ -256,11 +274,12 @@ export function moveInteractiveStroke(x: number, y: number): void {
   if (mode === 'erase') {
     wb.interactive.lastX = x;
     wb.interactive.lastY = y;
+    const eraserWidth = Math.max(18, strokeSize * 4.5);
 
     applyLogicalTransform(wb.snapshotCtx);
     wb.snapshotCtx.save();
     wb.snapshotCtx.strokeStyle = '#FFFFFF';
-    wb.snapshotCtx.lineWidth = 26;
+    wb.snapshotCtx.lineWidth = eraserWidth;
     wb.snapshotCtx.lineCap = 'round';
     wb.snapshotCtx.lineJoin = 'round';
     wb.snapshotCtx.beginPath();
@@ -278,7 +297,7 @@ export function moveInteractiveStroke(x: number, y: number): void {
     syncDisplayFromSnapshot();
     wb.rcLive.line(startX, startY, x, y, {
       stroke: color,
-      strokeWidth: 2.6,
+      strokeWidth: strokeSize,
       roughness: 1.0,
       seed,
     });
@@ -295,7 +314,7 @@ export function moveInteractiveStroke(x: number, y: number): void {
     const rh = Math.max(6, Math.abs(y - startY));
     wb.rcLive.rectangle(rx, ry, rw, rh, {
       stroke: color,
-      strokeWidth: 2.4,
+      strokeWidth: Math.max(1.5, strokeSize * 0.9),
       fill: 'rgba(14, 165, 233, 0.14)',
       fillStyle: 'hachure',
       hachureGap: 8,
@@ -310,7 +329,7 @@ export function moveInteractiveStroke(x: number, y: number): void {
  */
 export function endInteractiveStroke(): void {
   if (!wb.interactive.active || !wb.snapshotCtx || !wb.rcSnapshot) return;
-  const { mode, startX, startY, lastX, lastY, color, seed, points } = wb.interactive;
+  const { mode, startX, startY, lastX, lastY, color, strokeSize, seed, points } = wb.interactive;
   wb.interactive.active = false;
 
   if (mode === 'pencil' && points.length === 1) {
@@ -318,7 +337,7 @@ export function endInteractiveStroke(): void {
     wb.snapshotCtx.save();
     wb.snapshotCtx.fillStyle = color;
     wb.snapshotCtx.beginPath();
-    wb.snapshotCtx.arc(startX, startY, 1.8, 0, Math.PI * 2);
+    wb.snapshotCtx.arc(startX, startY, Math.max(1.6, strokeSize * 0.55), 0, Math.PI * 2);
     wb.snapshotCtx.fill();
     wb.snapshotCtx.restore();
     syncDisplayFromSnapshot();
@@ -329,7 +348,7 @@ export function endInteractiveStroke(): void {
     applyLogicalTransform(wb.snapshotCtx);
     wb.rcSnapshot.line(startX, startY, lastX, lastY, {
       stroke: color,
-      strokeWidth: 2.6,
+      strokeWidth: strokeSize,
       roughness: 1.0,
       seed,
     });
@@ -345,7 +364,7 @@ export function endInteractiveStroke(): void {
     const rh = Math.max(12, Math.abs(lastY - startY));
     wb.rcSnapshot.rectangle(rx, ry, rw, rh, {
       stroke: color,
-      strokeWidth: 2.4,
+      strokeWidth: Math.max(1.5, strokeSize * 0.9),
       fill: 'rgba(14, 165, 233, 0.14)',
       fillStyle: 'hachure',
       hachureGap: 8,
@@ -797,9 +816,10 @@ async function drawBoardExplanationBlock(
   if (!trimmed) return startY;
 
   const isAnswerHighlight = trimmed.startsWith('✅') || trimmed.startsWith('💡') || trimmed.startsWith('سؤال');
+  const baseFont = wb.boardFontSize || 16;
   const font = isAnswerHighlight
-    ? '800 17px Cairo, "JetBrains Mono", sans-serif'
-    : '600 16px Cairo, "JetBrains Mono", sans-serif';
+    ? `800 ${baseFont + 1}px Cairo, "JetBrains Mono", sans-serif`
+    : `600 ${baseFont}px Cairo, "JetBrains Mono", sans-serif`;
   const color = trimmed.startsWith('✅')
     ? '#0284C7'
     : trimmed.startsWith('💡')
@@ -807,7 +827,7 @@ async function drawBoardExplanationBlock(
     : '#0F172A';
 
   const maxLineWidth = 790; // Right margin 848 down to left margin 58
-  const lineHeight = 29;
+  const lineHeight = Math.round(baseFont * 1.82);
   const rightX = 835;
 
   const lines = wrapCanvasLines(wb.snapshotCtx, trimmed, maxLineWidth, font);
@@ -1030,6 +1050,8 @@ export async function processAIResponse(
   // Measure total text lines beforehand so the white canvas fits all explanation/solution lines cleanly
   const textStartY = hasDrawCommands ? 426 : 54;
   let estimatedTextHeight = textStartY + 30;
+  const baseFont = wb.boardFontSize || 16;
+  const measuredLineHeight = Math.round(baseFont * 1.82);
   if (wb.snapshotCtx) {
     for (const item of sequence) {
       if (item.type === 'TEXT') {
@@ -1037,9 +1059,9 @@ export async function processAIResponse(
           wb.snapshotCtx,
           item.payload,
           790,
-          '800 17px Cairo, "JetBrains Mono", sans-serif'
+          `800 ${baseFont + 1}px Cairo, "JetBrains Mono", sans-serif`
         );
-        estimatedTextHeight += Math.max(1, lines.length) * 29 + 16;
+        estimatedTextHeight += Math.max(1, lines.length) * measuredLineHeight + 16;
       }
     }
   }

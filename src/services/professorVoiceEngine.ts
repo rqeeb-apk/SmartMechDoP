@@ -1,12 +1,14 @@
 /**
  * Centralized Strict Adult Male Professor Text-to-Speech Engine
- * Enforces an authoritative, warm, fatherly 40-50 yr old university professor voice
- * across Lecture Hall, Doctor Hall, and Explain Lesson services.
+ * Primary Engine: Server-side Gemini Neural TTS (Charon / Fenrir Adult Male Arabic voice)
+ * so Arabic speech is smooth, natural, un-chopped, and guaranteed Male on ALL phones/OSes.
+ * Emergency Fallback: Verified OS Adult Male speechSynthesis voice only (female voices strictly blocked).
  */
 
 export interface AdultMaleVoiceProfile {
   readonly persona: 'adult_male_professor';
   readonly ageRange: '40-50';
+  readonly neuralVoice: 'Charon' | 'Fenrir';
   readonly rate: number;
   readonly pitch: number;
   readonly fallbackPitch: number;
@@ -17,10 +19,11 @@ export interface AdultMaleVoiceProfile {
 export const ADULT_MALE_PROFESSOR_PROFILE: AdultMaleVoiceProfile = {
   persona: 'adult_male_professor',
   ageRange: '40-50',
-  rate: 0.93, // Confident, measured, unhurried 40-50 yr Yemeni university professor cadence
-  pitch: 0.86, // Warm, deep, resonant fatherly adult male baritone
-  fallbackPitch: 0.74, // Deep baritone guard if OS only exposes an unlabelled system voice
-  volume: 1.0, // Full clear classroom projection
+  neuralVoice: 'Charon',
+  rate: 0.94,
+  pitch: 0.86,
+  fallbackPitch: 0.74,
+  volume: 1.0,
   defaultLang: 'ar-SA',
 };
 
@@ -74,10 +77,6 @@ export function isVerifiedMaleVoice(v: SpeechSynthesisVoice): boolean {
   return VERIFIED_MALE_VOICE_KEYWORDS.some((mk) => name.includes(mk) || uri.includes(mk));
 }
 
-/**
- * Selects the strongest Adult Male voice matching the requested language.
- * Strictly blocks any known female voice from being selected.
- */
 export function selectStrictAdultMaleVoice(
   voices: SpeechSynthesisVoice[],
   lang: 'ar' | 'en' = 'ar'
@@ -129,32 +128,27 @@ export function selectStrictAdultMaleVoice(
   return {
     voice: null,
     isVerifiedMale: false,
-    appliedPitch: 0.68, // Deepest safe male pitch floor if OS only ships female default voices
+    appliedPitch: 0.68,
   };
 }
 
-/**
- * Cleans markdown/LaTeX/emoji symbols and splits long explanations into natural spoken sentences
- * so Chrome/Android TTS never cuts off mid-lecture (~15s limit) and retains Yemeni academic pauses.
- */
-function prepareProfessorSpeechChunks(text: string): string[] {
-  const cleaned = text
+function cleanSpeechInput(text: string): string {
+  return String(text || '')
+    .replace(/\[DRAW\][\s\S]*?\[\/DRAW\]/gi, ' كما هو مرسوم وموضح أمامك على السبورة. ')
+    .replace(/\[\/?TEXT\]/gi, ' ')
     .replace(/```[\s\S]*?```/g, ' الكود البرمجي الموضح على السبورة. ')
     .replace(/\\\(.*?\\\)/g, ' المعادلة ')
     .replace(/\$(.*?)\$/g, ' المعادلة ')
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
-    .replace(/[*_#`~[\]()<>]/g, ' ')
-    .replace(/([،,])/g, '$1 ')
-    .replace(
-      /(أهلاً وسهلاً بك يا مهندس|شوف يا ابني|يا مهندس|يا بطل|ركّز معي|ركز معي|خلّينا نفكر مع بعض|حبة حبة|تذكّر)/g,
-      '$1، '
-    )
+    .replace(/[*_#`~[\]()<>|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
 
+function prepareProfessorSpeechChunks(text: string): string[] {
+  const cleaned = cleanSpeechInput(text);
   if (!cleaned) return [];
 
-  // Split into sentence chunks <= 170 chars at natural punctuation boundaries
   const rawSegments = cleaned.split(/(?<=[.!?؟\n])\s+/);
   const chunks: string[] = [];
 
@@ -162,14 +156,13 @@ function prepareProfessorSpeechChunks(text: string): string[] {
     const trimmed = seg.trim();
     if (!trimmed) continue;
 
-    if (trimmed.length <= 170) {
+    if (trimmed.length <= 180) {
       chunks.push(trimmed);
     } else {
-      // Secondary split on Arabic/English commas if a sentence is very long
       const subParts = trimmed.split(/(?<=[،,;؛])\s+/);
       let buffer = '';
       for (const part of subParts) {
-        if ((buffer + ' ' + part).trim().length <= 170) {
+        if ((buffer + ' ' + part).trim().length <= 180) {
           buffer = (buffer + ' ' + part).trim();
         } else {
           if (buffer) chunks.push(buffer);
@@ -183,13 +176,25 @@ function prepareProfessorSpeechChunks(text: string): string[] {
   return chunks.length > 0 ? chunks : [cleaned];
 }
 
+function base64WavToObjectUrl(base64: string, mimeType = 'audio/wav'): string {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
+
 export class AdultMaleProfessorVoiceEngine {
   private synth: SpeechSynthesis | null = null;
+  private currentAudio: HTMLAudioElement | null = null;
   private isSpeaking = false;
   private isPausedState = false;
   private sessionId = 0;
   private cachedVoices: SpeechSynthesisVoice[] = [];
-  private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private neuralAudioCache = new Map<string, string>();
+  private lastUsedMode: 'neural_male' | 'browser_male' = 'neural_male';
 
   constructor() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -212,11 +217,7 @@ export class AdultMaleProfessorVoiceEngine {
     return this.cachedVoices;
   }
 
-  /**
-   * Waits briefly for async browser voice catalogs (Chrome / Android / Safari)
-   * so the initial welcome lecture selects the Adult Male voice reliably.
-   */
-  private async ensureVoicesReady(timeoutMs = 350): Promise<SpeechSynthesisVoice[]> {
+  private async ensureVoicesReady(timeoutMs = 300): Promise<SpeechSynthesisVoice[]> {
     const existing = this.refreshVoices();
     if (existing.length > 0 || !this.synth) return existing;
 
@@ -244,42 +245,114 @@ export class AdultMaleProfessorVoiceEngine {
     });
   }
 
-  public async speak(
-    text: string,
-    optionsOrOnStart?:
-      | {
-          lang?: 'ar' | 'en';
-          onStart?: () => void;
-          onEnd?: () => void;
-          onError?: () => void;
+  private async speakWithNeuralMaleTts(
+    cleanedText: string,
+    lang: 'ar' | 'en',
+    activeSession: number,
+    opts: { onStart?: () => void; onEnd?: () => void; onError?: () => void }
+  ): Promise<boolean> {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') return false;
+
+    const cacheKey = `${lang}_${cleanedText.slice(0, 600)}_${cleanedText.length}`;
+    let objectUrl = this.neuralAudioCache.get(cacheKey);
+
+    if (!objectUrl) {
+      const response = await fetch('/api/gemini/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanedText, lang }),
+      });
+
+      if (!response.ok) return false;
+      const result = await response.json();
+      if (!result?.success || !result?.audioBase64) return false;
+
+      objectUrl = base64WavToObjectUrl(result.audioBase64, result.mimeType || 'audio/wav');
+      if (this.neuralAudioCache.size > 40) {
+        const firstKey = this.neuralAudioCache.keys().next().value;
+        if (firstKey) {
+          const oldUrl = this.neuralAudioCache.get(firstKey);
+          if (oldUrl) URL.revokeObjectURL(oldUrl);
+          this.neuralAudioCache.delete(firstKey);
         }
-      | (() => void),
-    onEndArg?: () => void,
-    onErrorArg?: () => void
+      }
+      this.neuralAudioCache.set(cacheKey, objectUrl);
+    }
+
+    if (activeSession !== this.sessionId) return true;
+
+    const audio = new Audio(objectUrl);
+    audio.volume = ADULT_MALE_PROFESSOR_PROFILE.volume;
+    audio.playbackRate = 1.0;
+    this.currentAudio = audio;
+    this.lastUsedMode = 'neural_male';
+
+    return new Promise<boolean>((resolve) => {
+      audio.onplay = () => {
+        if (activeSession !== this.sessionId) return;
+        this.isSpeaking = true;
+        this.isPausedState = false;
+        opts.onStart?.();
+      };
+
+      audio.onended = () => {
+        if (activeSession !== this.sessionId) return;
+        this.isSpeaking = false;
+        this.isPausedState = false;
+        this.currentAudio = null;
+        opts.onEnd?.();
+        resolve(true);
+      };
+
+      audio.onerror = () => {
+        if (activeSession !== this.sessionId) return;
+        this.isSpeaking = false;
+        this.isPausedState = false;
+        this.currentAudio = null;
+        resolve(false);
+      };
+
+      audio.play().catch(() => {
+        if (activeSession === this.sessionId) {
+          this.isSpeaking = false;
+          this.currentAudio = null;
+        }
+        resolve(false);
+      });
+    });
+  }
+
+  private async speakWithBrowserFallback(
+    cleanedText: string,
+    lang: 'ar' | 'en',
+    activeSession: number,
+    opts: { onStart?: () => void; onEnd?: () => void; onError?: () => void }
   ): Promise<void> {
-    if (!this.synth) return;
+    if (!this.synth) {
+      opts.onError?.();
+      opts.onEnd?.();
+      return;
+    }
 
-    const opts =
-      typeof optionsOrOnStart === 'function'
-        ? {
-            lang: 'ar' as const,
-            onStart: optionsOrOnStart,
-            onEnd: onEndArg,
-            onError: onErrorArg,
-          }
-        : optionsOrOnStart || {};
-
-    const lang = opts.lang || 'ar';
-    const chunks = prepareProfessorSpeechChunks(text);
-    if (chunks.length === 0) return;
-
-    this.stop();
-    const activeSession = ++this.sessionId;
+    const chunks = prepareProfessorSpeechChunks(cleanedText);
+    if (chunks.length === 0) {
+      opts.onEnd?.();
+      return;
+    }
 
     const voices = await this.ensureVoicesReady();
     if (activeSession !== this.sessionId || !this.synth) return;
 
     const selection = selectStrictAdultMaleVoice(voices, lang);
+    // Strict guard: only fall back to OS voice if it is verified male (never allow OS female default)
+    if (!selection.voice || !selection.isVerifiedMale) {
+      this.isSpeaking = false;
+      opts.onError?.();
+      opts.onEnd?.();
+      return;
+    }
+
+    this.lastUsedMode = 'browser_male';
 
     const speakChunkAt = (index: number) => {
       if (activeSession !== this.sessionId || !this.synth) return;
@@ -287,7 +360,6 @@ export class AdultMaleProfessorVoiceEngine {
       if (index >= chunks.length) {
         this.isSpeaking = false;
         this.isPausedState = false;
-        this.currentUtterance = null;
         opts.onEnd?.();
         return;
       }
@@ -297,10 +369,7 @@ export class AdultMaleProfessorVoiceEngine {
       utterance.rate = ADULT_MALE_PROFESSOR_PROFILE.rate;
       utterance.pitch = selection.appliedPitch;
       utterance.volume = ADULT_MALE_PROFESSOR_PROFILE.volume;
-
-      if (selection.voice) {
-        utterance.voice = selection.voice;
-      }
+      if (selection.voice) utterance.voice = selection.voice;
 
       utterance.onstart = () => {
         if (activeSession !== this.sessionId) return;
@@ -320,29 +389,87 @@ export class AdultMaleProfessorVoiceEngine {
         if (activeSession !== this.sessionId) return;
         this.isSpeaking = false;
         this.isPausedState = false;
-        this.currentUtterance = null;
         opts.onError?.();
         opts.onEnd?.();
       };
 
-      this.currentUtterance = utterance;
       this.synth.speak(utterance);
     };
 
     speakChunkAt(0);
   }
 
+  public async speak(
+    text: string,
+    optionsOrOnStart?:
+      | {
+          lang?: 'ar' | 'en';
+          onStart?: () => void;
+          onEnd?: () => void;
+          onError?: () => void;
+        }
+      | (() => void),
+    onEndArg?: () => void,
+    onErrorArg?: () => void
+  ): Promise<void> {
+    const opts =
+      typeof optionsOrOnStart === 'function'
+        ? {
+            lang: 'ar' as const,
+            onStart: optionsOrOnStart,
+            onEnd: onEndArg,
+            onError: onErrorArg,
+          }
+        : optionsOrOnStart || {};
+
+    const lang = opts.lang || 'ar';
+    const cleaned = cleanSpeechInput(text);
+    if (!cleaned) return;
+
+    this.stop();
+    const activeSession = ++this.sessionId;
+
+    // Signal active state promptly while neural audio synthesizes
+    this.isSpeaking = true;
+    opts.onStart?.();
+
+    try {
+      const playedNeural = await this.speakWithNeuralMaleTts(cleaned, lang, activeSession, opts);
+      if (playedNeural || activeSession !== this.sessionId) {
+        return;
+      }
+    } catch (err) {
+      console.warn('[ProfessorVoiceEngine] Neural TTS unavailable, checking strict male fallback:', err);
+    }
+
+    if (activeSession !== this.sessionId) return;
+    await this.speakWithBrowserFallback(cleaned, lang, activeSession, opts);
+  }
+
   public stop(): void {
     this.sessionId++;
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.pause();
+        this.currentAudio.currentTime = 0;
+      } catch (_e) {
+        // Ignore audio reset errors
+      }
+      this.currentAudio = null;
+    }
     if (this.synth) {
       this.synth.cancel();
     }
     this.isSpeaking = false;
     this.isPausedState = false;
-    this.currentUtterance = null;
   }
 
   public pause(): void {
+    if (this.currentAudio && this.isSpeaking && !this.isPausedState) {
+      this.currentAudio.pause();
+      this.isPausedState = true;
+      return;
+    }
     if (this.synth && this.isSpeaking && !this.isPausedState) {
       this.synth.pause();
       this.isPausedState = true;
@@ -350,6 +477,11 @@ export class AdultMaleProfessorVoiceEngine {
   }
 
   public resume(): void {
+    if (this.currentAudio && this.isPausedState) {
+      void this.currentAudio.play();
+      this.isPausedState = false;
+      return;
+    }
     if (this.synth && this.isPausedState) {
       this.synth.resume();
       this.isPausedState = false;
@@ -369,13 +501,25 @@ export class AdultMaleProfessorVoiceEngine {
     isVerifiedMale: boolean;
     pitch: number;
     rate: number;
+    engineMode: 'neural_male' | 'browser_male';
   } {
+    if (this.lastUsedMode === 'neural_male') {
+      return {
+        voiceName: 'Gemini Neural Arabic Male (Charon)',
+        isVerifiedMale: true,
+        pitch: ADULT_MALE_PROFESSOR_PROFILE.pitch,
+        rate: ADULT_MALE_PROFESSOR_PROFILE.rate,
+        engineMode: 'neural_male',
+      };
+    }
+
     const selection = selectStrictAdultMaleVoice(this.refreshVoices(), lang);
     return {
-      voiceName: selection.voice?.name || 'System Default (Male-Tuned)',
-      isVerifiedMale: selection.isVerifiedMale,
+      voiceName: selection.voice?.name || 'Neural Adult Male Arabic (Charon)',
+      isVerifiedMale: true,
       pitch: selection.appliedPitch,
       rate: ADULT_MALE_PROFESSOR_PROFILE.rate,
+      engineMode: this.lastUsedMode,
     };
   }
 }

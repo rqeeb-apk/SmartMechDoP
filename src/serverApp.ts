@@ -2045,6 +2045,192 @@ ${fileName ? `\nاسم الملف المرفق: ${fileName}` : ''}
   }
 });
 
+// ==========================================
+// NEURAL ADULT MALE ARABIC TTS ENDPOINT
+// Uses Gemini 3.8 Neural TTS with guaranteed Adult Male voice (Charon/Fenrir)
+// Eliminates browser/OS female fallback and Arabic word/letter chopping
+// ==========================================
+
+function cleanTextForNeuralTTS(rawText: string): string {
+  return String(rawText || '')
+    .replace(/\[DRAW\][\s\S]*?\[\/DRAW\]/gi, ' كما هو مرسوم وموضح أمامك على السبورة. ')
+    .replace(/\[\/?TEXT\]/gi, ' ')
+    .replace(/```[\s\S]*?```/g, ' الكود البرمجي الموضح على السبورة. ')
+    .replace(/\\\(.*?\\\)/g, ' المعادلة الموضحة ')
+    .replace(/\$(.*?)\$/g, ' المعادلة ')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
+    .replace(/[*_#`~[\]()<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitArabicTextForTTS(text: string, maxChars = 750): string[] {
+  if (!text) return [];
+  if (text.length <= maxChars) return [text];
+
+  const sentences = text.split(/(?<=[.!?؟\n])\s+/);
+  const chunks: string[] = [];
+  let buffer = '';
+
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (!trimmed) continue;
+
+    if ((buffer ? `${buffer} ${trimmed}` : trimmed).length <= maxChars) {
+      buffer = buffer ? `${buffer} ${trimmed}` : trimmed;
+    } else {
+      if (buffer) chunks.push(buffer);
+      if (trimmed.length <= maxChars) {
+        buffer = trimmed;
+      } else {
+        const words = trimmed.split(/\s+/);
+        let wordBuf = '';
+        for (const w of words) {
+          if ((wordBuf ? `${wordBuf} ${w}` : w).length <= maxChars) {
+            wordBuf = wordBuf ? `${wordBuf} ${w}` : w;
+          } else {
+            if (wordBuf) chunks.push(wordBuf);
+            wordBuf = w;
+          }
+        }
+        buffer = wordBuf;
+      }
+    }
+  }
+  if (buffer) chunks.push(buffer);
+  return chunks.slice(0, 4); // Keep latency fast & reliable (up to ~3,000 chars of spoken lecture)
+}
+
+function mergeWavBuffers(buffers: Buffer[]): Buffer {
+  if (buffers.length === 0) return Buffer.alloc(0);
+  if (buffers.length === 1) return buffers[0];
+
+  const first = buffers[0];
+  const isRiff = first.length > 44 && first.subarray(0, 4).toString('ascii') === 'RIFF';
+  if (!isRiff) {
+    return Buffer.concat(buffers);
+  }
+
+  const header = Buffer.from(first.subarray(0, 44));
+  const pcmParts: Buffer[] = [first.subarray(44)];
+  for (let i = 1; i < buffers.length; i++) {
+    const b = buffers[i];
+    if (b.length > 44 && b.subarray(0, 4).toString('ascii') === 'RIFF') {
+      pcmParts.push(b.subarray(44));
+    } else {
+      pcmParts.push(b);
+    }
+  }
+
+  const combinedPcm = Buffer.concat(pcmParts);
+  const result = Buffer.concat([header, combinedPcm]);
+  result.writeUInt32LE(36 + combinedPcm.length, 4);
+  result.writeUInt32LE(combinedPcm.length, 40);
+  return result;
+}
+
+geminiRouter.post('/tts', async (req: Request, res: Response) => {
+  try {
+    const { text, lang = 'ar' } = req.body || {};
+    const cleaned = cleanTextForNeuralTTS(String(text || ''));
+    if (!cleaned) {
+      return res.status(400).json({ success: false, error: 'النص المطلوب تحويله إلى صوت فارغ.' });
+    }
+
+    const cacheKey = computeCacheKey('neural_tts_male_charon', cleaned, String(lang));
+    const cached = aiResponseCache.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, cached: true, ...cached });
+    }
+
+    const ai = getGeminiClient();
+    const chunks = splitArabicTextForTTS(cleaned, 750);
+    const voiceStyle =
+      lang === 'en'
+        ? 'Warm, authoritative, resonant 45-year-old male university engineering professor speaking clear fluent English at a calm measured pace.'
+        : 'صوت رجل بالغ وقور ودافئ وواثق، أستاذ جامعي يمني في الهندسة عمره 45 عاماً، ينطق العربية الفصحى واليمنية المهذبة بسلاسة كاملة ومخارج حروف واضحة ومتصلة دون تقطيع أو تكسير للكلمات، بنبرة أبوية هادئة ومشجعة.';
+
+    const ttsModels = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts'];
+    const maleVoices = ['Charon', 'Fenrir'];
+
+    const wavBuffers: Buffer[] = [];
+    let usedModel = ttsModels[0];
+    let usedVoice = maleVoices[0];
+
+    for (const chunkText of chunks) {
+      let chunkBuf: Buffer | null = null;
+      let lastErr: any = null;
+
+      for (const modelName of ttsModels) {
+        for (const voiceName of maleVoices) {
+          try {
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    {
+                      text: chunkText,
+                      speechMetadata: {
+                        style: voiceStyle,
+                      },
+                    },
+                  ],
+                },
+              ],
+              config: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  languageCode: lang === 'en' ? 'en' : 'ar',
+                  voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName },
+                  },
+                },
+              },
+            });
+
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+              chunkBuf = Buffer.from(base64Audio, 'base64');
+              usedModel = modelName;
+              usedVoice = voiceName;
+              break;
+            }
+          } catch (err: any) {
+            lastErr = err;
+            console.warn(`[Neural TTS] ${modelName}/${voiceName} fallback:`, err?.message?.slice(0, 120));
+          }
+        }
+        if (chunkBuf) break;
+      }
+
+      if (!chunkBuf) {
+        throw lastErr || new Error('تعذر توليد الصوت الذكوري من خادم الذكاء الصوتي.');
+      }
+      wavBuffers.push(chunkBuf);
+    }
+
+    const finalWav = mergeWavBuffers(wavBuffers);
+    const payload = {
+      audioBase64: finalWav.toString('base64'),
+      mimeType: 'audio/wav',
+      voiceName: usedVoice,
+      model: usedModel,
+      persona: 'adult_male_professor',
+    };
+
+    aiResponseCache.set(cacheKey, payload, 6 * 3600 * 1000);
+    return res.json({ success: true, ...payload });
+  } catch (error: any) {
+    console.error('[Neural TTS API Error]:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'حدث خطأ أثناء توليد الصوت العربي الذكوري.',
+    });
+  }
+});
+
 // Mount geminiRouter on /api/gemini, /gemini, and /api
 app.use('/api/gemini', geminiRouter);
 app.use('/gemini', geminiRouter);
