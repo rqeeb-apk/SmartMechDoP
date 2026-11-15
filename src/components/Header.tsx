@@ -121,8 +121,8 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {user.role !== 'owner' && (
               <div className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#FAF5E8] dark:bg-[#091830] border border-[rgba(212,175,55,0.45)] dark:border-amber-400/60 text-[#0F172A] dark:text-amber-300 text-[10px] sm:text-[11px] font-extrabold flex items-center gap-1 shadow-sm whitespace-nowrap">
-                <span className="text-xs">✅</span>
-                <span>اشتراك مفعل</span>
+                <span className="text-xs">{user.isSubscribed ? '✅' : '⏳'}</span>
+                <span>{user.isSubscribed ? 'اشتراك مفعل' : 'تجربة 24 ساعة'}</span>
               </div>
             )}
 

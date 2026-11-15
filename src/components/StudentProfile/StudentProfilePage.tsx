@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../../types';
 import { updateUserProfile } from '../../services/storage';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { User, Award, BookOpen, Layers, Cpu, CheckCircle2, Shield, Edit3 } from 'lucide-react';
 
 interface StudentProfilePageProps {
@@ -179,29 +180,61 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
             e.preventDefault();
             setRedeemNotice(null);
             const inputEl = e.currentTarget.elements.namedItem('redemptionCode') as HTMLInputElement;
-            const codeVal = inputEl ? inputEl.value : '';
+            const codeVal = inputEl ? inputEl.value.trim() : '';
             if (!codeVal) return;
 
-            try {
-              const res = await fetch('/api/subscriptions/redeem', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  code: codeVal,
-                  studentName: user.name,
-                  studentEmail: user.email,
-                }),
+            if (!supabase || !isSupabaseConfigured) {
+              setRedeemNotice({
+                type: 'error',
+                text: 'لم يتم إعداد مفاتيح الربط مع Supabase (VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY).',
               });
-              const data = await res.json();
-              if (!res.ok || !data.success) {
-                setRedeemNotice({ type: 'error', text: data.error || 'فشلت عملية التفعيل' });
+              return;
+            }
+
+            try {
+              const {
+                data: { session },
+              } = await supabase.auth.getSession();
+              const targetUserId = session?.user?.id || user.id;
+
+              const { data: redeemResult, error: rpcError } = await supabase.rpc('redeem_code', {
+                user_id: targetUserId,
+                input_code: codeVal,
+              });
+
+              if (rpcError || redeemResult !== true) {
+                setRedeemNotice({
+                  type: 'error',
+                  text: 'عذراً، كود التفعيل غير صحيح أو مستخدم مسبقاً. يرجى التواصل مع الدعم عبر الواتساب.',
+                });
                 return;
               }
 
-              setRedeemNotice({ type: 'success', text: data.message || 'تم تفعيل الاشتراك السنوي بنجاح!' });
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .update({ is_subscribed: true })
+                .eq('id', targetUserId);
+
+              if (profileError) {
+                setRedeemNotice({ type: 'error', text: `تعذر تحديث الاشتراك: ${profileError.message}` });
+                return;
+              }
+
+              const nowIso = new Date().toISOString();
+              const expiresDate = new Date();
+              expiresDate.setDate(expiresDate.getDate() + 365);
+
+              setRedeemNotice({ type: 'success', text: '🎉 تم تفعيل الاشتراك السنوي بنجاح!' });
               const updated = updateUserProfile({
                 isSubscribed: true,
-                subscription: data.subscription,
+                subscription: {
+                  status: 'active',
+                  codeUsed: codeVal,
+                  activatedAt: nowIso,
+                  expiresAt: expiresDate.toISOString(),
+                  priceYER: 4000,
+                  durationDays: 365,
+                },
               });
               setUser(updated);
               inputEl.value = '';

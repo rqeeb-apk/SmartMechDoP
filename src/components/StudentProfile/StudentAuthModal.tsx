@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   Lock, User, Phone, Building2, GraduationCap, Key, CheckCircle2,
-  AlertTriangle, MessageCircle, X, ShieldCheck
+  AlertTriangle, MessageCircle, X, ShieldCheck, Clock
 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { updateUserProfile, OFFICIAL_LOGO_URL } from '../../services/storage';
@@ -54,10 +54,11 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
   const [loginPassword, setLoginPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [trialLoading, setTrialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Stealth 20-click counter on logo for owner portal access even behind auth wall
+  // Stealth 20-click counter on logo for owner portal access
   const [logoClicks, setLogoClicks] = useState(0);
   const clickTimerRef = useRef<any>(null);
 
@@ -76,24 +77,140 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     clickTimerRef.current = setTimeout(() => setLogoClicks(0), 3000);
   };
 
-  // Build WhatsApp URL with exact requested format
-  const studentDisplayName = fullName.trim().replace(/\s+/g, '_') || 'طالب';
-  const whatsappText = encodeURIComponent(
-    `السلام_عليكم_أريد_كود_تفعيل_في_المنصة_اسمي_${studentDisplayName}`
-  );
-  const whatsappUrl = `https://wa.me/967785500075?text=${whatsappText}`;
+  // Feature 1: Build WhatsApp message dynamically from the 4 student fields
+  const whatsappMessage = [
+    'أريد الإشتراك في منصه الدكتور الذكي',
+    `الاسم: ${fullName.trim() || 'غير محدد'}`,
+    `الرقم: ${phone.trim() || 'غير محدد'}`,
+    `الجامعه: ${university.trim() || 'غير محدد'}`,
+    `السنه: ${level}`,
+  ].join('\n');
+
+  const whatsappUrl = `https://wa.me/967785500075?text=${encodeURIComponent(whatsappMessage)}`;
 
   const handleWhatsAppClick = () => {
     setError(null);
     setShowActivationFields(true);
   };
 
+  // Feature 2: 24-Hour Free Trial (without code)
+  const handleFreeTrialSignUp = async () => {
+    setError(null);
+    setSuccessMsg(null);
+
+    if (!fullName.trim() || !phone.trim() || !password.trim()) {
+      setError('يرجى تعبئة الاسم الكامل، رقم الهاتف، وكلمة المرور للبدء بالتجربة المجانية.');
+      return;
+    }
+
+    const cleanPhone = normalizePhoneDigits(phone);
+    if (cleanPhone.length < 6) {
+      setError('يرجى إدخال رقم هاتف صحيح (أرقام فقط).');
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      setError('يجب أن تتكون كلمة المرور من 6 أحرف أو أرقام على الأقل.');
+      return;
+    }
+
+    if (!supabase || !isSupabaseConfigured) {
+      setError('لم يتم إعداد مفاتيح الربط مع Supabase (VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY).');
+      return;
+    }
+
+    setTrialLoading(true);
+    const syntheticEmail = `${cleanPhone}@yma.app`;
+
+    try {
+      // 1. Create Supabase Auth account using synthetic email phone@yma.app
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: syntheticEmail,
+        password: password.trim(),
+      });
+
+      if (signUpError) {
+        const msg = signUpError.message || '';
+        if (msg.toLowerCase().includes('already registered')) {
+          throw new Error('رقم الهاتف هذا مسجل مسبقاً. يرجى استخدام تبويب "تسجيل الدخول".');
+        }
+        throw new Error(msg || 'تعذر إنشاء الحساب في نظام المصادقة.');
+      }
+
+      if (!authData.user?.id) {
+        throw new Error('تعذر إنشاء معرف المستخدم في Supabase Auth.');
+      }
+
+      const userId = authData.user.id;
+      const now = new Date();
+      const nowIso = now.toISOString();
+      // 4. Calculate trial_ends_at = current time + 24 hours
+      const trialEndsAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+      // 2 & 3. Insert row into `profiles` with is_subscribed = false and trial_ends_at
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: userId,
+          full_name: fullName.trim(),
+          phone: cleanPhone,
+          university: university.trim(),
+          level,
+          is_subscribed: false,
+          trial_ends_at: trialEndsAt,
+        },
+        { onConflict: 'id' }
+      );
+
+      if (profileError) {
+        await supabase.auth.signOut();
+        throw new Error(`تعذر حفظ بيانات التجربة المجانية: ${profileError.message}`);
+      }
+
+      const trialUser: UserProfile = {
+        id: userId,
+        name: fullName.trim(),
+        email: syntheticEmail,
+        phone: cleanPhone,
+        university: university.trim(),
+        role: 'student',
+        specialization: 'هندسة الميكاترونكس والنظم المدمجة',
+        level,
+        isSubscribed: false,
+        points: 300,
+        completedQuizzesCount: 0,
+        savedExperimentsCount: 0,
+        createdProjectsCount: 0,
+        certificates: [],
+        createdAt: nowIso,
+        subscription: {
+          status: 'trial',
+          trialStartedAt: nowIso,
+          trialExpiresAt: trialEndsAt,
+          priceYER: 4000,
+          durationDays: 365,
+        },
+      };
+
+      const savedUser = updateUserProfile(trialUser);
+      setSuccessMsg('🎉 تم تفعيل التجربة المجانية لمدة 24 ساعة بنجاح! جاري نقلك للمنصة...');
+
+      setTimeout(() => {
+        onSuccess(savedUser);
+        if (onClose) onClose();
+      }, 500);
+    } catch (err: any) {
+      setError(err?.message || 'حدث خطأ أثناء تفعيل التجربة المجانية.');
+    } finally {
+      setTrialLoading(false);
+    }
+  };
+
+  // Sign Up with Activation Code
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
-    // 1. Ensure all fields are filled
     if (
       !fullName.trim() ||
       !phone.trim() ||
@@ -127,7 +244,6 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     const cleanCode = activationCode.trim();
 
     try {
-      // 2. Create account in Supabase Auth using synthetic email phone@yma.app
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: syntheticEmail,
         password: password.trim(),
@@ -147,7 +263,6 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
 
       const userId = authData.user.id;
 
-      // 3. Call Supabase RPC function `redeem_code(user_id, input_code)`
       const { data: redeemResult, error: rpcError } = await supabase.rpc('redeem_code', {
         user_id: userId,
         input_code: cleanCode,
@@ -156,13 +271,11 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
       const isCodeValid = !rpcError && redeemResult === true;
 
       if (!isCodeValid) {
-        // 5. Invalid/used code -> immediately sign out so no dangling session/data remains
         await supabase.auth.signOut();
         setError('عذراً، كود التفعيل غير صحيح أو مستخدم مسبقاً. يرجى التواصل مع الدعم عبر الواتساب.');
         return;
       }
 
-      // 4. Code redeemed === true -> save profile row with is_subscribed = true
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert(
@@ -219,7 +332,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
       setTimeout(() => {
         onSuccess(savedUser);
         if (onClose) onClose();
-      }, 600);
+      }, 500);
     } catch (err: any) {
       setError(err?.message || 'حدث خطأ أثناء تفعيل الكود وإنشاء الحساب.');
     } finally {
@@ -227,6 +340,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     }
   };
 
+  // Login Handler (supports Subscribed, Active Trial, and Expired Trial)
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -264,17 +378,21 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
         throw new Error('رقم الهاتف أو كلمة المرور غير صحيحة.');
       }
 
-      // Check is_subscribed in `profiles` table
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authData.user.id)
         .single();
 
-      if (profileError || !profile || profile.is_subscribed !== true) {
+      if (profileError || !profile) {
         await supabase.auth.signOut();
-        throw new Error('عذراً، هذا الحساب غير مشترك أو غير مفعل. يرجى التواصل مع الدعم عبر الواتساب.');
+        throw new Error('لم يتم العثور على بيانات الملف الشخصي لهذا الحساب.');
       }
+
+      const isSubscribed = profile.is_subscribed === true;
+      const trialEndsAt = profile.trial_ends_at || undefined;
+      const isTrialStillActive =
+        !isSubscribed && trialEndsAt && new Date(trialEndsAt).getTime() > Date.now();
 
       const nowIso = new Date().toISOString();
       const expiresDate = new Date();
@@ -289,24 +407,31 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
         role: 'student',
         specialization: 'هندسة الميكاترونكس والنظم المدمجة',
         level: profile.level || 'السنة الأولى',
-        isSubscribed: true,
+        isSubscribed,
         points: 500,
         completedQuizzesCount: 0,
         savedExperimentsCount: 0,
         createdProjectsCount: 0,
         certificates: [],
         createdAt: profile.created_at || nowIso,
-        subscription: {
-          status: 'active',
-          activatedAt: nowIso,
-          expiresAt: expiresDate.toISOString(),
-          priceYER: 4000,
-          durationDays: 365,
-        },
+        subscription: isSubscribed
+          ? {
+              status: 'active',
+              activatedAt: nowIso,
+              expiresAt: expiresDate.toISOString(),
+              priceYER: 4000,
+              durationDays: 365,
+            }
+          : {
+              status: isTrialStillActive ? 'trial' : 'trial_expired',
+              trialExpiresAt: trialEndsAt,
+              priceYER: 4000,
+              durationDays: 365,
+            },
       };
 
       const savedUser = updateUserProfile(userObj);
-      setSuccessMsg('✅ تم تسجيل الدخول بنجاح! مرحباً بك في منصة دكتور الميكاترونكس الذكي.');
+      setSuccessMsg('✅ تم تسجيل الدخول بنجاح!');
       onSuccess(savedUser);
       if (onClose) onClose();
     } catch (err: any) {
@@ -363,7 +488,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                 </h2>
               </div>
               <p className="text-[11px] sm:text-xs text-[#475569] dark:text-amber-300/90 font-medium mt-0.5 leading-snug">
-                الدخول مخصص للمشتركين فقط · يتطلب تفعيل الحساب بكود اشتراك ساري
+                اشترك بكود التفعيل السنوي أو ابدأ تجربة مجانية لمدة 24 ساعة
               </p>
             </div>
           </div>
@@ -417,7 +542,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
             </div>
           )}
 
-          {/* SIGN UP FORM (Exact ordered fields 1 -> 8) */}
+          {/* SIGN UP FORM */}
           {authMode === 'signup' ? (
             <form onSubmit={handleSignUpSubmit} className="space-y-3.5 text-xs">
               {/* 1. الاسم الكامل */}
@@ -512,8 +637,8 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                 </div>
               </div>
 
-              {/* 6. زر أخضر كبير: طلب كود التفعيل عبر واتساب */}
-              <div className="pt-1">
+              {/* 6. زر أخضر كبير: طلب كود التفعيل عبر واتساب + زر التجربة المجانية 24 ساعة */}
+              <div className="pt-1 space-y-2.5">
                 <a
                   href={whatsappUrl}
                   target="_blank"
@@ -524,12 +649,25 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                   <MessageCircle className="w-5 h-5 shrink-0" />
                   <span>طلب كود التفعيل عبر واتساب</span>
                 </a>
+
+                <button
+                  type="button"
+                  onClick={handleFreeTrialSignUp}
+                  disabled={trialLoading || loading}
+                  className="w-full py-3 px-4 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 border border-amber-400/70 dark:border-amber-400/50 text-amber-900 dark:text-amber-300 font-extrabold text-xs sm:text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span>
+                    {trialLoading
+                      ? 'جاري تجهيز التجربة المجانية...'
+                      : 'تجربة مجانية لمدة 24 ساعة (بدون كود)'}
+                  </span>
+                </button>
               </div>
 
               {/* 7 & 8. Hidden initially until WhatsApp button is clicked */}
               {showActivationFields && (
                 <div className="space-y-3.5 pt-2 animate-fade-in">
-                  {/* 7. حقل إدخال كود التفعيل */}
                   <div className="p-4 rounded-2xl bg-[#E0F2FE]/70 dark:bg-amber-500/10 border border-[#0EA5E9]/35 dark:border-amber-500/40 space-y-2">
                     <label className="text-xs font-extrabold text-[#0284C7] dark:text-amber-300 flex items-center gap-2">
                       <Key className="w-4 h-4 text-[#0EA5E9] dark:text-amber-400" />
@@ -545,10 +683,9 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                     />
                   </div>
 
-                  {/* 8. زر تفعيل وإنشاء الحساب */}
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || trialLoading}
                     className="w-full py-3.5 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] dark:bg-gradient-to-r dark:from-amber-500 dark:to-amber-600 text-white dark:text-slate-950 font-extrabold text-sm shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <ShieldCheck className="w-5 h-5" />

@@ -335,7 +335,7 @@ const INITIAL_USER: UserProfile = {
 
 export function checkUserAccessStatus(user: UserProfile): {
   isAccessAllowed: boolean;
-  statusType: 'owner' | 'active' | 'inactive' | 'expired';
+  statusType: 'owner' | 'active' | 'trial' | 'trial_expired' | 'inactive';
   remainingTrialHours: number;
   remainingTrialMinutes: number;
   remainingTrialSec: number;
@@ -371,6 +371,32 @@ export function checkUserAccessStatus(user: UserProfile): {
       remainingTrialMinutes: 365 * 24 * 60,
       remainingTrialSec: 365 * 24 * 3600,
       formattedCountdown: 'اشتراك سنوي نشط (365 يومًا)',
+    };
+  }
+
+  if (user.subscription?.trialExpiresAt) {
+    const diffMs = new Date(user.subscription.trialExpiresAt).getTime() - Date.now();
+    if (diffMs > 0) {
+      const totalSec = Math.floor(diffMs / 1000);
+      const hours = Math.floor(totalSec / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      return {
+        isAccessAllowed: true,
+        statusType: 'trial',
+        remainingTrialHours: hours,
+        remainingTrialMinutes: mins,
+        remainingTrialSec: totalSec,
+        formattedCountdown: `متبقي لك ${hours} ساعة و ${mins} دقيقة من التجربة المجانية. اشترك الآن!`,
+      };
+    }
+
+    return {
+      isAccessAllowed: false,
+      statusType: 'trial_expired',
+      remainingTrialHours: 0,
+      remainingTrialMinutes: 0,
+      remainingTrialSec: 0,
+      formattedCountdown: 'انتهت فترة التجربة المجانية (24 ساعة)',
     };
   }
 
@@ -531,17 +557,7 @@ export const getStoredUser = (): UserProfile => {
     return INITIAL_USER;
   }
   try {
-    const user: UserProfile = JSON.parse(data);
-    if (user.subscription?.status === 'trial') {
-      user.subscription = {
-        status: 'inactive',
-        priceYER: 4000,
-        durationDays: 365,
-      };
-      user.isSubscribed = false;
-      localStorage.setItem('dr_smart_user', JSON.stringify(user));
-    }
-    return user;
+    return JSON.parse(data) as UserProfile;
   } catch {
     return INITIAL_USER;
   }

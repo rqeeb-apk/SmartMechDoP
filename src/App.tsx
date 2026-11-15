@@ -16,13 +16,14 @@ import { QuizCenterPage } from './components/QuizCenter/QuizCenterPage';
 import { CommunityPage } from './components/Community/CommunityPage';
 import { StudentProfilePage } from './components/StudentProfile/StudentProfilePage';
 import { StudentAuthModal } from './components/StudentProfile/StudentAuthModal';
+import { TrialExpiredLockModal } from './components/StudentProfile/TrialExpiredLockModal';
 import { OwnerDashboardPage } from './components/OwnerDashboard/OwnerDashboardPage';
 import { OwnerLoginModal } from './components/OwnerDashboard/OwnerLoginModal';
 import { LectureHallPage } from './components/LectureHall/LectureHallPage';
-import { getStoredUser, updateUserProfile, resetStoredUser } from './services/storage';
+import { getStoredUser, updateUserProfile, resetStoredUser, checkUserAccessStatus } from './services/storage';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { UserProfile, LabType, EngineeringBook } from './types';
-import { Cpu, ArrowRight, Home, GraduationCap, Bot, FileCheck2, Zap, Loader2 } from 'lucide-react';
+import { Cpu, ArrowRight, Home, GraduationCap, Bot, FileCheck2, Zap, Loader2, Clock } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -36,8 +37,10 @@ export default function App() {
     }
   });
   const [isSecretOwnerModalOpen, setIsSecretOwnerModalOpen] = useState<boolean>(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [authChecking, setAuthChecking] = useState<boolean>(true);
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+  const [hasSession, setHasSession] = useState<boolean>(false);
+  const [, setTick] = useState<number>(0);
 
   useEffect(() => {
     if (isDark) {
@@ -69,17 +72,17 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  // Strict Content Protection: Verify Supabase session + `profiles.is_subscribed === true`
+  // Auth Gate: Verify Supabase session + profiles (is_subscribed & trial_ends_at)
   const verifySupabaseSessionAndProfile = useCallback(async () => {
     const currentLocal = getStoredUser();
     if (currentLocal.role === 'owner') {
-      setIsAuthorized(true);
+      setHasSession(true);
       setAuthChecking(false);
       return;
     }
 
     if (!supabase || !isSupabaseConfigured) {
-      setIsAuthorized(false);
+      setHasSession(false);
       setAuthChecking(false);
       return;
     }
@@ -93,7 +96,7 @@ export default function App() {
       if (!session?.user) {
         const guest = resetStoredUser();
         setUser(guest);
-        setIsAuthorized(false);
+        setHasSession(false);
         return;
       }
 
@@ -103,13 +106,18 @@ export default function App() {
         .eq('id', session.user.id)
         .single();
 
-      if (error || !profile || profile.is_subscribed !== true) {
+      if (error || !profile) {
         await supabase.auth.signOut();
         const guest = resetStoredUser();
         setUser(guest);
-        setIsAuthorized(false);
+        setHasSession(false);
         return;
       }
+
+      const isSubscribed = profile.is_subscribed === true;
+      const trialEndsAt = profile.trial_ends_at || undefined;
+      const isTrialStillActive =
+        !isSubscribed && trialEndsAt && new Date(trialEndsAt).getTime() > Date.now();
 
       const syncedUser = updateUserProfile({
         id: session.user.id,
@@ -119,22 +127,29 @@ export default function App() {
         university: profile.university || currentLocal.university,
         level: profile.level || currentLocal.level,
         role: 'student',
-        isSubscribed: true,
-        subscription: {
-          status: 'active',
-          activatedAt: currentLocal.subscription?.activatedAt || new Date().toISOString(),
-          expiresAt:
-            currentLocal.subscription?.expiresAt ||
-            new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-          priceYER: 4000,
-          durationDays: 365,
-        },
+        isSubscribed,
+        subscription: isSubscribed
+          ? {
+              status: 'active',
+              activatedAt: currentLocal.subscription?.activatedAt || new Date().toISOString(),
+              expiresAt:
+                currentLocal.subscription?.expiresAt ||
+                new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+              priceYER: 4000,
+              durationDays: 365,
+            }
+          : {
+              status: isTrialStillActive ? 'trial' : 'trial_expired',
+              trialExpiresAt: trialEndsAt,
+              priceYER: 4000,
+              durationDays: 365,
+            },
       });
       setUser(syncedUser);
-      setIsAuthorized(true);
+      setHasSession(true);
     } catch (err) {
       console.error('Auth verification error:', err);
-      setIsAuthorized(false);
+      setHasSession(false);
     } finally {
       setAuthChecking(false);
     }
@@ -152,7 +167,7 @@ export default function App() {
         if (stored.role !== 'owner') {
           const guest = resetStoredUser();
           setUser(guest);
-          setIsAuthorized(false);
+          setHasSession(false);
         }
       }
     });
@@ -161,6 +176,19 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, [verifySupabaseSessionAndProfile]);
+
+  // Live timer tick for active 24h free trial countdown (updates hours & minutes + auto-locks on expiry)
+  useEffect(() => {
+    if (!hasSession || user.role === 'owner' || user.isSubscribed) return;
+
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 15000);
+
+    return () => clearInterval(timer);
+  }, [hasSession, user.role, user.isSubscribed]);
+
+  const accessInfo = checkUserAccessStatus(user);
 
   const handleNavTabChange = (targetTab: string) => {
     setCurrentTab(targetTab);
@@ -171,7 +199,7 @@ export default function App() {
     const updated = updateUserProfile({ role: newRole });
     setUser(updated);
     if (newRole === 'owner') {
-      setIsAuthorized(true);
+      setHasSession(true);
       setCurrentTab('owner');
     } else {
       setCurrentTab('home');
@@ -190,8 +218,9 @@ export default function App() {
 
   const handleAuthSuccess = (updatedUser: UserProfile) => {
     setUser(updatedUser);
-    setIsAuthorized(true);
+    setHasSession(true);
     setAuthChecking(false);
+    setIsUpgradeModalOpen(false);
     setCurrentTab('home');
   };
 
@@ -201,11 +230,12 @@ export default function App() {
     }
     const guest = resetStoredUser();
     setUser(guest);
-    setIsAuthorized(false);
+    setHasSession(false);
+    setIsUpgradeModalOpen(false);
     setCurrentTab('home');
   };
 
-  // Block ALL platform content while verifying auth/subscription status
+  // Loading state while verifying session & profiles
   if (authChecking) {
     return (
       <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 flex flex-col items-center justify-center p-6 gap-4">
@@ -217,8 +247,8 @@ export default function App() {
     );
   }
 
-  // Content Protection Wall: If not signed in OR `is_subscribed !== true` (and not owner), show ONLY login/signup screen
-  if (!isAuthorized && user.role !== 'owner') {
+  // Unauthenticated Guest -> Show ONLY Login / Sign Up screen
+  if (!hasSession && user.role !== 'owner') {
     return (
       <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 font-sans">
         <StudentAuthModal
@@ -239,7 +269,7 @@ export default function App() {
           onSuccess={() => {
             const updated = updateUserProfile({ role: 'owner' });
             setUser(updated);
-            setIsAuthorized(true);
+            setHasSession(true);
             setCurrentTab('owner');
             setIsSecretOwnerModalOpen(false);
             if (window.location.hash) {
@@ -251,8 +281,63 @@ export default function App() {
     );
   }
 
+  // Case 3 (Expired Trial): is_subscribed == false AND trial_ends_at expired -> Block ALL content & show lock modal
+  if (user.role !== 'owner' && !accessInfo.isAccessAllowed) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 font-sans">
+        <TrialExpiredLockModal
+          isOpen={true}
+          allowClose={false}
+          user={user}
+          onSuccess={handleAuthSuccess}
+          onSignOut={handleSignOut}
+        />
+
+        <OwnerLoginModal
+          isOpen={isSecretOwnerModalOpen}
+          onClose={() => {
+            setIsSecretOwnerModalOpen(false);
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }}
+          onSuccess={() => {
+            const updated = updateUserProfile({ role: 'owner' });
+            setUser(updated);
+            setHasSession(true);
+            setCurrentTab('owner');
+            setIsSecretOwnerModalOpen(false);
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Case 1 (Subscribed) or Case 2 (Active Trial)
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 flex flex-col font-sans selection:bg-[#0EA5E9] selection:text-white dark:selection:bg-cyan-500 dark:selection:text-black w-full max-w-full overflow-x-hidden relative transition-colors duration-200">
+      {/* Case 2: Yellow Free Trial Countdown Banner at Top */}
+      {user.role !== 'owner' && accessInfo.statusType === 'trial' && (
+        <div className="w-full bg-amber-300 dark:bg-amber-400 border-b border-amber-500/60 text-slate-950 px-3 sm:px-4 py-2 text-center text-xs sm:text-sm font-extrabold flex flex-wrap items-center justify-center gap-2 sm:gap-3 shadow-sm z-50">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-slate-900 shrink-0" />
+            <span>
+              متبقي لك {accessInfo.remainingTrialHours} ساعة و {accessInfo.remainingTrialMinutes} دقيقة من التجربة المجانية.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsUpgradeModalOpen(true)}
+            className="px-3 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-amber-300 text-xs font-black transition-all shadow cursor-pointer"
+          >
+            اشترك الآن!
+          </button>
+        </div>
+      )}
+
       {/* Top Bar Navigation */}
       <Header
         currentTab={currentTab}
@@ -265,7 +350,7 @@ export default function App() {
         onOwnerAuthSuccess={() => {
           const updated = updateUserProfile({ role: 'owner' });
           setUser(updated);
-          setIsAuthorized(true);
+          setHasSession(true);
           setCurrentTab('owner');
         }}
       />
@@ -403,6 +488,15 @@ export default function App() {
         </button>
       </nav>
 
+      {/* Voluntary Upgrade Modal from Yellow Trial Banner */}
+      <TrialExpiredLockModal
+        isOpen={isUpgradeModalOpen}
+        allowClose={true}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        user={user}
+        onSuccess={handleAuthSuccess}
+      />
+
       <OwnerLoginModal
         isOpen={isSecretOwnerModalOpen}
         onClose={() => {
@@ -414,7 +508,7 @@ export default function App() {
         onSuccess={() => {
           const updated = updateUserProfile({ role: 'owner' });
           setUser(updated);
-          setIsAuthorized(true);
+          setHasSession(true);
           setCurrentTab('owner');
           setIsSecretOwnerModalOpen(false);
           if (window.location.hash) {
