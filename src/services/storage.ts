@@ -311,27 +311,23 @@ const INITIAL_POSTS: CommunityPost[] = [
 ];
 
 const nowIso = new Date().toISOString();
-const trialExpiresIso = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
 const INITIAL_USER: UserProfile = {
-  id: 'usr_student_1',
+  id: 'usr_student_guest',
   name: 'طالب ميكاترونكس',
   email: 'student@mechatronics.dr-smart.edu',
   role: 'student',
   specialization: 'هندسة الميكاترونكس والروبوتات',
-  level: 'السنة الثالثة الجامعية',
-  points: 350,
-  completedQuizzesCount: 3,
-  savedExperimentsCount: 5,
-  createdProjectsCount: 1,
-  certificates: [
-    { title: 'شهادة إتمام دوائر الكهرباء والإلكترونيات ثلاثية الأبعاد', date: '2026-11-01', score: 95 }
-  ],
+  level: 'السنة الأولى',
+  isSubscribed: false,
+  points: 0,
+  completedQuizzesCount: 0,
+  savedExperimentsCount: 0,
+  createdProjectsCount: 0,
+  certificates: [],
   createdAt: nowIso,
   subscription: {
-    status: 'trial',
-    trialStartedAt: nowIso,
-    trialExpiresAt: trialExpiresIso,
+    status: 'inactive',
     priceYER: 4000,
     durationDays: 365,
   }
@@ -339,13 +335,24 @@ const INITIAL_USER: UserProfile = {
 
 export function checkUserAccessStatus(user: UserProfile): {
   isAccessAllowed: boolean;
-  statusType: 'owner' | 'active' | 'trial' | 'trial_expired' | 'expired';
+  statusType: 'owner' | 'active' | 'inactive' | 'expired';
   remainingTrialHours: number;
   remainingTrialMinutes: number;
   remainingTrialSec: number;
   formattedCountdown: string;
 } {
-  if (!user || user.role === 'owner') {
+  if (!user) {
+    return {
+      isAccessAllowed: false,
+      statusType: 'inactive',
+      remainingTrialHours: 0,
+      remainingTrialMinutes: 0,
+      remainingTrialSec: 0,
+      formattedCountdown: 'يتطلب اشتراكاً مفعلاً',
+    };
+  }
+
+  if (user.role === 'owner') {
     return {
       isAccessAllowed: true,
       statusType: 'owner',
@@ -356,7 +363,7 @@ export function checkUserAccessStatus(user: UserProfile): {
     };
   }
 
-  if (user.subscription?.status === 'active') {
+  if (user.subscription?.status === 'active' && user.isSubscribed === true) {
     return {
       isAccessAllowed: true,
       statusType: 'active',
@@ -367,61 +374,17 @@ export function checkUserAccessStatus(user: UserProfile): {
     };
   }
 
-  // Calculate 1-Day Trial Precision (24 Hours = 86,400 seconds starting at registration)
-  let trialExpiresAt = 0;
-  if (user.subscription?.trialExpiresAt) {
-    trialExpiresAt = new Date(user.subscription.trialExpiresAt).getTime();
-  } else if (user.createdAt) {
-    trialExpiresAt = new Date(user.createdAt).getTime() + 24 * 3600 * 1000;
-  } else {
-    trialExpiresAt = Date.now() + 24 * 3600 * 1000;
-  }
-
-  const diffMs = trialExpiresAt - Date.now();
-
-  if (diffMs > 0) {
-    const totalSec = Math.floor(diffMs / 1000);
-    const hours = Math.floor(totalSec / 3600);
-    const mins = Math.floor((totalSec % 3600) / 60);
-    const secs = totalSec % 60;
-    return {
-      isAccessAllowed: true,
-      statusType: 'trial',
-      remainingTrialHours: hours,
-      remainingTrialMinutes: Math.floor(totalSec / 60),
-      remainingTrialSec: totalSec,
-      formattedCountdown: `تجربة مجانية متبقية: ${hours} ساعة و ${mins} دقيقة و ${secs} ثانية`,
-    };
-  }
-
   return {
     isAccessAllowed: false,
-    statusType: 'trial_expired',
+    statusType: 'inactive',
     remainingTrialHours: 0,
     remainingTrialMinutes: 0,
     remainingTrialSec: 0,
-    formattedCountdown: 'انتهت التجربة المجانية (24 ساعة)',
+    formattedCountdown: 'يتطلب تفعيل الاشتراك بكود التفعيل',
   };
 }
 
 export async function syncServerSubscriptionStatus(user: UserProfile): Promise<UserProfile> {
-  try {
-    const res = await fetch('/api/subscriptions/check-access', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: user.email,
-        role: user.role,
-        subscription: user.subscription,
-      }),
-    });
-    const data = await res.json();
-    if (data.success && data.subscription) {
-      return updateUserProfile({ subscription: data.subscription });
-    }
-  } catch (e) {
-    console.error('Error syncing server subscription:', e);
-  }
   return user;
 }
 
@@ -564,59 +527,29 @@ export const savePost = (post: CommunityPost): CommunityPost[] => {
 export const getStoredUser = (): UserProfile => {
   const data = localStorage.getItem('dr_smart_user');
   if (!data) {
-    const freshUser: UserProfile = {
-      ...INITIAL_USER,
-      subscription: {
-        status: 'trial',
-        trialStartedAt: new Date().toISOString(),
-        trialExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-        priceYER: 4000,
-        durationDays: 365,
-      },
-    };
-    localStorage.setItem('dr_smart_user', JSON.stringify(freshUser));
-    return freshUser;
+    localStorage.setItem('dr_smart_user', JSON.stringify(INITIAL_USER));
+    return INITIAL_USER;
   }
   try {
     const user: UserProfile = JSON.parse(data);
-    // Ensure active trial provides a full fresh 24 hours from current visit
     if (user.subscription?.status === 'trial') {
-      const now = Date.now();
-      const currentExpiry = new Date(user.subscription.trialExpiresAt || 0).getTime();
-      // If remaining time is less than 12 hours or expired, grant a fresh 24-hour window
-      if (!user.subscription.trialExpiresAt || currentExpiry - now < 12 * 3600 * 1000) {
-        user.subscription.trialStartedAt = new Date().toISOString();
-        user.subscription.trialExpiresAt = new Date(now + 24 * 3600 * 1000).toISOString();
-        localStorage.setItem('dr_smart_user', JSON.stringify(user));
-      }
+      user.subscription = {
+        status: 'inactive',
+        priceYER: 4000,
+        durationDays: 365,
+      };
+      user.isSubscribed = false;
+      localStorage.setItem('dr_smart_user', JSON.stringify(user));
     }
     return user;
   } catch {
-    const fallbackUser: UserProfile = {
-      ...INITIAL_USER,
-      subscription: {
-        status: 'trial',
-        trialStartedAt: new Date().toISOString(),
-        trialExpiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-        priceYER: 4000,
-        durationDays: 365,
-      },
-    };
-    return fallbackUser;
+    return INITIAL_USER;
   }
 };
 
-export const renewFreeTrial = (): UserProfile => {
-  const now = Date.now();
-  return updateUserProfile({
-    subscription: {
-      status: 'trial',
-      trialStartedAt: new Date(now).toISOString(),
-      trialExpiresAt: new Date(now + 24 * 3600 * 1000).toISOString(),
-      priceYER: 4000,
-      durationDays: 365,
-    },
-  });
+export const resetStoredUser = (): UserProfile => {
+  localStorage.setItem('dr_smart_user', JSON.stringify(INITIAL_USER));
+  return INITIAL_USER;
 };
 
 export const updateUserProfile = (profile: Partial<UserProfile>): UserProfile => {

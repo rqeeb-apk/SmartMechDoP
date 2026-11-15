@@ -86,7 +86,7 @@ export const OwnerLoginModal: React.FC<OwnerLoginModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-slate-900/65 dark:bg-black/85 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-[120] overflow-y-auto overflow-x-hidden bg-slate-900/65 dark:bg-black/85 backdrop-blur-md animate-fade-in">
       <div className="min-h-full w-full flex items-center justify-center p-3 sm:p-6 text-center">
         <div className="relative w-full max-w-lg champagne-card dark:bg-[#0F213E] rounded-3xl p-5 sm:p-8 shadow-2xl text-[#0F172A] dark:text-slate-100 text-right overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
           

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User, Moon, Sun } from 'lucide-react';
+import { User, Moon, Sun, LogOut } from 'lucide-react';
 import { UserProfile } from '../types';
 import { OFFICIAL_LOGO_URL } from '../services/storage';
 import { OwnerLoginModal } from './OwnerDashboard/OwnerLoginModal';
@@ -13,6 +13,7 @@ interface HeaderProps {
   setIsDark: (dark: boolean) => void;
   onOwnerAuthSuccess?: () => void;
   onOpenAuthModal?: () => void;
+  onSignOut?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   setIsDark,
   onOwnerAuthSuccess,
   onOpenAuthModal,
+  onSignOut,
 }) => {
   const [logoClicks, setLogoClicks] = useState<number>(0);
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState<boolean>(false);
@@ -119,18 +121,30 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {user.role !== 'owner' && (
               <div className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[#FAF5E8] dark:bg-[#091830] border border-[rgba(212,175,55,0.45)] dark:border-amber-400/60 text-[#0F172A] dark:text-amber-300 text-[10px] sm:text-[11px] font-extrabold flex items-center gap-1 shadow-sm whitespace-nowrap">
-                <span className="text-xs">⏳</span>
-                <span>{user.subscription?.status === 'active' ? '365 يوم' : 'تجربة 24 ساعة'}</span>
+                <span className="text-xs">✅</span>
+                <span>اشتراك مفعل</span>
               </div>
             )}
 
             {user.role !== 'owner' && (
               <button
-                onClick={onOpenAuthModal}
+                onClick={() => setCurrentTab('profile')}
                 className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-gradient-to-r dark:from-amber-400 dark:to-yellow-500 dark:hover:from-amber-300 dark:hover:to-yellow-400 dark:text-slate-950 font-black text-[10px] sm:text-xs shadow-md shadow-sky-500/20 dark:shadow-amber-500/30 transition-all active:scale-95 whitespace-nowrap shrink-0"
               >
                 <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span>{user.email !== 'student@mechatronics.dr-smart.edu' ? (user.name.split(' ')[0] || user.name) : 'دخول / حساب'}</span>
+                <span>{user.name.split(' ')[0] || user.name}</span>
+              </button>
+            )}
+
+            {user.role !== 'owner' && onSignOut && (
+              <button
+                onClick={onSignOut}
+                title="تسجيل الخروج"
+                aria-label="تسجيل الخروج"
+                className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/15 dark:hover:bg-rose-500/25 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-[10px] sm:text-xs font-bold transition-all shrink-0"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">خروج</span>
               </button>
             )}
 
@@ -174,11 +188,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={tab.id}
                     onClick={() => {
-                      if (tab.id === 'profile' && user.email === 'student@mechatronics.dr-smart.edu') {
-                        if (onOpenAuthModal) onOpenAuthModal();
-                      } else {
-                        setCurrentTab(tab.id);
-                      }
+                      setCurrentTab(tab.id);
                     }}
                     className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-black whitespace-nowrap transition-all shadow-sm shrink-0 ${
                       isActive

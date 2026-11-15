@@ -13,6 +13,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
   const [name, setName] = useState(user.name);
   const [specialization, setSpecialization] = useState(user.specialization);
   const [level, setLevel] = useState(user.level);
+  const [redeemNotice, setRedeemNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +48,10 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
               </button>
             </div>
 
-            <p className="text-xs text-[#475569] dark:text-slate-300">{user.specialization} · {user.level}</p>
+            <p className="text-xs text-[#475569] dark:text-slate-300">
+              {user.university ? `${user.university} · ` : ''}{user.level} · {user.specialization}
+              {user.phone ? ` · ${user.phone}` : ''}
+            </p>
           </div>
         </div>
 
@@ -157,10 +161,23 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
           </div>
         )}
 
+        {redeemNotice && (
+          <div
+            className={`p-3 rounded-xl text-xs font-bold border ${
+              redeemNotice.type === 'success'
+                ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                : 'bg-rose-50 dark:bg-rose-500/15 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300'
+            }`}
+          >
+            {redeemNotice.text}
+          </div>
+        )}
+
         {/* Redemption Input Form */}
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            setRedeemNotice(null);
             const inputEl = e.currentTarget.elements.namedItem('redemptionCode') as HTMLInputElement;
             const codeVal = inputEl ? inputEl.value : '';
             if (!codeVal) return;
@@ -177,18 +194,19 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
               });
               const data = await res.json();
               if (!res.ok || !data.success) {
-                alert(data.error || 'فشلت عملية التفعيل');
+                setRedeemNotice({ type: 'error', text: data.error || 'فشلت عملية التفعيل' });
                 return;
               }
 
-              alert(data.message || 'تم تفعيل الاشتراك السنوي بنجاح!');
+              setRedeemNotice({ type: 'success', text: data.message || 'تم تفعيل الاشتراك السنوي بنجاح!' });
               const updated = updateUserProfile({
+                isSubscribed: true,
                 subscription: data.subscription,
               });
               setUser(updated);
               inputEl.value = '';
             } catch (err: any) {
-              alert('حدث خطأ أثناء تفعيل الكود');
+              setRedeemNotice({ type: 'error', text: 'حدث خطأ أثناء تفعيل الكود' });
             }
           }}
           className="flex flex-col sm:flex-row items-center gap-3 pt-2"

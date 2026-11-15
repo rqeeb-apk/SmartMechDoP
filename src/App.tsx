@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { HomePage } from './components/HomePage';
 import { DoctorHallPage } from './components/DoctorHall/DoctorHallPage';
@@ -16,13 +16,13 @@ import { QuizCenterPage } from './components/QuizCenter/QuizCenterPage';
 import { CommunityPage } from './components/Community/CommunityPage';
 import { StudentProfilePage } from './components/StudentProfile/StudentProfilePage';
 import { StudentAuthModal } from './components/StudentProfile/StudentAuthModal';
-import { TrialExpiredLockModal } from './components/StudentProfile/TrialExpiredLockModal';
 import { OwnerDashboardPage } from './components/OwnerDashboard/OwnerDashboardPage';
 import { OwnerLoginModal } from './components/OwnerDashboard/OwnerLoginModal';
 import { LectureHallPage } from './components/LectureHall/LectureHallPage';
-import { getStoredUser, updateUserProfile, checkUserAccessStatus, syncServerSubscriptionStatus } from './services/storage';
+import { getStoredUser, updateUserProfile, resetStoredUser } from './services/storage';
+import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { UserProfile, LabType, EngineeringBook } from './types';
-import { Cpu, Clock, ArrowRight, Home, GraduationCap, Bot, FileCheck2, Zap } from 'lucide-react';
+import { Cpu, ArrowRight, Home, GraduationCap, Bot, FileCheck2, Zap, Loader2 } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('home');
@@ -35,9 +35,9 @@ export default function App() {
       return false;
     }
   });
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isSecretOwnerModalOpen, setIsSecretOwnerModalOpen] = useState<boolean>(false);
-  const [, setTick] = useState<number>(0);
+  const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
 
   useEffect(() => {
     if (isDark) {
@@ -69,25 +69,98 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  // Sync user subscription state with server-side middleware on startup
-  useEffect(() => {
-    syncServerSubscriptionStatus(user).then((synced: UserProfile) => {
-      setUser(synced);
-    });
+  // Strict Content Protection: Verify Supabase session + `profiles.is_subscribed === true`
+  const verifySupabaseSessionAndProfile = useCallback(async () => {
+    const currentLocal = getStoredUser();
+    if (currentLocal.role === 'owner') {
+      setIsAuthorized(true);
+      setAuthChecking(false);
+      return;
+    }
+
+    if (!supabase || !isSupabaseConfigured) {
+      setIsAuthorized(false);
+      setAuthChecking(false);
+      return;
+    }
+
+    setAuthChecking(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        const guest = resetStoredUser();
+        setUser(guest);
+        setIsAuthorized(false);
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error || !profile || profile.is_subscribed !== true) {
+        await supabase.auth.signOut();
+        const guest = resetStoredUser();
+        setUser(guest);
+        setIsAuthorized(false);
+        return;
+      }
+
+      const syncedUser = updateUserProfile({
+        id: session.user.id,
+        name: profile.full_name || currentLocal.name || 'طالب ميكاترونكس',
+        email: session.user.email || currentLocal.email,
+        phone: profile.phone || currentLocal.phone,
+        university: profile.university || currentLocal.university,
+        level: profile.level || currentLocal.level,
+        role: 'student',
+        isSubscribed: true,
+        subscription: {
+          status: 'active',
+          activatedAt: currentLocal.subscription?.activatedAt || new Date().toISOString(),
+          expiresAt:
+            currentLocal.subscription?.expiresAt ||
+            new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+          priceYER: 4000,
+          durationDays: 365,
+        },
+      });
+      setUser(syncedUser);
+      setIsAuthorized(true);
+    } catch (err) {
+      console.error('Auth verification error:', err);
+      setIsAuthorized(false);
+    } finally {
+      setAuthChecking(false);
+    }
   }, []);
 
-  // Real-time countdown tick for trial timer
   useEffect(() => {
-    if (user.role === 'owner' || user.subscription?.status === 'active') return;
+    verifySupabaseSessionAndProfile();
 
-    const timer = setInterval(() => {
-      setTick((t) => t + 1);
-    }, 1000);
+    if (!supabase) return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        const stored = getStoredUser();
+        if (stored.role !== 'owner') {
+          const guest = resetStoredUser();
+          setUser(guest);
+          setIsAuthorized(false);
+        }
+      }
+    });
 
-    return () => clearInterval(timer);
-  }, [user]);
-
-  const accessInfo = checkUserAccessStatus(user);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [verifySupabaseSessionAndProfile]);
 
   const handleNavTabChange = (targetTab: string) => {
     setCurrentTab(targetTab);
@@ -97,7 +170,13 @@ export default function App() {
     const newRole = user.role === 'owner' ? 'student' : 'owner';
     const updated = updateUserProfile({ role: newRole });
     setUser(updated);
-    setCurrentTab(newRole === 'owner' ? 'owner' : 'home');
+    if (newRole === 'owner') {
+      setIsAuthorized(true);
+      setCurrentTab('owner');
+    } else {
+      setCurrentTab('home');
+      verifySupabaseSessionAndProfile();
+    }
   };
 
   const handleSelectLab = (labId: string) => {
@@ -111,8 +190,66 @@ export default function App() {
 
   const handleAuthSuccess = (updatedUser: UserProfile) => {
     setUser(updatedUser);
-    setIsAuthModalOpen(false);
+    setIsAuthorized(true);
+    setAuthChecking(false);
+    setCurrentTab('home');
   };
+
+  const handleSignOut = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    const guest = resetStoredUser();
+    setUser(guest);
+    setIsAuthorized(false);
+    setCurrentTab('home');
+  };
+
+  // Block ALL platform content while verifying auth/subscription status
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 flex flex-col items-center justify-center p-6 gap-4">
+        <Loader2 className="w-10 h-10 text-[#0EA5E9] dark:text-amber-400 animate-spin" />
+        <p className="text-sm font-bold text-[#475569] dark:text-slate-300">
+          جاري التحقق من حالة الاشتراك...
+        </p>
+      </div>
+    );
+  }
+
+  // Content Protection Wall: If not signed in OR `is_subscribed !== true` (and not owner), show ONLY login/signup screen
+  if (!isAuthorized && user.role !== 'owner') {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 font-sans">
+        <StudentAuthModal
+          isOpen={true}
+          allowClose={false}
+          onSuccess={handleAuthSuccess}
+          onOpenOwnerPortal={() => setIsSecretOwnerModalOpen(true)}
+        />
+
+        <OwnerLoginModal
+          isOpen={isSecretOwnerModalOpen}
+          onClose={() => {
+            setIsSecretOwnerModalOpen(false);
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }}
+          onSuccess={() => {
+            const updated = updateUserProfile({ role: 'owner' });
+            setUser(updated);
+            setIsAuthorized(true);
+            setCurrentTab('owner');
+            setIsSecretOwnerModalOpen(false);
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A192F] text-[#0F172A] dark:text-slate-100 flex flex-col font-sans selection:bg-[#0EA5E9] selection:text-white dark:selection:bg-cyan-500 dark:selection:text-black w-full max-w-full overflow-x-hidden relative transition-colors duration-200">
@@ -124,29 +261,14 @@ export default function App() {
         toggleRole={toggleRole}
         isDark={isDark}
         setIsDark={setIsDark}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onSignOut={handleSignOut}
         onOwnerAuthSuccess={() => {
           const updated = updateUserProfile({ role: 'owner' });
           setUser(updated);
+          setIsAuthorized(true);
           setCurrentTab('owner');
         }}
       />
-
-      {/* Trial Banner */}
-      {user.role !== 'owner' && accessInfo.statusType === 'trial' && (
-        <div className="bg-[#FAF5E8] dark:bg-gradient-to-r dark:from-amber-600 dark:via-amber-500 dark:to-orange-600 border-b border-[rgba(212,175,55,0.35)] dark:border-amber-400/40 text-[#0F172A] dark:text-slate-950 px-2 sm:px-4 py-1.5 sm:py-2 text-center text-[11px] sm:text-xs font-bold flex flex-wrap items-center justify-center gap-2 sm:gap-3 shadow-sm w-full max-w-full overflow-hidden">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Clock className="w-3.5 h-3.5 text-[#0EA5E9] dark:text-slate-950 animate-spin shrink-0" />
-            <span className="truncate">منصة دكتور الميكاترونكس الذكي · {accessInfo.formattedCountdown}</span>
-          </div>
-          <button
-            onClick={() => setIsAuthModalOpen(true)}
-            className="px-2.5 py-0.5 sm:py-1 rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-slate-950 dark:text-amber-400 dark:hover:bg-slate-900 text-[10px] sm:text-[11px] font-bold transition-all shadow shrink-0"
-          >
-            تفعيل الاشتراك السنوي بالكود (365 يوم)
-          </button>
-        </div>
-      )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-4 lg:px-6 py-3 sm:py-4 min-w-0 overflow-x-hidden">
@@ -281,20 +403,6 @@ export default function App() {
         </button>
       </nav>
 
-      <StudentAuthModal
-        isOpen={isAuthModalOpen}
-        onSuccess={handleAuthSuccess}
-        onClose={() => setIsAuthModalOpen(false)}
-        allowClose={true}
-      />
-
-      <TrialExpiredLockModal
-        isOpen={!accessInfo.isAccessAllowed && user.role !== 'owner'}
-        user={user}
-        onSuccess={handleAuthSuccess}
-        onGoHome={() => setCurrentTab('home')}
-      />
-
       <OwnerLoginModal
         isOpen={isSecretOwnerModalOpen}
         onClose={() => {
@@ -306,6 +414,7 @@ export default function App() {
         onSuccess={() => {
           const updated = updateUserProfile({ role: 'owner' });
           setUser(updated);
+          setIsAuthorized(true);
           setCurrentTab('owner');
           setIsSecretOwnerModalOpen(false);
           if (window.location.hash) {

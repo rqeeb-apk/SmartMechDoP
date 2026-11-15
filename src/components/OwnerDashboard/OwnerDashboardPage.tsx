@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldAlert, Users, BookOpen, Layers, Cpu, Key, Database, Download, Upload,
   Activity, CheckCircle, Trash2, Plus, Copy, Search, RefreshCw, Printer, AlertTriangle,
   CreditCard, DollarSign, Settings, Sliders, Lock, Zap, Eye, BarChart3, Bot, Check, FileText
 } from 'lucide-react';
 import { getStoredDoctors, getStoredBooks, getStoredProjects, OFFICIAL_LOGO_URL } from '../../services/storage';
-import { ActivationCode, SecurityLog } from '../../types';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { SecurityLog, SupabaseActivationCode } from '../../types';
 
 export const OwnerDashboardPage: React.FC = () => {
   const doctors = getStoredDoctors();
@@ -16,36 +17,22 @@ export const OwnerDashboardPage: React.FC = () => {
     'overview' | 'students' | 'pricing' | 'codes' | 'doctors' | 'content' | 'labs3d' | 'ai_quota' | 'avatar' | 'logs' | 'system' | 'finance'
   >('overview');
 
-  // Codes state from server
-  const [codes, setCodes] = useState<ActivationCode[]>([]);
-  const [stats, setStats] = useState<{
-    totalCount: number;
-    unusedCount: number;
-    activeCount: number;
-    expiredCount: number;
-    revokedCount: number;
-    pricePerYearYER: number;
-    totalRevenueYER: number;
-    totalPotentialRevenueYER: number;
-  }>({
-    totalCount: 300,
-    unusedCount: 300,
-    activeCount: 0,
-    expiredCount: 0,
-    revokedCount: 0,
-    pricePerYearYER: 4000,
-    totalRevenueYER: 0,
-    totalPotentialRevenueYER: 1200000,
-  });
-
-  const [codeFilter, setCodeFilter] = useState<'all' | 'unused' | 'active' | 'expired' | 'revoked'>('all');
+  // Activation codes state from Supabase (`activation_codes` table)
+  const [codes, setCodes] = useState<SupabaseActivationCode[]>([]);
+  const [codeFilter, setCodeFilter] = useState<'all' | 'unused' | 'used'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingCodes, setLoadingCodes] = useState(false);
+  const [codesError, setCodesError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [batchCopied, setBatchCopied] = useState(false);
+  const [pendingActionCode, setPendingActionCode] = useState<SupabaseActivationCode | null>(null);
+  const [updatingCodeId, setUpdatingCodeId] = useState<number | string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Security logs state
   const [logs, setLogs] = useState<SecurityLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Platform Config
   const [yearlyPrice, setYearlyPrice] = useState(4000);
@@ -54,23 +41,43 @@ export const OwnerDashboardPage: React.FC = () => {
   const [aiModel, setAiModel] = useState('gemini-3.8-flash');
   const [aiFallback, setAiFallback] = useState('gemini-3.1-flash-lite');
 
-  const fetchCodes = async () => {
+  const fetchActivationCodes = async () => {
+    if (!supabase || !isSupabaseConfigured) {
+      setCodes([]);
+      setCodesError(
+        'لم يتم إعداد مفاتيح Supabase في البيئة (VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY). أضف مفاتيح مشروعك لعرض الأكواد الحية.'
+      );
+      return;
+    }
+
     setLoadingCodes(true);
+    setCodesError(null);
     try {
-      const res = await fetch(`/api/owner/codes?status=${codeFilter}&search=${encodeURIComponent(searchQuery)}`);
-      const data = await res.json();
-      if (data.success) {
-        setCodes(data.codes);
-        if (data.stats) setStats(data.stats);
+      const { data, error } = await supabase
+        .from('activation_codes')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (error) {
+        throw error;
       }
-    } catch (e) {
-      console.error('Error fetching codes:', e);
+
+      setCodes((data as SupabaseActivationCode[]) || []);
+      setLastUpdatedAt(new Date().toISOString());
+    } catch (e: any) {
+      console.error('Error fetching activation_codes from Supabase:', e);
+      setCodesError(
+        e?.message
+          ? `فشل جلب الأكواد من Supabase: ${e.message}`
+          : 'فشل جلب الأكواد من Supabase. تأكد من صلاحيات الجدول (RLS) واتصالك بالإنترنت.'
+      );
     } finally {
       setLoadingCodes(false);
     }
   };
 
   const fetchLogs = async () => {
+    setLoadingLogs(true);
     try {
       const res = await fetch('/api/owner/logs');
       const data = await res.json();
@@ -79,13 +86,54 @@ export const OwnerDashboardPage: React.FC = () => {
       }
     } catch (e) {
       console.error('Error fetching logs:', e);
+    } finally {
+      setLoadingLogs(false);
     }
   };
 
   useEffect(() => {
-    fetchCodes();
+    fetchActivationCodes();
     fetchLogs();
-  }, [codeFilter, searchQuery]);
+  }, []);
+
+  // Compute real-time statistics dynamically from Supabase data (no hardcoded totals)
+  const stats = useMemo(() => {
+    const totalCount = codes.length;
+    const usedCount = codes.filter((c) => Boolean(c.is_used)).length;
+    const unusedCount = totalCount - usedCount;
+    const totalRevenueYER = usedCount * yearlyPrice;
+    const unusedValueYER = unusedCount * yearlyPrice;
+    const totalPotentialRevenueYER = totalCount * yearlyPrice;
+
+    return {
+      totalCount,
+      unusedCount,
+      usedCount,
+      pricePerYearYER: yearlyPrice,
+      totalRevenueYER,
+      unusedValueYER,
+      totalPotentialRevenueYER,
+    };
+  }, [codes, yearlyPrice]);
+
+  // Filtered codes for table view
+  const filteredCodes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return codes.filter((item) => {
+      const isUsed = Boolean(item.is_used);
+      if (codeFilter === 'unused' && isUsed) return false;
+      if (codeFilter === 'used' && !isUsed) return false;
+
+      if (!q) return true;
+      const codeStr = String(item.code || '').toLowerCase();
+      const idStr = String(item.id || '').toLowerCase();
+      const studentStr = String(item.student_name || item.used_by || item.student_email || '').toLowerCase();
+      return codeStr.includes(q) || idStr.includes(q) || studentStr.includes(q);
+    });
+  }, [codes, codeFilter, searchQuery]);
+
+  const firstCodeLabel = codes.length > 0 ? codes[0].code : null;
+  const lastCodeLabel = codes.length > 0 ? codes[codes.length - 1].code : null;
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -94,20 +142,30 @@ export const OwnerDashboardPage: React.FC = () => {
   };
 
   const handleBatchCopyUnused = () => {
-    const unusedList = codes.filter((c) => c.status === 'unused').map((c) => c.code).join('\n');
+    const unusedList = codes.filter((c) => !c.is_used).map((c) => c.code).join('\n');
+    if (!unusedList) {
+      setActionMessage({ type: 'error', text: 'لا توجد أكواد غير مستخدمة للنسخ حالياً.' });
+      setTimeout(() => setActionMessage(null), 3000);
+      return;
+    }
     navigator.clipboard.writeText(unusedList);
     setBatchCopied(true);
     setTimeout(() => setBatchCopied(false), 2500);
   };
 
   const handleExportCSV = () => {
+    if (codes.length === 0) {
+      setActionMessage({ type: 'error', text: 'لا توجد أكواد متاحة للتصدير.' });
+      setTimeout(() => setActionMessage(null), 3000);
+      return;
+    }
     const csvContent =
       'data:text/csv;charset=utf-8,' +
-      ['الكود,الحالة,السعر,المدة_بالأيام,اسم_الطالب,تاريخ_التفعيل,تاريخ_الانتهاء']
+      ['ID,الكود,الحالة,مستخدم_is_used,اسم_الطالب,تاريخ_الإنشاء']
         .concat(
           codes.map(
             (c) =>
-              `${c.code},${c.status},${c.priceYER},${c.durationDays},${c.redeemedBy?.studentName || ''},${c.redeemedAt || ''},${c.expiresAt || ''}`
+              `${c.id},${c.code},${c.is_used ? 'مستخدم' : 'غير مستخدم'},${Boolean(c.is_used)},${c.student_name || c.used_by || ''},${c.created_at || ''}`
           )
         )
         .join('\n');
@@ -121,39 +179,35 @@ export const OwnerDashboardPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleRevokeCode = async (code: string) => {
-    if (!confirm(`هل أنت تأكد من إلغاء كود الاشتراك (${code})؟`)) return;
+  const handleConfirmToggleUsage = async (row: SupabaseActivationCode) => {
+    if (!supabase) return;
+    setUpdatingCodeId(row.id);
+    setActionMessage(null);
+    const nextIsUsed = !Boolean(row.is_used);
     try {
-      const res = await fetch('/api/owner/codes/revoke', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        fetchCodes();
-        fetchLogs();
-      }
-    } catch (e) {
-      alert('فشل إلغاء الكود');
-    }
-  };
+      const { error } = await supabase
+        .from('activation_codes')
+        .update({ is_used: nextIsUsed })
+        .eq('id', row.id);
 
-  const handleResetCode = async (code: string) => {
-    if (!confirm(`هل تريد إعادة الكود (${code}) إلى وضع غير مستخدم؟`)) return;
-    try {
-      const res = await fetch('/api/owner/codes/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+      if (error) throw error;
+
+      setCodes((prev) =>
+        prev.map((item) => (item.id === row.id ? { ...item, is_used: nextIsUsed } : item))
+      );
+      setActionMessage({
+        type: 'success',
+        text: `تم تحديث حالة الكود (${row.code}) إلى "${nextIsUsed ? 'مستخدم' : 'غير مستخدم'}" في Supabase.`,
       });
-      const data = await res.json();
-      if (data.success) {
-        fetchCodes();
-        fetchLogs();
-      }
-    } catch (e) {
-      alert('فشل إعادة ضبط الكود');
+      setPendingActionCode(null);
+    } catch (e: any) {
+      setActionMessage({
+        type: 'error',
+        text: e?.message ? `تعذر تحديث الكود: ${e.message}` : 'تعذر تحديث حالة الكود في Supabase.',
+      });
+    } finally {
+      setUpdatingCodeId(null);
+      setTimeout(() => setActionMessage(null), 4000);
     }
   };
 
@@ -161,7 +215,7 @@ export const OwnerDashboardPage: React.FC = () => {
     { id: 'overview', label: '1. النظرة العامة', icon: BarChart3 },
     { id: 'students', label: '2. إدارة الطلاب', icon: Users },
     { id: 'pricing', label: '3. الأسعار والاشتراكات', icon: DollarSign },
-    { id: 'codes', label: '4. إدارة 300 كود', icon: Key },
+    { id: 'codes', label: `4. إدارة الأكواد (${stats.totalCount})`, icon: Key },
     { id: 'doctors', label: '5. الدكاترة الافتراضيون', icon: Bot },
     { id: 'content', label: '6. المحتوى والكتب', icon: BookOpen },
     { id: 'labs3d', label: '7. المختبر 3D', icon: Layers },
@@ -187,11 +241,11 @@ export const OwnerDashboardPage: React.FC = () => {
                 لوحة مالك منصة الدكتور الذكي (Owner Console)
               </h1>
               <span className="bg-[#E0F2FE] dark:bg-amber-500/20 text-[#0284C7] dark:text-amber-300 text-[10px] font-mono font-bold px-2.5 py-1 rounded-md border border-[#0EA5E9]/30 dark:border-amber-500/40">
-                VERIFIED SERVER BACKEND
+                SUPABASE LIVE SYNC
               </span>
             </div>
             <p className="text-xs text-[#475569] dark:text-slate-400 mt-1">
-              إدارة شاملة لـ 300 كود تفعيل، الاشتراكات السنوية (4000 ريال يمني/365 يوماً)، سجل الأمان ومحرك الذكاء الاصطناعي
+              إدارة حية لـ {stats.totalCount} كود تفعيل من قاعدة بيانات Supabase، الاشتراكات السنوية ({yearlyPrice.toLocaleString()} ريال يمني/365 يوماً)، وسجل الأمان
             </p>
           </div>
         </div>
@@ -239,23 +293,54 @@ export const OwnerDashboardPage: React.FC = () => {
       {/* SECTION 1: OVERVIEW & METRICS */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs text-[#475569] dark:text-slate-400 font-medium">
+              {lastUpdatedAt
+                ? `آخر مزامنة من Supabase: ${new Date(lastUpdatedAt).toLocaleTimeString('ar-EG')}`
+                : 'مزامنة مباشرة مع جدول activation_codes في Supabase'}
+            </div>
+            <button
+              onClick={fetchActivationCodes}
+              disabled={loadingCodes}
+              className="px-3.5 py-2 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] disabled:opacity-60 text-white text-xs font-bold flex items-center gap-2 transition-colors shadow-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingCodes ? 'animate-spin' : ''}`} />
+              <span>{loadingCodes ? 'جاري التحديث...' : 'تحديث'}</span>
+            </button>
+          </div>
+
+          {codesError && (
+            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{codesError}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="champagne-card dark:border-amber-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">إجمالي أكواد التفعيل المصدرة</span>
-              <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400">{stats.totalCount} كود</div>
-              <p className="text-[11px] text-[#475569] dark:text-slate-400">من DR-248G3C7X إلى DR-ZX2N4K8L</p>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الكل (إجمالي الأكواد)</span>
+              <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400">
+                {loadingCodes ? '...' : `${stats.totalCount} كود`}
+              </div>
+              <p className="text-[11px] text-[#475569] dark:text-slate-400 font-mono truncate">
+                {firstCodeLabel && lastCodeLabel ? `${firstCodeLabel} — ${lastCodeLabel}` : 'جدول activation_codes'}
+              </p>
             </div>
 
             <div className="champagne-card dark:border-cyan-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الأكواد غير المستخدمة</span>
-              <div className="text-3xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">{stats.unusedCount} كود</div>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">غير مستخدم</span>
+              <div className="text-3xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">
+                {loadingCodes ? '...' : `${stats.unusedCount} كود`}
+              </div>
               <p className="text-[11px] text-[#0284C7] dark:text-cyan-300/80">جاهزة للتوزيع والتفعيل</p>
             </div>
 
             <div className="champagne-card dark:border-emerald-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الاشتراكات المفعلة والمحصلة</span>
-              <div className="text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">{stats.activeCount} طالب</div>
-              <p className="text-[11px] text-emerald-700 dark:text-emerald-300">سارية لمدة 365 يومًا</p>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">مستخدم (المفعلة)</span>
+              <div className="text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
+                {loadingCodes ? '...' : `${stats.usedCount} كود`}
+              </div>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300">أكواد تم استخدامها فعلياً</p>
             </div>
 
             <div className="champagne-card dark:border-purple-500/30 p-5 rounded-2xl space-y-2">
@@ -263,7 +348,7 @@ export const OwnerDashboardPage: React.FC = () => {
               <div className="text-3xl font-extrabold font-mono text-purple-700 dark:text-purple-300">
                 {stats.totalRevenueYER.toLocaleString()} YER
               </div>
-              <p className="text-[11px] text-[#475569] dark:text-slate-400">سعر الاشتراك السنوي: 4000 ريال yemen</p>
+              <p className="text-[11px] text-[#475569] dark:text-slate-400">سعر الاشتراك السنوي: {yearlyPrice.toLocaleString()} ريال يمني</p>
             </div>
           </div>
 
@@ -336,34 +421,35 @@ export const OwnerDashboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/60 font-mono">
-                {codes.filter((c) => c.status === 'active').length === 0 ? (
+                {codes.filter((c) => Boolean(c.is_used)).length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
-                      لا يوجد طلاب مفعلين حالياً. قم بتسليم الأكواد غير المستخدمة للطلاب لتفعيل اشتراكاتهم.
+                      لا توجد أكواد مستخدمة حالياً في قاعدة البيانات.
                     </td>
                   </tr>
                 ) : (
                   codes
-                    .filter((c) => c.status === 'active')
+                    .filter((c) => Boolean(c.is_used))
                     .map((c) => (
-                      <tr key={c.code} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-900/50">
-                        <td className="py-3 px-3 font-sans font-bold text-[#0F172A] dark:text-white">{c.redeemedBy?.studentName || 'طالب ميكاترونكس'}</td>
-                        <td className="py-3 px-3 text-[#0284C7] dark:text-cyan-300">{c.redeemedBy?.studentEmail || 'student@dr-smart.edu'}</td>
+                      <tr key={String(c.id)} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-900/50">
+                        <td className="py-3 px-3 font-sans font-bold text-[#0F172A] dark:text-white">{c.student_name || c.used_by || 'طالب ميكاترونكس'}</td>
+                        <td className="py-3 px-3 text-[#0284C7] dark:text-cyan-300">{c.student_email || '-'}</td>
                         <td className="py-3 px-3 font-bold text-amber-600 dark:text-amber-400">{c.code}</td>
                         <td className="py-3 px-3">
                           <span className="px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
-                            نشط (365 يوم)
+                            مستخدم
                           </span>
                         </td>
                         <td className="py-3 px-3 text-[#475569] dark:text-slate-400">
-                          {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString('ar-EG') : '365 يوم'}
+                          {c.expires_at ? new Date(c.expires_at).toLocaleDateString('ar-EG') : `${c.duration_days || 365} يوم`}
                         </td>
                         <td className="py-3 px-3">
                           <button
-                            onClick={() => handleResetCode(c.code)}
-                            className="px-2 py-1 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 text-[10px] transition-colors"
+                            onClick={() => handleConfirmToggleUsage(c)}
+                            disabled={updatingCodeId === c.id}
+                            className="px-2 py-1 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 text-[10px] transition-colors disabled:opacity-50"
                           >
-                            إلغاء التفعيل
+                            إعادة لغير مستخدم
                           </button>
                         </td>
                       </tr>
@@ -414,27 +500,38 @@ export const OwnerDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* SECTION 4: 300 ACTIVATION CODES MANAGER */}
+      {/* SECTION 4: SUPABASE ACTIVATION CODES MANAGER */}
       {activeTab === 'codes' && (
         <div className="champagne-card dark:border-amber-500/30 p-6 rounded-2xl space-y-6 shadow-xl">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.25)] dark:border-amber-500/20 pb-4">
             <div>
               <h3 className="text-lg font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
                 <Key className="w-5 h-5 text-[#0EA5E9] dark:text-amber-400" />
-                <span>إدارة وحفظ 300 كود تفعيل للأنظمة السنوية</span>
+                <span>إدارة أكواد التفعيل من Supabase ({stats.totalCount} كود)</span>
               </h3>
               <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
-                قيمة الكود: 4000 ريال يمني | صلاحية: 365 يوماً | الكود الأول: DR-248G3C7X - الكود الأخير: DR-ZX2N4K8L
+                {firstCodeLabel && lastCodeLabel
+                  ? `عرض مباشر من جدول activation_codes | أول كود: ${firstCodeLabel} | آخر كود: ${lastCodeLabel}`
+                  : 'عرض مباشر من جدول activation_codes في قاعدة بيانات Supabase'}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <button
+                onClick={fetchActivationCodes}
+                disabled={loadingCodes}
+                className="px-3.5 py-2 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] disabled:opacity-60 text-white text-xs font-bold flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingCodes ? 'animate-spin' : ''}`} />
+                <span>{loadingCodes ? 'جاري التحديث...' : 'تحديث'}</span>
+              </button>
+
+              <button
                 onClick={handleBatchCopyUnused}
-                className="px-3 py-2 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-cyan-500/20 dark:border dark:border-cyan-500/40 dark:text-cyan-300 dark:hover:bg-cyan-500/30 text-xs font-bold flex items-center gap-2 transition-colors"
+                className="px-3 py-2 rounded-xl bg-[#E0F2FE] hover:bg-[#BAE6FD] text-[#0284C7] dark:bg-cyan-500/20 dark:border dark:border-cyan-500/40 dark:text-cyan-300 dark:hover:bg-cyan-500/30 text-xs font-bold flex items-center gap-2 transition-colors"
               >
                 <Copy className="w-4 h-4" />
-                <span>{batchCopied ? 'تم نسخ الأكواد!' : 'نسخ الأكواد غير المستخدمة'}</span>
+                <span>{batchCopied ? 'تم نسخ الأكواد!' : 'نسخ غير المستخدم'}</span>
               </button>
 
               <button
@@ -455,6 +552,69 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Live Dynamic Summary Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="champagne-subcard p-4 rounded-xl flex items-center justify-between">
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-300">الكل</span>
+              <span className="text-xl font-extrabold font-mono text-[#0F172A] dark:text-amber-400">{stats.totalCount}</span>
+            </div>
+            <div className="champagne-subcard p-4 rounded-xl flex items-center justify-between">
+              <span className="text-xs font-bold text-[#0284C7] dark:text-cyan-300">غير مستخدم</span>
+              <span className="text-xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">{stats.unusedCount}</span>
+            </div>
+            <div className="champagne-subcard p-4 rounded-xl flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">مستخدم</span>
+              <span className="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">{stats.usedCount}</span>
+            </div>
+          </div>
+
+          {/* Feedback / Error / Inline Confirmation Banners */}
+          {codesError && (
+            <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{codesError}</span>
+            </div>
+          )}
+
+          {actionMessage && (
+            <div
+              className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border ${
+                actionMessage.type === 'success'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-300'
+              }`}
+            >
+              <span>{actionMessage.text}</span>
+              <button onClick={() => setActionMessage(null)} className="text-[11px] underline">
+                إغلاق
+              </button>
+            </div>
+          )}
+
+          {pendingActionCode && (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span>
+                هل تريد تغيير حالة الكود <strong className="font-mono">{pendingActionCode.code}</strong> إلى{' '}
+                <strong>{pendingActionCode.is_used ? 'غير مستخدم' : 'مستخدم'}</strong>؟
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleConfirmToggleUsage(pendingActionCode)}
+                  disabled={updatingCodeId === pendingActionCode.id}
+                  className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold transition-colors disabled:opacity-50"
+                >
+                  {updatingCodeId === pendingActionCode.id ? 'جاري الحفظ...' : 'تأكيد التحديث'}
+                </button>
+                <button
+                  onClick={() => setPendingActionCode(null)}
+                  className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[#475569] dark:text-slate-300 font-bold"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Controls & Filter Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="relative w-full sm:w-72">
@@ -472,14 +632,15 @@ export const OwnerDashboardPage: React.FC = () => {
               {[
                 { id: 'all', label: `الكل (${stats.totalCount})` },
                 { id: 'unused', label: `غير مستخدم (${stats.unusedCount})` },
-                { id: 'active', label: `مفعل (${stats.activeCount})` },
-                { id: 'revoked', label: `ملغى (${stats.revokedCount})` },
+                { id: 'used', label: `مستخدم (${stats.usedCount})` },
               ].map((f) => (
                 <button
                   key={f.id}
-                  onClick={() => setCodeFilter(f.id as any)}
+                  onClick={() => setCodeFilter(f.id as 'all' | 'unused' | 'used')}
                   className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-                    codeFilter === f.id ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold' : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
+                    codeFilter === f.id
+                      ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold'
+                      : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
                   }`}
                 >
                   {f.label}
@@ -489,81 +650,82 @@ export const OwnerDashboardPage: React.FC = () => {
           </div>
 
           {/* Activation Codes Grid / Table */}
-          <div className="overflow-x-auto rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 bg-white dark:bg-slate-900/60">
+          <div className="overflow-x-auto rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 bg-white dark:bg-slate-900/60 max-h-[600px] overflow-y-auto">
             <table className="w-full text-right text-xs">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-[#475569] dark:text-slate-400 bg-[#F8FAFC] dark:bg-slate-900">
-                  <th className="py-3 px-4">#</th>
-                  <th className="py-3 px-4">كود التفعيل (Code)</th>
-                  <th className="py-3 px-4">الحالة</th>
+                  <th className="py-3 px-4"># (ID)</th>
+                  <th className="py-3 px-4">الكود (code)</th>
+                  <th className="py-3 px-4">الحالة (is_used)</th>
                   <th className="py-3 px-4">السعر</th>
-                  <th className="py-3 px-4">مدة السريان</th>
-                  <th className="py-3 px-4">الطالب المستفيد</th>
-                  <th className="py-3 px-4">تاريخ التفعيل</th>
+                  <th className="py-3 px-4">المستفيد</th>
+                  <th className="py-3 px-4">التاريخ</th>
                   <th className="py-3 px-4 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/80 font-mono">
-                {codes.length === 0 ? (
+                {loadingCodes ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
-                      لا توجد أكواد مطابقة لمعايير البحث الحالية.
+                    <td colSpan={7} className="py-10 text-center text-[#0284C7] dark:text-cyan-400 font-sans font-bold">
+                      جاري جلب الأكواد الحقيقية من Supabase...
+                    </td>
+                  </tr>
+                ) : filteredCodes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
+                      {codesError
+                        ? 'تعذر عرض الأكواد بسبب خطأ في الاتصال بـ Supabase.'
+                        : 'لا توجد أكواد مطابقة لمعايير البحث الحالية.'}
                     </td>
                   </tr>
                 ) : (
-                  codes.slice(0, 100).map((c, i) => (
-                    <tr key={c.code} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50">
-                      <td className="py-2.5 px-4 text-[#64748B] dark:text-slate-500 text-[11px]">{i + 1}</td>
-                      <td className="py-2.5 px-4 font-bold text-amber-600 dark:text-amber-300 font-mono tracking-wider">{c.code}</td>
-                      <td className="py-2.5 px-4 font-sans">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            c.status === 'unused'
-                              ? 'bg-[#E0F2FE] text-[#0284C7] border border-[#0EA5E9]/30 dark:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-500/30'
-                              : c.status === 'active'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
-                              : 'bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30'
-                          }`}
-                        >
-                          {c.status === 'unused' ? 'غير مستخدم' : c.status === 'active' ? 'مفعل نشط' : 'ملغى'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300">{c.priceYER} YER</td>
-                      <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300">{c.durationDays} يوم</td>
-                      <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 font-sans">{c.redeemedBy?.studentName || '-'}</td>
-                      <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 text-[11px]">
-                        {c.redeemedAt ? new Date(c.redeemedAt).toLocaleDateString('ar-EG') : '-'}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleCopyCode(c.code)}
-                            className="p-1 rounded bg-[#F8FAFC] hover:bg-[#E0F2FE] text-[#475569] hover:text-[#0284C7] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-amber-400 transition-colors"
-                            title="نسخ الكود"
+                  filteredCodes.map((c) => {
+                    const isUsed = Boolean(c.is_used);
+                    const dateVal = c.used_at || c.redeemed_at || c.created_at;
+                    return (
+                      <tr key={String(c.id)} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50">
+                        <td className="py-2.5 px-4 text-[#64748B] dark:text-slate-500 text-[11px]">{c.id}</td>
+                        <td className="py-2.5 px-4 font-bold text-amber-600 dark:text-amber-300 font-mono tracking-wider">{c.code}</td>
+                        <td className="py-2.5 px-4 font-sans">
+                          <span
+                            className={`px-2.5 py-0.5 rounded text-[11px] font-bold inline-block ${
+                              !isUsed
+                                ? 'bg-[#E0F2FE] text-[#0284C7] border border-[#0EA5E9]/30 dark:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-500/30'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
+                            }`}
                           >
-                            {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                          {c.status === 'active' && (
+                            {isUsed ? 'مستخدم' : 'غير مستخدم'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300">
+                          {(c.price_yer ?? yearlyPrice).toLocaleString()} YER
+                        </td>
+                        <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 font-sans">
+                          {c.student_name || c.used_by || '-'}
+                        </td>
+                        <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 text-[11px]">
+                          {dateVal ? new Date(dateVal).toLocaleDateString('ar-EG') : '-'}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={() => handleResetCode(c.code)}
-                              className="px-2 py-0.5 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-400 dark:hover:bg-slate-700 text-[10px] font-sans transition-colors"
+                              onClick={() => handleCopyCode(c.code)}
+                              className="p-1.5 rounded bg-[#F8FAFC] hover:bg-[#E0F2FE] text-[#475569] hover:text-[#0284C7] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-amber-400 transition-colors"
+                              title="نسخ الكود"
                             >
-                              إعادة ضبط
+                              {copiedCode === c.code ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
-                          )}
-                          {c.status !== 'revoked' && (
                             <button
-                              onClick={() => handleRevokeCode(c.code)}
-                              className="p-1 rounded bg-[#F8FAFC] hover:bg-rose-50 text-[#64748B] hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950 dark:text-slate-400 dark:hover:text-rose-400 transition-colors"
-                              title="إلغاء الكود"
+                              onClick={() => setPendingActionCode(c)}
+                              className="px-2.5 py-1 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-400 dark:hover:bg-slate-700 text-[10px] font-sans font-bold transition-colors"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              {isUsed ? 'تعيين كغير مستخدم' : 'تعيين كمستخدم'}
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -703,9 +865,10 @@ export const OwnerDashboardPage: React.FC = () => {
             </h3>
             <button
               onClick={fetchLogs}
-              className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              disabled={loadingLogs}
+              className="px-3 py-1.5 rounded-lg bg-[#0EA5E9] hover:bg-[#0284C7] text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-60"
             >
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingLogs ? 'animate-spin' : ''}`} />
               <span>تحديث السجل</span>
             </button>
           </div>
@@ -788,16 +951,16 @@ export const OwnerDashboardPage: React.FC = () => {
         <div className="champagne-card p-6 rounded-2xl space-y-6">
           <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            <span>التقارير المالية وإجمالي أرباح اشتراكات 300 كود</span>
+            <span>التقارير المالية وإجمالي أرباح اشتراكات ({stats.totalCount} كود)</span>
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 rounded-2xl champagne-subcard space-y-2">
-              <span className="text-xs text-[#475569] dark:text-slate-400 font-bold block">إجمالي القيمة الكلية لـ 300 كود:</span>
+              <span className="text-xs text-[#475569] dark:text-slate-400 font-bold block">إجمالي القيمة الكلية ({stats.totalCount} كود):</span>
               <div className="text-2xl font-extrabold font-mono text-amber-600 dark:text-amber-400">
-                {(300 * 4000).toLocaleString()} YER
+                {stats.totalPotentialRevenueYER.toLocaleString()} YER
               </div>
-              <p className="text-[10px] text-[#475569] dark:text-slate-400">300 كود × 4000 ريال يمني</p>
+              <p className="text-[10px] text-[#475569] dark:text-slate-400">{stats.totalCount} كود × {yearlyPrice.toLocaleString()} ريال يمني</p>
             </div>
 
             <div className="p-5 rounded-2xl champagne-subcard space-y-2">
@@ -805,13 +968,13 @@ export const OwnerDashboardPage: React.FC = () => {
               <div className="text-2xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
                 {stats.totalRevenueYER.toLocaleString()} YER
               </div>
-              <p className="text-[10px] text-emerald-700 dark:text-emerald-300">من الطلاب الذين قاموا بتفعيل الأكواد</p>
+              <p className="text-[10px] text-emerald-700 dark:text-emerald-300">من {stats.usedCount} كود مستخدم</p>
             </div>
 
             <div className="p-5 rounded-2xl champagne-subcard space-y-2">
               <span className="text-xs text-[#475569] dark:text-slate-400 font-bold block">القيمة المتبقية من الأكواد غير المستخدمة:</span>
               <div className="text-2xl font-extrabold font-mono text-[#0284C7] dark:text-cyan-300">
-                {(stats.unusedCount * 4000).toLocaleString()} YER
+                {stats.unusedValueYER.toLocaleString()} YER
               </div>
               <p className="text-[10px] text-[#0EA5E9] dark:text-cyan-300/80">{stats.unusedCount} كود غير مستخدم</p>
             </div>

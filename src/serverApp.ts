@@ -4,9 +4,30 @@ import { streamText } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import dotenv from 'dotenv';
 import zlib from 'zlib';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SEEDED_ACTIVATION_CODES } from './data/activationCodesSeed.ts';
 
 dotenv.config();
+
+const getServerSupabase = (): SupabaseClient | null => {
+  const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+  const key = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    ''
+  ).trim();
+  if (
+    !url ||
+    !key ||
+    !/^https?:\/\/.+/i.test(url) ||
+    url.includes('your-project-id.supabase.co') ||
+    key === 'your_supabase_anon_key_here'
+  ) {
+    return null;
+  }
+  return createClient(url, key);
+};
 
 const app = express();
 
@@ -2400,7 +2421,7 @@ subscriptionsRouter.post('/check-access', (req: Request, res: Response) => {
   });
 });
 
-subscriptionsRouter.post('/redeem', (req: Request, res: Response) => {
+subscriptionsRouter.post('/redeem', async (req: Request, res: Response) => {
   const { code, studentName, studentEmail } = req.body;
   const ip = String(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
 
@@ -2410,6 +2431,95 @@ subscriptionsRouter.post('/redeem', (req: Request, res: Response) => {
 
   const cleanCode = code.trim().toUpperCase();
   const cleanEmail = String(studentEmail || 'student@mechatronics.dr-smart.edu').trim().toLowerCase();
+
+  const serverSupabase = getServerSupabase();
+  if (serverSupabase) {
+    try {
+      const { data: rows, error: findError } = await serverSupabase
+        .from('activation_codes')
+        .select('id, code, is_used')
+        .eq('code', cleanCode)
+        .limit(1);
+
+      if (findError) throw findError;
+
+      const found = rows && rows[0];
+      if (!found) {
+        addAuditLog({
+          event: 'محاولة تفعيل كود غير موجود (Supabase)',
+          category: 'redemption',
+          ip,
+          details: `الكود المدخل: ${cleanCode}`,
+          severity: 'warning',
+        });
+        return res.status(404).json({ success: false, error: 'كود التفعيل غير صحيح، يرجى التأكد من الرموز والمحاولة مجدداً.' });
+      }
+
+      if (found.is_used) {
+        return res.status(400).json({
+          success: false,
+          error: 'هذا الكود مستخدم بالفعل.',
+        });
+      }
+
+      const { data: updatedRows, error: updateError } = await serverSupabase
+        .from('activation_codes')
+        .update({ is_used: true })
+        .eq('id', found.id)
+        .eq('is_used', false)
+        .select('id');
+
+      if (updateError) throw updateError;
+      if (!updatedRows || updatedRows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'هذا الكود مستخدم بالفعل.',
+        });
+      }
+
+      const redeemedAt = new Date().toISOString();
+      const expiresDate = new Date();
+      expiresDate.setDate(expiresDate.getDate() + 365);
+      const expiresAt = expiresDate.toISOString();
+
+      const userSubRecord: UserSubscriptionRecord = {
+        email: cleanEmail,
+        name: studentName || 'طالب ميكاترونكس',
+        role: 'student',
+        status: 'active',
+        codeUsed: cleanCode,
+        trialStartedAt: redeemedAt,
+        trialExpiresAt: redeemedAt,
+        activatedAt: redeemedAt,
+        expiresAt,
+        priceYER: 4000,
+        durationDays: 365,
+      };
+
+      userSubscriptionsStore.set(cleanEmail, userSubRecord);
+
+      addAuditLog({
+        event: 'تفعيل اشتراك سنوي عبر Supabase',
+        category: 'redemption',
+        ip,
+        details: `تم تفعيل الكود (${cleanCode}) للطالب (${cleanEmail}) وتحديث is_used = true في Supabase.`,
+        severity: 'info',
+      });
+
+      return res.json({
+        success: true,
+        message: '🎉 تم تفعيل كود الاشتراك السنوي بنجاح وترقية حسابك إلى (365 يوماً)!',
+        subscription: userSubRecord,
+      });
+    } catch (supaErr) {
+      console.error('[Supabase Redeem Error]:', supaErr);
+      return res.status(500).json({
+        success: false,
+        error: 'تعذر التحقق من كود التفعيل في قاعدة البيانات، يرجى المحاولة لاحقاً.',
+      });
+    }
+  }
+
   const codeIndex = activationCodesStore.findIndex((c) => c.code === cleanCode);
 
   if (codeIndex === -1) {

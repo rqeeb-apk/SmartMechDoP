@@ -192,10 +192,12 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   university?: string;
   role: 'student' | 'engineer' | 'owner';
   specialization: string;
   level: string;
+  isSubscribed?: boolean;
   points: number;
   completedQuizzesCount: number;
   savedExperimentsCount: number;
@@ -227,6 +229,21 @@ export interface ActivationCode {
   };
   redeemedAt?: string;
   expiresAt?: string;
+}
+
+export interface SupabaseActivationCode {
+  id: number | string;
+  code: string;
+  is_used: boolean;
+  created_at?: string | null;
+  used_at?: string | null;
+  redeemed_at?: string | null;
+  expires_at?: string | null;
+  student_name?: string | null;
+  student_email?: string | null;
+  used_by?: string | null;
+  price_yer?: number | null;
+  duration_days?: number | null;
 }
 
 export interface SecurityLog {
