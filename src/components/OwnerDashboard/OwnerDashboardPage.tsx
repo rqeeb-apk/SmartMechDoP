@@ -2,8 +2,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldAlert, Users, BookOpen, Layers, Cpu, Key, Database, Download, Upload,
   Activity, CheckCircle, Trash2, Plus, Copy, Search, RefreshCw, Printer, AlertTriangle,
-  CreditCard, DollarSign, Settings, Sliders, Lock, Zap, Eye, BarChart3, Bot, Check, FileText
+  CreditCard, DollarSign, Settings, Sliders, Lock, Zap, Eye, BarChart3, Bot, Check, FileText,
+  TrendingUp, PieChart as PieChartIcon
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 import { getStoredDoctors, getStoredBooks, getStoredProjects, OFFICIAL_LOGO_URL } from '../../services/storage';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { SecurityLog, SupabaseActivationCode } from '../../types';
@@ -19,6 +33,7 @@ export const OwnerDashboardPage: React.FC = () => {
 
   // Activation codes state from Supabase (`activation_codes` table)
   const [codes, setCodes] = useState<SupabaseActivationCode[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Record<string, { full_name?: string; phone?: string; university?: string; level?: string; created_at?: string; is_subscribed?: boolean }>>({});
   const [codeFilter, setCodeFilter] = useState<'all' | 'unused' | 'used'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingCodes, setLoadingCodes] = useState(false);
@@ -41,6 +56,9 @@ export const OwnerDashboardPage: React.FC = () => {
   const [aiModel, setAiModel] = useState('gemini-3.8-flash');
   const [aiFallback, setAiFallback] = useState('gemini-3.1-flash-lite');
 
+  const isCodeUsed = (c: SupabaseActivationCode) =>
+    c.is_used === true || String(c.is_used).toLowerCase() === 'true';
+
   const fetchActivationCodes = async () => {
     if (!supabase || !isSupabaseConfigured) {
       setCodes([]);
@@ -56,14 +74,43 @@ export const OwnerDashboardPage: React.FC = () => {
       const { data, error } = await supabase
         .from('activation_codes')
         .select('*')
-        .order('id', { ascending: true });
+        .order('id', { ascending: true })
+        .range(0, 4999);
 
       if (error) {
         throw error;
       }
 
-      setCodes((data as SupabaseActivationCode[]) || []);
+      const fetchedCodes = (data as SupabaseActivationCode[]) || [];
+      setCodes(fetchedCodes);
       setLastUpdatedAt(new Date().toISOString());
+
+      // Optionally enrich `used_by` UUIDs with student profiles when RLS permits
+      try {
+        let profilesData: any[] | null = null;
+        const primaryProfilesRes = await supabase
+          .from('profiles')
+          .select('id, full_name, phone, university, level, is_subscribed, created_at');
+        if (!primaryProfilesRes.error && Array.isArray(primaryProfilesRes.data)) {
+          profilesData = primaryProfilesRes.data;
+        } else {
+          const fallbackProfilesRes = await supabase
+            .from('profiles')
+            .select('id, full_name, phone, university, level');
+          if (Array.isArray(fallbackProfilesRes.data)) {
+            profilesData = fallbackProfilesRes.data;
+          }
+        }
+        if (Array.isArray(profilesData)) {
+          const map: Record<string, { full_name?: string; phone?: string; university?: string; level?: string; created_at?: string; is_subscribed?: boolean }> = {};
+          for (const p of profilesData) {
+            if (p.id) map[String(p.id)] = p;
+          }
+          setProfilesMap(map);
+        }
+      } catch {
+        // Ignore if RLS restricts profiles table to owner/self
+      }
     } catch (e: any) {
       console.error('Error fetching activation_codes from Supabase:', e);
       setCodesError(
@@ -94,12 +141,29 @@ export const OwnerDashboardPage: React.FC = () => {
   useEffect(() => {
     fetchActivationCodes();
     fetchLogs();
+
+    if (!supabase || !isSupabaseConfigured) return;
+
+    const channel = supabase
+      .channel('owner_activation_codes_live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activation_codes' },
+        () => {
+          fetchActivationCodes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
   }, []);
 
-  // Compute real-time statistics dynamically from Supabase data (no hardcoded totals)
+  // Compute real-time statistics dynamically from Supabase activation_codes data
   const stats = useMemo(() => {
     const totalCount = codes.length;
-    const usedCount = codes.filter((c) => Boolean(c.is_used)).length;
+    const usedCount = codes.filter((c) => isCodeUsed(c)).length;
     const unusedCount = totalCount - usedCount;
     const totalRevenueYER = usedCount * yearlyPrice;
     const unusedValueYER = unusedCount * yearlyPrice;
@@ -116,21 +180,104 @@ export const OwnerDashboardPage: React.FC = () => {
     };
   }, [codes, yearlyPrice]);
 
+  // Recharts Dataset 1: New subscriptions over the last 7 days
+  const last7DaysChartData = useMemo(() => {
+    const toLocalDateKey = (dateInput: Date) => {
+      const y = dateInput.getFullYear();
+      const m = String(dateInput.getMonth() + 1).padStart(2, '0');
+      const d = String(dateInput.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    const days: { key: string; label: string; fullDate: string; subscriptions: number }[] = [];
+    const dayCounts = new Map<string, number>();
+    const now = new Date();
+
+    for (let offset = 6; offset >= 0; offset--) {
+      const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
+      const key = toLocalDateKey(dt);
+      dayCounts.set(key, 0);
+      const label = dt.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'numeric' });
+      const fullDate = dt.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+      days.push({ key, label, fullDate, subscriptions: 0 });
+    }
+
+    const countedProfileIds = new Set<string>();
+    for (const c of codes) {
+      if (!isCodeUsed(c)) continue;
+      if (c.used_by) countedProfileIds.add(String(c.used_by));
+      const profileCreatedAt = c.used_by ? profilesMap[String(c.used_by)]?.created_at : undefined;
+      const rawTimestamp = c.used_at || c.redeemed_at || profileCreatedAt;
+      if (!rawTimestamp) continue;
+      const parsed = new Date(rawTimestamp);
+      if (Number.isNaN(parsed.getTime())) continue;
+      const key = toLocalDateKey(parsed);
+      if (dayCounts.has(key)) {
+        dayCounts.set(key, (dayCounts.get(key) || 0) + 1);
+      }
+    }
+
+    // Include subscribed profiles not matched by a `used_by` link if profiles are readable
+    Object.entries(profilesMap).forEach(([uid, profile]) => {
+      if (countedProfileIds.has(uid)) return;
+      if (profile.is_subscribed && profile.created_at) {
+        const parsed = new Date(profile.created_at);
+        if (!Number.isNaN(parsed.getTime())) {
+          const key = toLocalDateKey(parsed);
+          if (dayCounts.has(key)) {
+            dayCounts.set(key, (dayCounts.get(key) || 0) + 1);
+          }
+        }
+      }
+    });
+
+    return days.map((d) => ({
+      ...d,
+      subscriptions: dayCounts.get(d.key) || 0,
+    }));
+  }, [codes, profilesMap]);
+
+  const totalLast7DaysSubscriptions = useMemo(
+    () => last7DaysChartData.reduce((acc, item) => acc + item.subscriptions, 0),
+    [last7DaysChartData]
+  );
+
+  // Recharts Dataset 2: Activation codes usage vs available ratio
+  const codeUsageRatioData = useMemo(() => {
+    return [
+      { name: 'الأكواد المستخدمة', value: stats.usedCount, color: '#10B981' },
+      { name: 'الأكواد المتاحة', value: stats.unusedCount, color: '#0EA5E9' },
+    ];
+  }, [stats.usedCount, stats.unusedCount]);
+
+  const codeUsagePercentage = useMemo(() => {
+    if (stats.totalCount === 0) return 0;
+    return Math.round((stats.usedCount / stats.totalCount) * 1000) / 10;
+  }, [stats.usedCount, stats.totalCount]);
+
   // Filtered codes for table view
   const filteredCodes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return codes.filter((item) => {
-      const isUsed = Boolean(item.is_used);
+      const isUsed = isCodeUsed(item);
       if (codeFilter === 'unused' && isUsed) return false;
       if (codeFilter === 'used' && !isUsed) return false;
 
       if (!q) return true;
       const codeStr = String(item.code || '').toLowerCase();
       const idStr = String(item.id || '').toLowerCase();
-      const studentStr = String(item.student_name || item.used_by || item.student_email || '').toLowerCase();
+      const profileInfo = item.used_by ? profilesMap[String(item.used_by)] : undefined;
+      const studentStr = String(
+        item.student_name ||
+          profileInfo?.full_name ||
+          profileInfo?.phone ||
+          item.used_by ||
+          item.student_email ||
+          ''
+      ).toLowerCase();
       return codeStr.includes(q) || idStr.includes(q) || studentStr.includes(q);
     });
-  }, [codes, codeFilter, searchQuery]);
+  }, [codes, codeFilter, searchQuery, profilesMap]);
 
   const firstCodeLabel = codes.length > 0 ? codes[0].code : null;
   const lastCodeLabel = codes.length > 0 ? codes[codes.length - 1].code : null;
@@ -142,7 +289,7 @@ export const OwnerDashboardPage: React.FC = () => {
   };
 
   const handleBatchCopyUnused = () => {
-    const unusedList = codes.filter((c) => !c.is_used).map((c) => c.code).join('\n');
+    const unusedList = codes.filter((c) => !isCodeUsed(c)).map((c) => c.code).join('\n');
     if (!unusedList) {
       setActionMessage({ type: 'error', text: 'لا توجد أكواد غير مستخدمة للنسخ حالياً.' });
       setTimeout(() => setActionMessage(null), 3000);
@@ -163,10 +310,12 @@ export const OwnerDashboardPage: React.FC = () => {
       'data:text/csv;charset=utf-8,' +
       ['ID,الكود,الحالة,مستخدم_is_used,اسم_الطالب,تاريخ_الإنشاء']
         .concat(
-          codes.map(
-            (c) =>
-              `${c.id},${c.code},${c.is_used ? 'مستخدم' : 'غير مستخدم'},${Boolean(c.is_used)},${c.student_name || c.used_by || ''},${c.created_at || ''}`
-          )
+          codes.map((c) => {
+            const used = isCodeUsed(c);
+            const profileInfo = c.used_by ? profilesMap[String(c.used_by)] : undefined;
+            const studentLabel = c.student_name || profileInfo?.full_name || c.used_by || '';
+            return `${c.id},${c.code},${used ? 'مستخدم' : 'غير مستخدم'},${used},${studentLabel},${c.created_at || ''}`;
+          })
         )
         .join('\n');
 
@@ -183,7 +332,7 @@ export const OwnerDashboardPage: React.FC = () => {
     if (!supabase) return;
     setUpdatingCodeId(row.id);
     setActionMessage(null);
-    const nextIsUsed = !Boolean(row.is_used);
+    const nextIsUsed = !isCodeUsed(row);
     try {
       const { error } = await supabase
         .from('activation_codes')
@@ -318,7 +467,7 @@ export const OwnerDashboardPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="champagne-card dark:border-amber-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الكل (إجمالي الأكواد)</span>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">إجمالي الأكواد</span>
               <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400">
                 {loadingCodes ? '...' : `${stats.totalCount} كود`}
               </div>
@@ -328,19 +477,19 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
 
             <div className="champagne-card dark:border-cyan-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">غير مستخدم</span>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الأكواد المتاحة (غير مستخدمة)</span>
               <div className="text-3xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">
                 {loadingCodes ? '...' : `${stats.unusedCount} كود`}
               </div>
-              <p className="text-[11px] text-[#0284C7] dark:text-cyan-300/80">جاهزة للتوزيع والتفعيل</p>
+              <p className="text-[11px] text-[#0284C7] dark:text-cyan-300/80">متاحة للتوزيع والتفعيل</p>
             </div>
 
             <div className="champagne-card dark:border-emerald-500/30 p-5 rounded-2xl space-y-2">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">مستخدم (المفعلة)</span>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-400 block">الأكواد المستخدمة</span>
               <div className="text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
                 {loadingCodes ? '...' : `${stats.usedCount} كود`}
               </div>
-              <p className="text-[11px] text-emerald-700 dark:text-emerald-300">أكواد تم استخدامها فعلياً</p>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300">أكواد تم تفعيلها فعلياً</p>
             </div>
 
             <div className="champagne-card dark:border-purple-500/30 p-5 rounded-2xl space-y-2">
@@ -349,6 +498,169 @@ export const OwnerDashboardPage: React.FC = () => {
                 {stats.totalRevenueYER.toLocaleString()} YER
               </div>
               <p className="text-[11px] text-[#475569] dark:text-slate-400">سعر الاشتراك السنوي: {yearlyPrice.toLocaleString()} ريال يمني</p>
+            </div>
+          </div>
+
+          {/* Recharts Analytics Dashboard: 7-Day Subscriptions & Code Usage Ratio */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Chart 1: New Subscriptions in Last 7 Days */}
+            <div className="lg:col-span-7 champagne-card dark:border-cyan-500/30 p-5 sm:p-6 rounded-2xl space-y-4 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0F172A] dark:text-white flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-[#0EA5E9] dark:text-cyan-400" />
+                    <span>الاشتراكات الجديدة (آخر 7 أيام)</span>
+                  </h3>
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                    توزيع التفعيلات والاشتراكات اليومية من قاعدة بيانات Supabase
+                  </p>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-[#E0F2FE] dark:bg-cyan-500/15 border border-[#0EA5E9]/30 dark:border-cyan-400/40 text-[#0284C7] dark:text-cyan-300 text-xs font-black font-mono">
+                  {totalLast7DaysSubscriptions} اشتراك خلال 7 أيام
+                </div>
+              </div>
+
+              <div className="h-72 w-full" dir="ltr">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={last7DaysChartData} margin={{ top: 10, right: 16, left: -12, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="subsAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.25)" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11, fill: '#94A3B8' }}
+                      axisLine={{ stroke: 'rgba(148, 163, 184, 0.35)' }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 11, fill: '#94A3B8' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0B192E',
+                        border: '1px solid rgba(56, 189, 248, 0.45)',
+                        borderRadius: '12px',
+                        color: '#F8FAFC',
+                        fontSize: '12px',
+                        direction: 'rtl',
+                        textAlign: 'right',
+                      }}
+                      formatter={(value: any) => [`${value} اشتراك`, 'الاشتراكات الجديدة']}
+                      labelFormatter={(_label, payload) => payload?.[0]?.payload?.fullDate || ''}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="subscriptions"
+                      name="الاشتراكات الجديدة"
+                      stroke="#0EA5E9"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#subsAreaGrad)"
+                      activeDot={{ r: 6, fill: '#F59E0B', stroke: '#FFFFFF', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Chart 2: Activation Codes Usage vs Available Ratio */}
+            <div className="lg:col-span-5 champagne-card dark:border-amber-500/30 p-5 sm:p-6 rounded-2xl space-y-4 shadow-lg flex flex-col justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0F172A] dark:text-white flex items-center gap-2">
+                    <PieChartIcon className="w-5 h-5 text-emerald-500 dark:text-amber-400" />
+                    <span>نسبة استخدام أكواد التفعيل</span>
+                  </h3>
+                  <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                    مقارنة الأكواد المستخدمة مقابل الأكواد المتاحة
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-black font-mono">
+                  {codeUsagePercentage}% مُفعّل
+                </span>
+              </div>
+
+              <div className="relative h-60 w-full" dir="ltr">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={codeUsageRatioData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={58}
+                      outerRadius={86}
+                      paddingAngle={stats.usedCount > 0 && stats.unusedCount > 0 ? 4 : 0}
+                      stroke="none"
+                    >
+                      {codeUsageRatioData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0B192E',
+                        border: '1px solid rgba(245, 158, 11, 0.45)',
+                        borderRadius: '12px',
+                        color: '#F8FAFC',
+                        fontSize: '12px',
+                        direction: 'rtl',
+                        textAlign: 'right',
+                      }}
+                      formatter={(value: any, name: any) => {
+                        const pct = stats.totalCount > 0 ? ((Number(value) / stats.totalCount) * 100).toFixed(1) : '0.0';
+                        return [`${value} كود (${pct}%)`, name];
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={32}
+                      formatter={(value) => (
+                        <span className="text-xs font-bold text-[#0F172A] dark:text-slate-200 mx-1">{value}</span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Center Percentage Badge */}
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pb-6">
+                  <span className="text-2xl font-black font-mono text-[#0F172A] dark:text-white">
+                    {codeUsagePercentage}%
+                  </span>
+                  <span className="text-[10px] font-bold text-[#475569] dark:text-slate-400">
+                    نسبة التفعيل
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                <div className="champagne-subcard p-2.5 rounded-xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-bold text-[#475569] dark:text-slate-300">المستخدمة</span>
+                  </div>
+                  <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                    {stats.usedCount}
+                  </span>
+                </div>
+                <div className="champagne-subcard p-2.5 rounded-xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#0EA5E9] shrink-0" />
+                    <span className="font-bold text-[#475569] dark:text-slate-300">المتاحة</span>
+                  </div>
+                  <span className="font-mono font-black text-[#0EA5E9] dark:text-cyan-400">
+                    {stats.unusedCount}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -421,7 +733,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/60 font-mono">
-                {codes.filter((c) => Boolean(c.is_used)).length === 0 ? (
+                {codes.filter((c) => isCodeUsed(c)).length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
                       لا توجد أكواد مستخدمة حالياً في قاعدة البيانات.
@@ -429,31 +741,38 @@ export const OwnerDashboardPage: React.FC = () => {
                   </tr>
                 ) : (
                   codes
-                    .filter((c) => Boolean(c.is_used))
-                    .map((c) => (
-                      <tr key={String(c.id)} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-900/50">
-                        <td className="py-3 px-3 font-sans font-bold text-[#0F172A] dark:text-white">{c.student_name || c.used_by || 'طالب ميكاترونكس'}</td>
-                        <td className="py-3 px-3 text-[#0284C7] dark:text-cyan-300">{c.student_email || '-'}</td>
-                        <td className="py-3 px-3 font-bold text-amber-600 dark:text-amber-400">{c.code}</td>
-                        <td className="py-3 px-3">
-                          <span className="px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
-                            مستخدم
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-[#475569] dark:text-slate-400">
-                          {c.expires_at ? new Date(c.expires_at).toLocaleDateString('ar-EG') : `${c.duration_days || 365} يوم`}
-                        </td>
-                        <td className="py-3 px-3">
-                          <button
-                            onClick={() => handleConfirmToggleUsage(c)}
-                            disabled={updatingCodeId === c.id}
-                            className="px-2 py-1 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 text-[10px] transition-colors disabled:opacity-50"
-                          >
-                            إعادة لغير مستخدم
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    .filter((c) => isCodeUsed(c))
+                    .map((c) => {
+                      const matchedProfile = c.used_by ? profilesMap[String(c.used_by)] : undefined;
+                      return (
+                        <tr key={String(c.id)} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-900/50">
+                          <td className="py-3 px-3 font-sans font-bold text-[#0F172A] dark:text-white">
+                            {matchedProfile?.full_name || c.student_name || c.used_by || 'طالب ميكاترونكس'}
+                          </td>
+                          <td className="py-3 px-3 text-[#0284C7] dark:text-cyan-300">
+                            {matchedProfile?.phone || c.student_email || '-'}
+                          </td>
+                          <td className="py-3 px-3 font-bold text-amber-600 dark:text-amber-400">{c.code}</td>
+                          <td className="py-3 px-3">
+                            <span className="px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">
+                              مستخدم
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-[#475569] dark:text-slate-400">
+                            {c.expires_at ? new Date(c.expires_at).toLocaleDateString('ar-EG') : `${c.duration_days || 365} يوم`}
+                          </td>
+                          <td className="py-3 px-3">
+                            <button
+                              onClick={() => handleConfirmToggleUsage(c)}
+                              disabled={updatingCodeId === c.id}
+                              className="px-2 py-1 rounded bg-[#E0F2FE] text-[#0284C7] hover:bg-[#0EA5E9] hover:text-white dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 text-[10px] transition-colors disabled:opacity-50"
+                            >
+                              إعادة لغير مستخدم
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                 )}
               </tbody>
             </table>
@@ -555,16 +874,22 @@ export const OwnerDashboardPage: React.FC = () => {
           {/* Live Dynamic Summary Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="champagne-subcard p-4 rounded-xl flex items-center justify-between">
-              <span className="text-xs font-bold text-[#475569] dark:text-slate-300">الكل</span>
-              <span className="text-xl font-extrabold font-mono text-[#0F172A] dark:text-amber-400">{stats.totalCount}</span>
+              <span className="text-xs font-bold text-[#475569] dark:text-slate-300">إجمالي الأكواد</span>
+              <span className="text-xl font-extrabold font-mono text-[#0F172A] dark:text-amber-400">
+                {loadingCodes ? '...' : stats.totalCount}
+              </span>
             </div>
             <div className="champagne-subcard p-4 rounded-xl flex items-center justify-between">
-              <span className="text-xs font-bold text-[#0284C7] dark:text-cyan-300">غير مستخدم</span>
-              <span className="text-xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">{stats.unusedCount}</span>
+              <span className="text-xs font-bold text-[#0284C7] dark:text-cyan-300">المتاحة (غير مستخدم)</span>
+              <span className="text-xl font-extrabold font-mono text-[#0EA5E9] dark:text-cyan-400">
+                {loadingCodes ? '...' : stats.unusedCount}
+              </span>
             </div>
             <div className="champagne-subcard p-4 rounded-xl flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">مستخدم</span>
-              <span className="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">{stats.usedCount}</span>
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">المستخدمة</span>
+              <span className="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
+                {loadingCodes ? '...' : stats.usedCount}
+              </span>
             </div>
           </div>
 
@@ -595,7 +920,7 @@ export const OwnerDashboardPage: React.FC = () => {
             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
               <span>
                 هل تريد تغيير حالة الكود <strong className="font-mono">{pendingActionCode.code}</strong> إلى{' '}
-                <strong>{pendingActionCode.is_used ? 'غير مستخدم' : 'مستخدم'}</strong>؟
+                <strong>{isCodeUsed(pendingActionCode) ? 'غير مستخدم' : 'مستخدم'}</strong>؟
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -680,8 +1005,9 @@ export const OwnerDashboardPage: React.FC = () => {
                   </tr>
                 ) : (
                   filteredCodes.map((c) => {
-                    const isUsed = Boolean(c.is_used);
+                    const isUsed = isCodeUsed(c);
                     const dateVal = c.used_at || c.redeemed_at || c.created_at;
+                    const matchedProfile = c.used_by ? profilesMap[String(c.used_by)] : undefined;
                     return (
                       <tr key={String(c.id)} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50">
                         <td className="py-2.5 px-4 text-[#64748B] dark:text-slate-500 text-[11px]">{c.id}</td>
@@ -701,7 +1027,7 @@ export const OwnerDashboardPage: React.FC = () => {
                           {(c.price_yer ?? yearlyPrice).toLocaleString()} YER
                         </td>
                         <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 font-sans">
-                          {c.student_name || c.used_by || '-'}
+                          {matchedProfile?.full_name || c.student_name || c.used_by || '-'}
                         </td>
                         <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 text-[11px]">
                           {dateVal ? new Date(dateVal).toLocaleDateString('ar-EG') : '-'}

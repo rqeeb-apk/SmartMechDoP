@@ -395,4 +395,12 @@ export interface DoctorRealWorldExample {
   engineeringApplication: string;
 }
 
-
+export interface StudentFileRecord {
+  id: string | number;
+  user_id?: string | null;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size?: number | null;
+  created_at?: string | null;
+}

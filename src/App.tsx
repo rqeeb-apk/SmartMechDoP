@@ -20,6 +20,7 @@ import { TrialExpiredLockModal } from './components/StudentProfile/TrialExpiredL
 import { OwnerDashboardPage } from './components/OwnerDashboard/OwnerDashboardPage';
 import { OwnerLoginModal } from './components/OwnerDashboard/OwnerLoginModal';
 import { LectureHallPage } from './components/LectureHall/LectureHallPage';
+import { UploadAnalyzePage } from './components/UploadAnalyze/UploadAnalyzePage';
 import { getStoredUser, updateUserProfile, resetStoredUser, checkUserAccessStatus } from './services/storage';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { UserProfile, LabType, EngineeringBook } from './types';
@@ -383,6 +384,7 @@ export default function App() {
                 {currentTab === 'projects' && 'مركز المشاريع الهندسية'}
                 {currentTab === 'quizzes' && 'مركز الاختبارات'}
                 {currentTab === 'community' && 'مجتمع المهندسين'}
+                {currentTab === 'upload_analyze' && '📚 ارفع محاضرتك وذاكر مع الدكتور (Upload & Analyze)'}
                 {currentTab === 'profile' && 'الملف الشخصي للطالب'}
                 {currentTab === 'owner' && 'لوحة الإدارة المركزية'}
               </span>
@@ -393,6 +395,8 @@ export default function App() {
         {currentTab === 'home' && (
           <HomePage setCurrentTab={setCurrentTab} onSelectLab={handleSelectLab} />
         )}
+
+        {currentTab === 'upload_analyze' && <UploadAnalyzePage />}
 
         {currentTab === 'lecture_hall' && <LectureHallPage />}
 
@@ -519,30 +523,46 @@ export default function App() {
 
       {/* Footer */}
       <footer className="w-full bg-[#F8FAFC] dark:bg-[#0D1B2A] border-t border-slate-200 dark:border-slate-800/80 py-6 pb-20 lg:pb-6 px-4 text-center text-xs text-[#475569] dark:text-slate-400">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-right">
-            <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-[#0EA5E9] dark:text-cyan-400" />
-              <span className="font-bold text-[#0F172A] dark:text-slate-200">دكتور الميكاترونكس الذكي (Dr Mecha Smart)</span>
+        <div className="max-w-7xl mx-auto space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-2 text-center sm:text-right">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-[#0EA5E9] dark:text-cyan-400" />
+                <span className="font-bold text-[#0F172A] dark:text-slate-200">دكتور الميكاترونكس الذكي (Dr Mecha Smart)</span>
+              </div>
+              <a
+                href="https://dr-mechasmart.online"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0EA5E9] hover:text-[#0284C7] dark:text-amber-400/90 dark:hover:text-amber-300 font-mono text-[11px] underline underline-offset-2"
+              >
+                dr-mechasmart.online
+              </a>
+              <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
+              <span>تعلّم بذكاء، جرّب بواقعية، وابتكر بلا حدود</span>
             </div>
-            <a
-              href="https://dr-mechasmart.online"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#0EA5E9] hover:text-[#0284C7] dark:text-amber-400/90 dark:hover:text-amber-300 font-mono text-[11px] underline underline-offset-2"
-            >
-              dr-mechasmart.online
-            </a>
-            <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
-            <span>تعلّم بذكاء، جرّب بواقعية، وابتكر بلا حدود</span>
+
+            <div className="flex flex-wrap justify-center items-center gap-3 text-[11px]">
+              <button onClick={() => setCurrentTab('home')} className="hover:text-[#0EA5E9] dark:hover:text-cyan-400 transition-colors">الرئيسية</button>
+              <button onClick={() => setCurrentTab('lecture_hall')} className="hover:text-[#0EA5E9] dark:hover:text-cyan-400 transition-colors">قاعة المحاضرات</button>
+              <button onClick={() => setCurrentTab('doctor_hall')} className="hover:text-[#0EA5E9] dark:hover:text-purple-400 transition-colors">قاعة الدكتور</button>
+              <button onClick={() => setCurrentTab('solve_questions')} className="hover:text-[#0EA5E9] dark:hover:text-amber-400 transition-colors">حل أسئلتي</button>
+              <button onClick={() => setCurrentTab('smart_labs')} className="hover:text-[#0EA5E9] dark:hover:text-emerald-400 transition-colors">مختبرات ومعامل ذكية</button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap justify-center items-center gap-3 text-[11px]">
-            <button onClick={() => setCurrentTab('home')} className="hover:text-[#0EA5E9] dark:hover:text-cyan-400 transition-colors">الرئيسية</button>
-            <button onClick={() => setCurrentTab('lecture_hall')} className="hover:text-[#0EA5E9] dark:hover:text-cyan-400 transition-colors">قاعة المحاضرات</button>
-            <button onClick={() => setCurrentTab('doctor_hall')} className="hover:text-[#0EA5E9] dark:hover:text-purple-400 transition-colors">قاعة الدكتور</button>
-            <button onClick={() => setCurrentTab('solve_questions')} className="hover:text-[#0EA5E9] dark:hover:text-amber-400 transition-colors">حل أسئلتي</button>
-            <button onClick={() => setCurrentTab('smart_labs')} className="hover:text-[#0EA5E9] dark:hover:text-emerald-400 transition-colors">مختبرات ومعامل ذكية</button>
+          <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-center">
+            <p className="text-xs sm:text-sm font-medium text-[#475569] dark:text-slate-300">
+              جميع الحقوق محفوظة © 2025 لدى{' '}
+              <a
+                href="https://rqeebpro.online"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-[#0EA5E9] hover:text-[#0284C7] dark:text-amber-400 dark:hover:text-amber-300 underline decoration-[#0EA5E9]/40 hover:decoration-[#0284C7] dark:decoration-amber-400/50 dark:hover:decoration-amber-300 underline-offset-4 transition-all duration-200 hover:brightness-110"
+              >
+                رقيب للبرمجة والتسويق الرقمي
+              </a>
+            </p>
           </div>
         </div>
       </footer>

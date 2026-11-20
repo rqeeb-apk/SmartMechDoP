@@ -44,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Supporting tools & community modules preserved in the More dropdown
   const secondaryTabs = [
+    { id: 'upload_analyze', label: 'ارفع وذاكر مع الدكتور', icon: '📚' },
     { id: 'lab_3d', label: 'Circuit Wizard والمختبر 3D', icon: '🛠️' },
     { id: 'library', label: 'المكتبة الهندسية (1-5)', icon: '📖' },
     { id: 'calculators', label: 'الحاسبات الهندسية', icon: '🧮' },

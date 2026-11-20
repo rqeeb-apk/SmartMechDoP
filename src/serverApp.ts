@@ -2259,6 +2259,284 @@ geminiRouter.post('/tts', async (req: Request, res: Response) => {
   }
 });
 
+// ==========================================
+// UPLOAD & ANALYZE STUDENT FILE (PDF / IMAGE -> GEMINI)
+// ==========================================
+const STUDENT_FILE_SYSTEM_PROMPT =
+  'أنت دكتور الميكاترونكس. اقرأ هذا الملف بدقة، ثم قم بتلخيصه في نقاط واضحة، واشرح المفاهيم الصعبة فيه بلهجة يمنية مبسطة. إذا واجهت مسائل رياضية أو دوائر، قم بحلها خطوة بخطوة.';
+
+const MAX_STUDENT_FILE_BYTES = 25 * 1024 * 1024; // 25 MB hard cap
+const INLINE_DATA_THRESHOLD_BYTES = 10 * 1024 * 1024; // Use Gemini File API above 10 MB
+
+function isAllowedSupabaseStorageUrl(rawUrl: string): { ok: boolean; parsed?: URL; reason?: string } {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { ok: false, reason: 'بروتوكول الرابط غير مدعوم.' };
+    }
+    const host = parsed.hostname.toLowerCase();
+    // Block loopback, private, and cloud metadata addresses
+    if (
+      host === 'localhost' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.startsWith('127.') ||
+      host.startsWith('10.') ||
+      host.startsWith('169.254.') ||
+      host.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host) ||
+      /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ||
+      host.includes(':')
+    ) {
+      return { ok: false, reason: 'غير مسموح بالوصول إلى عناوين الشبكة الداخلية.' };
+    }
+
+    const configuredUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
+    let configuredHost = '';
+    if (configuredUrl) {
+      try {
+        configuredHost = new URL(configuredUrl).hostname.toLowerCase();
+      } catch {
+        configuredHost = '';
+      }
+    }
+
+    const isStandardSupabaseHost = /^[a-z0-9-]+\.supabase\.(co|in)$/i.test(host);
+    const matchesConfiguredHost = Boolean(configuredHost && host === configuredHost);
+
+    if (!isStandardSupabaseHost && !matchesConfiguredHost) {
+      return { ok: false, reason: 'رابط الملف يجب أن يكون من خادم التخزين المعتمد (Supabase Storage).' };
+    }
+
+    return { ok: true, parsed };
+  } catch {
+    return { ok: false, reason: 'رابط الملف غير صالح.' };
+  }
+}
+
+function normalizeAllowedMimeType(rawMime?: string, fileName?: string): string | null {
+  const mime = (rawMime || '').toLowerCase().split(';')[0].trim();
+  const lowerName = (fileName || '').toLowerCase();
+  if (mime === 'application/pdf' || (!mime && lowerName.endsWith('.pdf'))) {
+    return 'application/pdf';
+  }
+  if (mime === 'image/png' || (!mime && lowerName.endsWith('.png'))) {
+    return 'image/png';
+  }
+  if (mime === 'image/jpeg' || mime === 'image/jpg' || (!mime && /\.(jpe?g)$/.test(lowerName))) {
+    return 'image/jpeg';
+  }
+  if (mime === 'image/webp' || (!mime && lowerName.endsWith('.webp'))) {
+    return 'image/webp';
+  }
+  if (mime.startsWith('image/')) {
+    return mime;
+  }
+  return null;
+}
+
+geminiRouter.post('/analyze-student-file', async (req: Request, res: Response) => {
+  let geminiUploadedFileName: string | null = null;
+  try {
+    const {
+      fileUrl,
+      fileName,
+      fileType,
+      extractedText,
+      studentNote,
+      inlineBase64,
+      supabaseAccessToken,
+    } = req.body || {};
+
+    const cleanFileName = String(fileName || 'lecture_file.pdf').slice(0, 180);
+    const resolvedMime = normalizeAllowedMimeType(fileType, cleanFileName);
+
+    if (!resolvedMime) {
+      return res.status(400).json({
+        success: false,
+        error: 'نوع الملف غير مدعوم. يرجى رفع ملف PDF أو صورة واضحة للمحاضرة (PNG / JPG / WEBP).',
+      });
+    }
+
+    let fileBuffer: Buffer | null = null;
+    let effectiveMime = resolvedMime;
+
+    // 1. Prefer fetching securely from validated Supabase Storage URL
+    if (typeof fileUrl === 'string' && fileUrl.trim()) {
+      const check = isAllowedSupabaseStorageUrl(fileUrl.trim());
+      if (!check.ok || !check.parsed) {
+        return res.status(400).json({
+          success: false,
+          error: check.reason || 'رابط الملف غير مصرح به.',
+        });
+      }
+
+      const fetchHeaders: Record<string, string> = {};
+      if (typeof supabaseAccessToken === 'string' && supabaseAccessToken.trim()) {
+        fetchHeaders['Authorization'] = `Bearer ${supabaseAccessToken.trim()}`;
+      }
+
+      const fileRes = await fetch(check.parsed.toString(), {
+        method: 'GET',
+        headers: Object.keys(fetchHeaders).length > 0 ? fetchHeaders : undefined,
+        signal: AbortSignal.timeout(25000),
+      });
+
+      if (fileRes.ok) {
+        const contentLenHeader = Number(fileRes.headers.get('content-length') || 0);
+        if (contentLenHeader > MAX_STUDENT_FILE_BYTES) {
+          return res.status(413).json({
+            success: false,
+            error: 'حجم الملف كبير جداً (الحد الأقصى 25 ميجابايت). يرجى ضغط الملف أو تقسيمه ثم إعادة المحاولة.',
+          });
+        }
+        const arrayBuf = await fileRes.arrayBuffer();
+        if (arrayBuf.byteLength > MAX_STUDENT_FILE_BYTES) {
+          return res.status(413).json({
+            success: false,
+            error: 'حجم الملف كبير جداً (الحد الأقصى 25 ميجابايت).',
+          });
+        }
+        fileBuffer = Buffer.from(arrayBuf);
+        const headerMime = normalizeAllowedMimeType(fileRes.headers.get('content-type') || undefined, cleanFileName);
+        if (headerMime) {
+          effectiveMime = headerMime;
+        }
+      } else if (!inlineBase64) {
+        return res.status(502).json({
+          success: false,
+          error: `تعذر تحميل الملف من التخزين السحابي (HTTP ${fileRes.status}). تأكد من أن Bucket "student_uploads" عام (Public) أو أعد رفع الملف.`,
+        });
+      }
+    }
+
+    // 2. Fallback to inlineBase64 if supplied directly
+    if (!fileBuffer && typeof inlineBase64 === 'string' && inlineBase64.trim()) {
+      const cleanedB64 = inlineBase64.replace(/^data:[^;]+;base64,/, '').trim();
+      const buf = Buffer.from(cleanedB64, 'base64');
+      if (buf.byteLength > MAX_STUDENT_FILE_BYTES) {
+        return res.status(413).json({
+          success: false,
+          error: 'حجم الملف كبير جداً (الحد الأقصى 25 ميجابايت).',
+        });
+      }
+      fileBuffer = buf;
+    }
+
+    const safeExtractedText =
+      typeof extractedText === 'string' ? extractedText.trim().slice(0, 28000) : '';
+
+    if ((!fileBuffer || fileBuffer.byteLength === 0) && !safeExtractedText) {
+      return res.status(400).json({
+        success: false,
+        error: 'لم يتم العثور على محتوى الملف لتحليله. تأكد من رابط الملف أو أعد رفعه.',
+      });
+    }
+
+    const ai = getGeminiClient();
+    const parts: any[] = [];
+    let usedFileApi = false;
+
+    if (fileBuffer && fileBuffer.byteLength > 0) {
+      if (fileBuffer.byteLength <= INLINE_DATA_THRESHOLD_BYTES) {
+        parts.push({
+          inlineData: {
+            mimeType: effectiveMime,
+            data: fileBuffer.toString('base64'),
+          },
+        });
+      } else {
+        // Larger PDFs (> 10 MB up to 25 MB): upload via Gemini File API
+        const blob = new Blob([new Uint8Array(fileBuffer)], { type: effectiveMime });
+        const uploaded = await ai.files.upload({
+          file: blob,
+          config: {
+            mimeType: effectiveMime,
+            displayName: cleanFileName,
+          },
+        });
+        if (!uploaded.uri) {
+          throw new Error('تعذر رفع الملف إلى Gemini File API.');
+        }
+        geminiUploadedFileName = uploaded.name || null;
+        usedFileApi = true;
+        parts.push({
+          fileData: {
+            fileUri: uploaded.uri,
+            mimeType: uploaded.mimeType || effectiveMime,
+          },
+        });
+      }
+    }
+
+    const userPromptLines = [
+      `اسم الملف المرفوع: ${cleanFileName}`,
+      studentNote ? `ملاحظة الطالب: ${String(studentNote).slice(0, 500)}` : '',
+      safeExtractedText
+        ? `\n--- نص مستخرج أولياً من الملف للمساعدة ---\n${safeExtractedText}\n`
+        : '',
+      `المطلوب تنفيذه الآن:`,
+      `1. اقرأ كامل محتوى الملف بدقة عالية (بما في ذلك المعادلات والرسومات والدوائر).`,
+      `2. قدّم ملخصاً منظماً في نقاط واضحة وعناوين فرعية (Markdown).`,
+      `3. اشرح المفاهيم الصعبة والمصطلحات الهندسية بأسلوب الدكتور اليمني المبسط والقريب للطالب.`,
+      `4. إذا احتوى الملف على مسائل رياضية أو هندسية أو دوائر كهربائية/إلكترونية، قم بحلها خطوة بخطوة مع كتابة القوانين والنتائج النهائية بوضوح.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    parts.push({ text: userPromptLines });
+
+    let analysisText = '';
+    if (usedFileApi) {
+      // Direct call with File API reference (fallback cascade handled if needed)
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: { parts },
+        config: {
+          systemInstruction: STUDENT_FILE_SYSTEM_PROMPT,
+        },
+      });
+      analysisText = response.text || '';
+    } else {
+      analysisText = await generateGeminiContentWithRetry({
+        contents: { parts },
+        config: {
+          systemInstruction: STUDENT_FILE_SYSTEM_PROMPT,
+        },
+        primaryModel: 'gemini-4-hydrogen',
+        fallbackModel: 'gemini-3.1-flash-lite',
+        maxAttempts: 3,
+      });
+    }
+
+    if (!analysisText.trim()) {
+      throw new Error('لم يُرجع الذكاء الاصطناعي نصاً للتحليل. يرجى المحاولة مرة أخرى.');
+    }
+
+    return res.json({
+      success: true,
+      analysis: analysisText,
+      fileName: cleanFileName,
+      method: usedFileApi ? 'file_api' : 'inline_data',
+    });
+  } catch (error: any) {
+    console.error('[Analyze Student File Error]:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'حدث خطأ أثناء تحليل الملف عبر Gemini. يرجى المحاولة مجدداً.',
+    });
+  } finally {
+    if (geminiUploadedFileName) {
+      try {
+        const ai = getGeminiClient();
+        await ai.files.delete({ name: geminiUploadedFileName });
+      } catch {
+        // Ignore cleanup failure for temporary Gemini file
+      }
+    }
+  }
+});
+
 // Mount geminiRouter on /api/gemini, /gemini, and /api
 app.use('/api/gemini', geminiRouter);
 app.use('/gemini', geminiRouter);

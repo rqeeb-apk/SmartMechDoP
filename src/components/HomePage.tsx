@@ -86,7 +86,7 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
   ];
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-20 select-none font-sans text-[#0F172A] dark:text-slate-100 w-full max-w-full overflow-x-hidden min-w-0">
+    <div className="space-y-6 sm:space-y-8 pb-4 sm:pb-6 select-none font-sans text-[#0F172A] dark:text-slate-100 w-full max-w-full overflow-x-hidden min-w-0">
       {/* =====================================================================
           HERO BANNER: Clean Typography + Robot Visual + 4 Flagship Service CTAs
          ===================================================================== */}
@@ -154,6 +154,44 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
               </button>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* =====================================================================
+          FEATURED NEW SERVICE: Upload & Analyze (ارفع وذاكر مع الدكتور)
+         ===================================================================== */}
+      <section className="rounded-2xl sm:rounded-3xl champagne-card dark:bg-gradient-to-l dark:from-[#081C3A] dark:via-[#0A192F] dark:to-[#061224] border-2 border-[#0EA5E9]/40 dark:border-amber-400/50 p-4 sm:p-6 shadow-lg w-full max-w-full min-w-0">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5 text-right min-w-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#E0F2FE] dark:bg-amber-400/15 border border-[#0EA5E9]/40 dark:border-amber-400/50 flex items-center justify-center text-3xl shrink-0 shadow-sm">
+              📚
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#0EA5E9] text-white dark:bg-amber-400 dark:text-slate-950 text-[10px] font-black">
+                  ميزة جديدة · Upload & Analyze
+                </span>
+                <span className="text-[11px] font-bold text-[#0284C7] dark:text-cyan-300">
+                  PDF + صور المحاضرات
+                </span>
+              </div>
+              <h2 className="text-base sm:text-xl font-black text-[#0F172A] dark:text-white">
+                📚 ارفع محاضرتك وذاكر مع الدكتور
+              </h2>
+              <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 leading-relaxed max-w-2xl">
+                ارفع ملف محاضرة PDF أو كتاباً أو ملخصاً، ليقوم الدكتور الذكي بقراءته وتلخيصه وشرح المفاهيم الصعبة بلهجة يمنية مبسطة وحل المسائل والدوائر خطوة بخطوة.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setCurrentTab('upload_analyze')}
+            className="w-full md:w-auto shrink-0 min-h-[46px] px-6 py-3 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] dark:bg-gradient-to-r dark:from-amber-400 dark:to-yellow-500 dark:text-slate-950 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+          >
+            <span>ارفع ملفك الآن</span>
+            <ArrowLeft className="w-4 h-4" />
+          </button>
         </div>
       </section>
 
