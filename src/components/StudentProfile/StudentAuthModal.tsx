@@ -77,13 +77,23 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
     clickTimerRef.current = setTimeout(() => setLogoClicks(0), 3000);
   };
 
-  // Feature 1: Build WhatsApp message dynamically from the 4 student fields
+  // Package options for pricing
+  const PACKAGE_OPTIONS = [
+    { label: 'الترم الأول (6000 ريال)', packageName: 'الترم الأول', price: '6000 ريال يمني' },
+    { label: 'الترم الثاني (6000 ريال)', packageName: 'الترم الثاني', price: '6000 ريال يمني' },
+    { label: 'الاشتراك السنوي (10000 ريال)', packageName: 'الاشتراك السنوي', price: '10000 ريال يمني' },
+  ];
+  const [selectedPkgIndex, setSelectedPkgIndex] = useState(2);
+  const selectedPkg = PACKAGE_OPTIONS[selectedPkgIndex];
+
+  // Feature 1: Build WhatsApp message dynamically from student fields and selected package
   const whatsappMessage = [
-    'أريد الإشتراك في منصه الدكتور الذكي',
+    'أريد الإشتراك في منصة دكتور الميكاترونكس الذكي',
     `الاسم: ${fullName.trim() || 'غير محدد'}`,
     `الرقم: ${phone.trim() || 'غير محدد'}`,
-    `الجامعه: ${university.trim() || 'غير محدد'}`,
-    `السنه: ${level}`,
+    `الجامعة: ${university.trim() || 'غير محدد'}`,
+    `المستوى: ${level}`,
+    `الباقة المطلوبة: ${selectedPkg.packageName} - السعر: ${selectedPkg.price}`,
   ].join('\n');
 
   const whatsappUrl = `https://wa.me/967785500075?text=${encodeURIComponent(whatsappMessage)}`;
@@ -616,6 +626,25 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
                   <option value="السنة الثالثة">السنة الثالثة</option>
                   <option value="السنة الرابعة">السنة الرابعة</option>
                   <option value="السنة الخامسة">السنة الخامسة</option>
+                </select>
+              </div>
+
+              {/* الباقة المطلوبة */}
+              <div>
+                <label className="block text-[#0F172A] dark:text-slate-200 font-bold mb-1">
+                  الباقة المطلوبة
+                </label>
+                <select
+                  value={selectedPkgIndex}
+                  onChange={(e) => setSelectedPkgIndex(Number(e.target.value))}
+                  required
+                  className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-[rgba(212,175,55,0.35)] dark:border-slate-700 text-[#0F172A] dark:text-white focus:border-[#0EA5E9] dark:focus:border-amber-400 focus:outline-none font-bold text-amber-600 dark:text-amber-400"
+                >
+                  {PACKAGE_OPTIONS.map((opt, idx) => (
+                    <option key={idx} value={idx}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -196,6 +196,53 @@ export const HomePage: React.FC<HomePageProps> = ({ setCurrentTab, onSelectLab }
       </section>
 
       {/* =====================================================================
+          FEATURED NEW SERVICE: Ask Doctor (اسأل الدكتور)
+         ===================================================================== */}
+      <section className="rounded-2xl sm:rounded-3xl champagne-card dark:bg-gradient-to-l dark:from-[#150F2E] dark:via-[#0A192F] dark:to-[#061224] border-2 border-purple-500/40 dark:border-purple-400/50 p-4 sm:p-6 shadow-lg w-full max-w-full min-w-0">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5 text-right min-w-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-purple-100 dark:bg-purple-500/15 border border-purple-300 dark:border-purple-400/40 flex items-center justify-center text-3xl shrink-0 shadow-sm">
+              👨‍🏫
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-600 text-white dark:bg-purple-500 dark:text-white text-[10px] font-black">
+                  خدمة جديدة · تواصل مباشر
+                </span>
+                <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300">
+                  أسئلة، استفسارات ومتابعة
+                </span>
+              </div>
+              <h2 className="text-base sm:text-xl font-black text-[#0F172A] dark:text-white">
+                👨‍🏫 اسأل الدكتور
+              </h2>
+              <p className="text-xs sm:text-sm text-[#475569] dark:text-slate-300 leading-relaxed max-w-2xl">
+                أرسل سؤالك للدكتور واستفسر عن المحاضرات والدروس والمسائل العلمية مع إرفاق الصور والملفات ومتابعة ردود الدكتور مباشرة.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setCurrentTab('ask_doctor')}
+              className="flex-1 md:flex-none min-h-[46px] px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            >
+              <span>اطرح سؤالاً الآن</span>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentTab('student_questions')}
+              className="flex-1 md:flex-none min-h-[46px] px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-500/40 text-purple-700 dark:text-purple-300 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm hover:bg-purple-50 dark:hover:bg-slate-700 transition-all cursor-pointer"
+            >
+              <span>📨 أسئلتي</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================================
           SECTION 2: The 4 Core Services (Clean 2x2 Architectural Grid)
          ===================================================================== */}
       <section className="space-y-4 w-full max-w-full min-w-0 rounded-2xl sm:rounded-3xl bg-[#F8FAFC] dark:bg-transparent border border-slate-200/70 dark:border-transparent p-3 sm:p-5">

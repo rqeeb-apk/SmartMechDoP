@@ -21,6 +21,9 @@ import { OwnerDashboardPage } from './components/OwnerDashboard/OwnerDashboardPa
 import { OwnerLoginModal } from './components/OwnerDashboard/OwnerLoginModal';
 import { LectureHallPage } from './components/LectureHall/LectureHallPage';
 import { UploadAnalyzePage } from './components/UploadAnalyze/UploadAnalyzePage';
+import { AskDoctorPage } from './components/DoctorQA/AskDoctorPage';
+import { StudentQuestionsPage } from './components/DoctorQA/StudentQuestionsPage';
+import { DoctorDashboardPage } from './components/DoctorQA/DoctorDashboardPage';
 import { getStoredUser, updateUserProfile, resetStoredUser, checkUserAccessStatus } from './services/storage';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { UserProfile, LabType, EngineeringBook } from './types';
@@ -385,6 +388,9 @@ export default function App() {
                 {currentTab === 'quizzes' && 'مركز الاختبارات'}
                 {currentTab === 'community' && 'مجتمع المهندسين'}
                 {currentTab === 'upload_analyze' && '📚 ارفع محاضرتك وذاكر مع الدكتور (Upload & Analyze)'}
+                {currentTab === 'ask_doctor' && '👨‍🏫 اسأل الدكتور'}
+                {currentTab === 'student_questions' && '📨 أسئلتي للدكتور'}
+                {currentTab === 'doctor_dashboard' && '👨‍🏫 لوحة الدكتور'}
                 {currentTab === 'profile' && 'الملف الشخصي للطالب'}
                 {currentTab === 'owner' && 'لوحة الإدارة المركزية'}
               </span>
@@ -397,6 +403,12 @@ export default function App() {
         )}
 
         {currentTab === 'upload_analyze' && <UploadAnalyzePage />}
+
+        {currentTab === 'ask_doctor' && <AskDoctorPage user={user} setCurrentTab={setCurrentTab} />}
+
+        {currentTab === 'student_questions' && <StudentQuestionsPage user={user} setCurrentTab={setCurrentTab} />}
+
+        {currentTab === 'doctor_dashboard' && <DoctorDashboardPage onExit={() => setCurrentTab('home')} />}
 
         {currentTab === 'lecture_hall' && <LectureHallPage />}
 

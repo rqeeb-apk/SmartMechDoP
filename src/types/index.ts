@@ -243,6 +243,8 @@ export interface SupabaseActivationCode {
   student_email?: string | null;
   used_by?: string | null;
   price_yer?: number | null;
+  price?: number | null;
+  package_type?: string | null;
   duration_days?: number | null;
 }
 

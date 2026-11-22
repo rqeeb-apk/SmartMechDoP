@@ -35,6 +35,7 @@ export const OwnerDashboardPage: React.FC = () => {
   const [codes, setCodes] = useState<SupabaseActivationCode[]>([]);
   const [profilesMap, setProfilesMap] = useState<Record<string, { full_name?: string; phone?: string; university?: string; level?: string; created_at?: string; is_subscribed?: boolean }>>({});
   const [codeFilter, setCodeFilter] = useState<'all' | 'unused' | 'used'>('all');
+  const [packageFilter, setPackageFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingCodes, setLoadingCodes] = useState(false);
   const [codesError, setCodesError] = useState<string | null>(null);
@@ -263,6 +264,13 @@ export const OwnerDashboardPage: React.FC = () => {
       if (codeFilter === 'unused' && isUsed) return false;
       if (codeFilter === 'used' && !isUsed) return false;
 
+      if (packageFilter !== 'all') {
+        const itemPkg = (item.package_type || 'الاشتراك السنوي').trim();
+        if (packageFilter === 'الترم الأول' && !itemPkg.includes('الترم الأول')) return false;
+        if (packageFilter === 'الترم الثاني' && !itemPkg.includes('الترم الثاني')) return false;
+        if (packageFilter === 'السنوي' && !itemPkg.includes('السنوي') && !itemPkg.includes('اشتراك')) return false;
+      }
+
       if (!q) return true;
       const codeStr = String(item.code || '').toLowerCase();
       const idStr = String(item.id || '').toLowerCase();
@@ -277,7 +285,7 @@ export const OwnerDashboardPage: React.FC = () => {
       ).toLowerCase();
       return codeStr.includes(q) || idStr.includes(q) || studentStr.includes(q);
     });
-  }, [codes, codeFilter, searchQuery, profilesMap]);
+  }, [codes, codeFilter, packageFilter, searchQuery, profilesMap]);
 
   const firstCodeLabel = codes.length > 0 ? codes[0].code : null;
   const lastCodeLabel = codes.length > 0 ? codes[codes.length - 1].code : null;
@@ -953,24 +961,47 @@ export const OwnerDashboardPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-xs font-bold overflow-x-auto no-scrollbar w-full sm:w-auto">
-              {[
-                { id: 'all', label: `الكل (${stats.totalCount})` },
-                { id: 'unused', label: `غير مستخدم (${stats.unusedCount})` },
-                { id: 'used', label: `مستخدم (${stats.usedCount})` },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setCodeFilter(f.id as 'all' | 'unused' | 'used')}
-                  className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-                    codeFilter === f.id
-                      ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold'
-                      : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-xs font-bold overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'all', label: `الكل (${stats.totalCount})` },
+                  { id: 'unused', label: `غير مستخدم (${stats.unusedCount})` },
+                  { id: 'used', label: `مستخدم (${stats.usedCount})` },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setCodeFilter(f.id as 'all' | 'unused' | 'used')}
+                    className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                      codeFilter === f.id
+                        ? 'bg-[#0EA5E9] text-white dark:bg-amber-500 dark:text-slate-950 font-bold'
+                        : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-[rgba(212,175,55,0.3)] dark:border-slate-800 text-xs font-bold overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'all', label: 'جميع الباقات' },
+                  { id: 'الترم الأول', label: 'الترم الأول' },
+                  { id: 'الترم الثاني', label: 'الترم الثاني' },
+                  { id: 'السنوي', label: 'السنوي' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPackageFilter(p.id)}
+                    className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                      packageFilter === p.id
+                        ? 'bg-amber-500 text-slate-950 font-bold'
+                        : 'text-[#475569] hover:text-[#0F172A] dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -982,6 +1013,7 @@ export const OwnerDashboardPage: React.FC = () => {
                   <th className="py-3 px-4"># (ID)</th>
                   <th className="py-3 px-4">الكود (code)</th>
                   <th className="py-3 px-4">الحالة (is_used)</th>
+                  <th className="py-3 px-4">نوع الباقة</th>
                   <th className="py-3 px-4">السعر</th>
                   <th className="py-3 px-4">المستفيد</th>
                   <th className="py-3 px-4">التاريخ</th>
@@ -991,13 +1023,13 @@ export const OwnerDashboardPage: React.FC = () => {
               <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/80 font-mono">
                 {loadingCodes ? (
                   <tr>
-                    <td colSpan={7} className="py-10 text-center text-[#0284C7] dark:text-cyan-400 font-sans font-bold">
+                    <td colSpan={8} className="py-10 text-center text-[#0284C7] dark:text-cyan-400 font-sans font-bold">
                       جاري جلب الأكواد الحقيقية من Supabase...
                     </td>
                   </tr>
                 ) : filteredCodes.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
+                    <td colSpan={8} className="py-8 text-center text-[#64748B] dark:text-slate-500 font-sans">
                       {codesError
                         ? 'تعذر عرض الأكواد بسبب خطأ في الاتصال بـ Supabase.'
                         : 'لا توجد أكواد مطابقة لمعايير البحث الحالية.'}
@@ -1008,6 +1040,8 @@ export const OwnerDashboardPage: React.FC = () => {
                     const isUsed = isCodeUsed(c);
                     const dateVal = c.used_at || c.redeemed_at || c.created_at;
                     const matchedProfile = c.used_by ? profilesMap[String(c.used_by)] : undefined;
+                    const pkgType = c.package_type || 'الاشتراك السنوي';
+                    const pkgPrice = c.price ?? c.price_yer ?? (pkgType.includes('الترم') ? 6000 : 10000);
                     return (
                       <tr key={String(c.id)} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-800/50">
                         <td className="py-2.5 px-4 text-[#64748B] dark:text-slate-500 text-[11px]">{c.id}</td>
@@ -1023,8 +1057,11 @@ export const OwnerDashboardPage: React.FC = () => {
                             {isUsed ? 'مستخدم' : 'غير مستخدم'}
                           </span>
                         </td>
+                        <td className="py-2.5 px-4 font-sans font-bold text-[#0F172A] dark:text-cyan-300">
+                          {pkgType}
+                        </td>
                         <td className="py-2.5 px-4 text-[#334155] dark:text-slate-300">
-                          {(c.price_yer ?? yearlyPrice).toLocaleString()} YER
+                          {pkgPrice.toLocaleString()} YER
                         </td>
                         <td className="py-2.5 px-4 text-[#475569] dark:text-slate-400 font-sans">
                           {matchedProfile?.full_name || c.student_name || c.used_by || '-'}

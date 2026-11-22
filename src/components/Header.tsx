@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { User, Moon, Sun, LogOut } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { User, Moon, Sun, LogOut, Bell } from 'lucide-react';
 import { UserProfile } from '../types';
 import { OFFICIAL_LOGO_URL } from '../services/storage';
 import { OwnerLoginModal } from './OwnerDashboard/OwnerLoginModal';
+import { fetchDoctorNotifications } from '../services/doctorQaService';
 
 interface HeaderProps {
   currentTab: string;
@@ -31,10 +32,23 @@ export const Header: React.FC<HeaderProps> = ({
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState<boolean>(false);
   const clickTimerRef = useRef<any>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState<number>(0);
+
+  useEffect(() => {
+    if (user.id) {
+      fetchDoctorNotifications(user.id)
+        .then((notifs) => {
+          const unread = notifs.filter((n) => !n.is_read).length;
+          setUnreadNotifs(unread);
+        })
+        .catch(() => {});
+    }
+  }, [user.id]);
 
   // Flagship 4 Services + Home & Profile
   const primaryTabs = [
     { id: 'home', label: 'الرئيسية', icon: '🏠' },
+    { id: 'ask_doctor', label: 'اسأل الدكتور', icon: '👨‍🏫' },
     { id: 'lecture_hall', label: 'قاعة المحاضرات', icon: '🎓' },
     { id: 'doctor_hall', label: 'قاعة الدكتور', icon: '🏛️' },
     { id: 'solve_questions', label: 'حل أسئلتي', icon: '📝' },
@@ -44,6 +58,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Supporting tools & community modules preserved in the More dropdown
   const secondaryTabs = [
+    { id: 'ask_doctor', label: '👨‍🏫 اسأل الدكتور', icon: '👨‍🏫' },
+    { id: 'student_questions', label: '📨 أسئلتي للدكتور', icon: '📨' },
+    { id: 'doctor_dashboard', label: '👨‍🏫 لوحة الدكتور', icon: '🛡️' },
     { id: 'upload_analyze', label: 'ارفع وذاكر مع الدكتور', icon: '📚' },
     { id: 'lab_3d', label: 'Circuit Wizard والمختبر 3D', icon: '🛠️' },
     { id: 'library', label: 'المكتبة الهندسية (1-5)', icon: '📖' },
@@ -148,6 +165,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden md:inline">خروج</span>
               </button>
             )}
+
+            <button
+              onClick={() => setCurrentTab('student_questions')}
+              className="relative p-2 rounded-full bg-[#E0F2FE] hover:bg-sky-200/80 dark:bg-slate-900 dark:hover:bg-slate-800 border border-[#0EA5E9]/30 dark:border-slate-700 text-[#0284C7] dark:text-cyan-300 transition-all shadow-sm cursor-pointer"
+              title="الأسئلة والإشعارات"
+              aria-label="الأسئلة والإشعارات"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotifs > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center animate-bounce">
+                  {unreadNotifs}
+                </span>
+              )}
+            </button>
 
             <button
               onClick={() => setIsDark(!isDark)}
