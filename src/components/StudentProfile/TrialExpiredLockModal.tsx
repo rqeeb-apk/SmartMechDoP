@@ -91,7 +91,7 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
           codeUsed: cleanCode,
           activatedAt: nowIso,
           expiresAt: expiresDate.toISOString(),
-          priceYER: 4000,
+          priceYER: 10000,
           durationDays: 365,
         },
       });
@@ -144,7 +144,7 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
             {allowClose ? 'تفعيل الاشتراك السنوي الشامل' : 'انتهت فترة التجربة المجانية (24 ساعة)'}
           </h2>
 
-          <p className="text-xs md:text-sm text-[#475569] dark:text-slate-300 leading-relaxed mb-5 font-medium">
+          <p className="text-xs md:text-sm text-[#475569] dark:text-slate-300 leading-relaxed mb-4 font-medium">
             {allowClose ? (
               <>
                 مرحباً <span className="font-bold text-[#0284C7] dark:text-amber-300">{user.name}</span>، يمكنك طلب كود التفعيل عبر واتساب وإدخاله أدناه لترقية حسابك فوراً.
@@ -157,10 +157,23 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({
             )}
           </p>
 
-          {/* Price & Duration Info Badge */}
-          <div className="p-4 rounded-2xl bg-[#E0F2FE] dark:bg-amber-500/10 border border-[#0EA5E9]/30 dark:border-amber-500/30 mb-5 flex items-center justify-between text-xs font-bold font-mono">
-            <span className="text-[#0F172A] dark:text-slate-300 font-sans">سعر الاشتراك السنوي الشامل:</span>
-            <span className="text-[#0284C7] dark:text-amber-400 text-sm">4000 ريال يمني (365 يوم)</span>
+          {/* New Subscription Plans Info Badge */}
+          <div className="p-3.5 rounded-2xl bg-[#E0F2FE] dark:bg-amber-500/10 border border-[#0EA5E9]/30 dark:border-amber-500/30 mb-5 space-y-2 text-xs font-bold text-right">
+            <span className="text-[#0F172A] dark:text-slate-300 block font-black text-center">خطط الأسعار الجديدة:</span>
+            <div className="grid grid-cols-3 gap-2 font-mono text-center">
+              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-sans">الترم الأول</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">6000 YER</span>
+              </div>
+              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-sans">الترم الثاني</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">6000 YER</span>
+              </div>
+              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-sans">الاشتراك السنوي</span>
+                <span className="text-amber-600 dark:text-amber-400 font-bold text-[11px]">10000 YER</span>
+              </div>
+            </div>
           </div>
 
           {/* WhatsApp Subscribe Button */}

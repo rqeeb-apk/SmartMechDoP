@@ -328,7 +328,7 @@ const INITIAL_USER: UserProfile = {
   createdAt: nowIso,
   subscription: {
     status: 'inactive',
-    priceYER: 4000,
+    priceYER: 10000,
     durationDays: 365,
   }
 };

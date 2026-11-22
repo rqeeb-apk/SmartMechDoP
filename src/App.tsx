@@ -140,13 +140,13 @@ export default function App() {
               expiresAt:
                 currentLocal.subscription?.expiresAt ||
                 new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-              priceYER: 4000,
+              priceYER: 10000,
               durationDays: 365,
             }
           : {
               status: isTrialStillActive ? 'trial' : 'trial_expired',
               trialExpiresAt: trialEndsAt,
-              priceYER: 4000,
+              priceYER: 10000,
               durationDays: 365,
             },
       });

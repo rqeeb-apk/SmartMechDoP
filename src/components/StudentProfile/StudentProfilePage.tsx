@@ -232,7 +232,7 @@ export const StudentProfilePage: React.FC<StudentProfilePageProps> = ({ user, se
                   codeUsed: codeVal,
                   activatedAt: nowIso,
                   expiresAt: expiresDate.toISOString(),
-                  priceYER: 4000,
+                  priceYER: 10000,
                   durationDays: 365,
                 },
               });

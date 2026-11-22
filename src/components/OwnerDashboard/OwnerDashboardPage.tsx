@@ -104,7 +104,7 @@ export const OwnerDashboardPage: React.FC = () => {
   const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Platform Config
-  const [yearlyPrice, setYearlyPrice] = useState(4000);
+  const [yearlyPrice, setYearlyPrice] = useState(10000);
   const [currency, setCurrency] = useState('ريال يمني (YER)');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [aiModel, setAiModel] = useState('gemini-3.8-flash');

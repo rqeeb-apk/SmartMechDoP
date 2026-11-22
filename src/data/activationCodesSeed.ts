@@ -13,7 +13,7 @@ export interface ActivationCode {
 }
 
 // 300 Deterministic Activation Codes for Dr. Smart Mechatronics Platform
-// Price: 4000 YER | Duration: 365 Days
+// Price: 10000 YER | Duration: 365 Days
 const SEED_CODE_BASE = [
   'DR-248G3C7X', 'DR-2499FTS5', 'DR-27ZDT5GL', 'DR-28C3K9LX', 'DR-29M4X7PR',
   'DR-2B5V8W1Z', 'DR-2C6X9Y2A', 'DR-2D7Y0Z3B', 'DR-2E8Z1A4C', 'DR-2F9A2B5D',
@@ -50,7 +50,7 @@ function generate300Codes(): ActivationCode[] {
     codes.push({
       code: codeStr,
       status: 'unused',
-      priceYER: 4000,
+      priceYER: 10000,
       durationDays: 365,
       createdAt
     });

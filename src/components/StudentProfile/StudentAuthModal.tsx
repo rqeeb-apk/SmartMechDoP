@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Lock, User, Phone, Building2, GraduationCap, Key, CheckCircle2,
   AlertTriangle, MessageCircle, X, ShieldCheck, Clock
@@ -6,6 +6,7 @@ import {
 import { UserProfile } from '../../types';
 import { updateUserProfile, OFFICIAL_LOGO_URL } from '../../services/storage';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { fetchAnnouncements, Announcement } from '../../services/announcementsService';
 
 interface StudentAuthModalProps {
   isOpen: boolean;
@@ -57,6 +58,14 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
   const [trialLoading, setTrialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [modalAnnouncements, setModalAnnouncements] = useState<Announcement[]>([]);
+
+  useEffect(() => {
+    fetchAnnouncements().then((data) => {
+      setModalAnnouncements(data.filter((a) => a.is_active));
+    }).catch(console.error);
+  }, []);
 
   // Stealth 20-click counter on logo for owner portal access
   const [logoClicks, setLogoClicks] = useState(0);
@@ -196,7 +205,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
           status: 'trial',
           trialStartedAt: nowIso,
           trialExpiresAt: trialEndsAt,
-          priceYER: 4000,
+          priceYER: 10000,
           durationDays: 365,
         },
       };
@@ -331,7 +340,7 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
           codeUsed: cleanCode,
           activatedAt: nowIso,
           expiresAt: expiresDate.toISOString(),
-          priceYER: 4000,
+          priceYER: 10000,
           durationDays: 365,
         },
       };
@@ -429,13 +438,13 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
               status: 'active',
               activatedAt: nowIso,
               expiresAt: expiresDate.toISOString(),
-              priceYER: 4000,
+              priceYER: 10000,
               durationDays: 365,
             }
           : {
               status: isTrialStillActive ? 'trial' : 'trial_expired',
               trialExpiresAt: trialEndsAt,
-              priceYER: 4000,
+              priceYER: 10000,
               durationDays: 365,
             },
       };
@@ -765,6 +774,28 @@ export const StudentAuthModal: React.FC<StudentAuthModalProps> = ({
               </button>
             </form>
           )}
+
+          {/* Announcements & Notices Section at Bottom of Login/Signup Page */}
+          <div className="mt-6 pt-4 border-t border-[rgba(212,175,55,0.25)] dark:border-slate-800 space-y-2 text-right">
+            <h3 className="text-xs font-black text-[#0EA5E9] dark:text-amber-400 flex items-center gap-1.5">
+              <span>📢 التنويهات والتعليقات الإرشادية</span>
+            </h3>
+            <div className="space-y-2 max-h-36 overflow-y-auto no-scrollbar pr-1">
+              {modalAnnouncements.length === 0 ? (
+                <p className="text-[11px] text-slate-400 text-center py-2">لا توجد تنويهات حالياً.</p>
+              ) : (
+                modalAnnouncements.map((ann) => (
+                  <div key={ann.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-[#0F172A] dark:text-white">{ann.title}</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">{ann.type}</span>
+                    </div>
+                    <p className="text-[10px] text-[#475569] dark:text-slate-300 line-clamp-2 leading-relaxed">{ann.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
