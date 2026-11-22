@@ -21,6 +21,7 @@ import {
 import { getStoredDoctors, getStoredBooks, getStoredProjects, OFFICIAL_LOGO_URL } from '../../services/storage';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { SecurityLog, SupabaseActivationCode } from '../../types';
+import { fetchAnnouncements, saveAnnouncement, deleteAnnouncement, Announcement } from '../../services/announcementsService';
 
 export const OwnerDashboardPage: React.FC = () => {
   const doctors = getStoredDoctors();
@@ -28,8 +29,60 @@ export const OwnerDashboardPage: React.FC = () => {
   const projects = getStoredProjects();
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'students' | 'pricing' | 'codes' | 'doctors' | 'content' | 'labs3d' | 'ai_quota' | 'avatar' | 'logs' | 'system' | 'finance'
+    'overview' | 'students' | 'pricing' | 'codes' | 'doctors' | 'content' | 'labs3d' | 'ai_quota' | 'avatar' | 'logs' | 'system' | 'finance' | 'announcements'
   >('overview');
+
+  // Announcements management state
+  const [adminAnnouncements, setAdminAnnouncements] = useState<Announcement[]>([]);
+  const [newAnnTitle, setNewAnnTitle] = useState('');
+  const [newAnnContent, setNewAnnContent] = useState('');
+  const [newAnnType, setNewAnnType] = useState<'info' | 'warning' | 'subscription' | 'update' | 'maintenance'>('info');
+  const [newAnnAudience, setNewAnnAudience] = useState<'all' | 'free' | 'paid'>('all');
+  const [newAnnShowAuto, setNewAnnShowAuto] = useState<boolean>(true);
+  const [editingAnnId, setEditingAnnId] = useState<string | number | null>(null);
+
+  useEffect(() => {
+    fetchAnnouncements().then(setAdminAnnouncements).catch(console.error);
+  }, []);
+
+  const handleSaveAnnouncementForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnTitle.trim() || !newAnnContent.trim()) return;
+
+    try {
+      await saveAnnouncement({
+        id: editingAnnId || Date.now(),
+        title: newAnnTitle.trim(),
+        content: newAnnContent.trim(),
+        type: newAnnType,
+        target_audience: newAnnAudience,
+        is_active: true,
+        show_automatically: newAnnShowAuto,
+      });
+      const updatedList = await fetchAnnouncements();
+      setAdminAnnouncements(updatedList);
+      setNewAnnTitle('');
+      setNewAnnContent('');
+      setEditingAnnId(null);
+    } catch (e) {
+      console.error('Error saving announcement:', e);
+    }
+  };
+
+  const handleDeleteAdminAnn = async (id: string | number) => {
+    await deleteAnnouncement(id);
+    const updatedList = await fetchAnnouncements();
+    setAdminAnnouncements(updatedList);
+  };
+
+  const handleToggleActiveAdminAnn = async (ann: Announcement) => {
+    await saveAnnouncement({
+      ...ann,
+      is_active: !ann.is_active,
+    });
+    const updatedList = await fetchAnnouncements();
+    setAdminAnnouncements(updatedList);
+  };
 
   // Activation codes state from Supabase (`activation_codes` table)
   const [codes, setCodes] = useState<SupabaseActivationCode[]>([]);
@@ -381,6 +434,7 @@ export const OwnerDashboardPage: React.FC = () => {
     { id: 'logs', label: '10. سجل الأمان والتدقيق', icon: Activity },
     { id: 'system', label: '11. إعدادات النظام', icon: Settings },
     { id: 'finance', label: '12. التقارير المالية', icon: CreditCard },
+    { id: 'announcements', label: '13. 📢 إدارة التنويهات', icon: FileText },
   ];
 
   return (
@@ -1340,6 +1394,178 @@ export const OwnerDashboardPage: React.FC = () => {
                 {stats.unusedValueYER.toLocaleString()} YER
               </div>
               <p className="text-[10px] text-[#0EA5E9] dark:text-cyan-300/80">{stats.unusedCount} كود غير مستخدم</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 13: ANNOUNCEMENTS MANAGEMENT */}
+      {activeTab === 'announcements' && (
+        <div className="champagne-card p-6 rounded-2xl space-y-6">
+          <div className="flex items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <span>📢 إدارة التنويهات والإعلانات الأكاديمية</span>
+              </h3>
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                إضافة، تعديل، حذف ونشر التنويهات والتعليمات لجميع الطلاب أو للمجانيين والمدفوعين حصرياً
+              </p>
+            </div>
+          </div>
+
+          {/* Add / Edit Form */}
+          <form onSubmit={handleSaveAnnouncementForm} className="p-5 rounded-2xl champagne-subcard space-y-4 text-right">
+            <h4 className="text-xs font-black text-[#0F172A] dark:text-amber-300">
+              {editingAnnId ? 'تعديل التنويه الحالي' : 'إضافة تنويه جديد للمنصة'}
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold mb-1 text-[#475569] dark:text-slate-300">عنوان التنويه:</label>
+                <input
+                  type="text"
+                  value={newAnnTitle}
+                  onChange={(e) => setNewAnnTitle(e.target.value)}
+                  placeholder="مثال: تنويه بشأن جدول الاختبارات..."
+                  required
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-[#0F172A] dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1 text-[#475569] dark:text-slate-300">نوع التنويه:</label>
+                <select
+                  value={newAnnType}
+                  onChange={(e) => setNewAnnType(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-[#0F172A] dark:text-white font-bold"
+                >
+                  <option value="info">معلومة (info)</option>
+                  <option value="warning">تحذير (warning)</option>
+                  <option value="subscription">اشتراك (subscription)</option>
+                  <option value="update">تحديث (update)</option>
+                  <option value="maintenance">صيانة (maintenance)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1 text-[#475569] dark:text-slate-300">الفئة المستهدفة:</label>
+                <select
+                  value={newAnnAudience}
+                  onChange={(e) => setNewAnnAudience(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-[#0F172A] dark:text-white font-bold"
+                >
+                  <option value="all">جميع المستخدمين</option>
+                  <option value="free">الطلاب المجانيون فقط</option>
+                  <option value="paid">الطلاب المدفوعون فقط</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1 text-[#475569] dark:text-slate-300">نص التنويه والإرشادات:</label>
+              <textarea
+                rows={3}
+                value={newAnnContent}
+                onChange={(e) => setNewAnnContent(e.target.value)}
+                placeholder="اكتب نص التنويه المفصل هنا..."
+                required
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-[#0F172A] dark:text-white leading-relaxed"
+              />
+            </div>
+
+            <div className="flex items-center justify-between flex-wrap gap-4 pt-1">
+              <label className="flex items-center gap-2 text-xs font-bold text-[#475569] dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newAnnShowAuto}
+                  onChange={(e) => setNewAnnShowAuto(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#0EA5E9]"
+                />
+                <span>يظهر تلقائياً كبطاقة عائمة فور دخول الطالب</span>
+              </label>
+
+              <div className="flex items-center gap-2">
+                {editingAnnId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAnnId(null);
+                      setNewAnnTitle('');
+                      setNewAnnContent('');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                  >
+                    إلغاء التعديل
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-slate-950 text-white font-black text-xs shadow-md cursor-pointer"
+                >
+                  {editingAnnId ? 'حفظ التعديلات' : 'نشر التنويه الجديد'}
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {/* Announcements List Table */}
+          <div className="space-y-3 pt-2">
+            <h4 className="text-xs font-black text-[#0F172A] dark:text-white">قائمة التنويهات الحالية</h4>
+            <div className="space-y-3">
+              {adminAnnouncements.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">لا توجد تنويهات مضافة.</p>
+              ) : (
+                adminAnnouncements.map((ann) => (
+                  <div
+                    key={ann.id}
+                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1 text-right">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-sm text-[#0F172A] dark:text-white">{ann.title}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                          {ann.type}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ann.is_active ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300'}`}>
+                          {ann.is_active ? '✅ منشور' : '⏸️ متوقف'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#475569] dark:text-slate-400 line-clamp-1">{ann.content}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActiveAdminAnn(ann)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#0F172A] dark:text-slate-200 hover:bg-slate-200 cursor-pointer"
+                      >
+                        {ann.is_active ? 'إيقاف' : 'نشر'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAnnId(ann.id);
+                          setNewAnnTitle(ann.title);
+                          setNewAnnContent(ann.content);
+                          setNewAnnType(ann.type);
+                          setNewAnnAudience(ann.target_audience);
+                          setNewAnnShowAuto(ann.show_automatically);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-[#E0F2FE] text-[#0284C7] dark:bg-cyan-500/20 dark:text-cyan-300 text-xs font-bold cursor-pointer"
+                      >
+                        تعديل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAdminAnn(ann.id)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 text-xs font-bold cursor-pointer"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

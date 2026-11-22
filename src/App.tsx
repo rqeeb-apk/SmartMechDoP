@@ -24,6 +24,7 @@ import { UploadAnalyzePage } from './components/UploadAnalyze/UploadAnalyzePage'
 import { AskDoctorPage } from './components/DoctorQA/AskDoctorPage';
 import { StudentQuestionsPage } from './components/DoctorQA/StudentQuestionsPage';
 import { DoctorDashboardPage } from './components/DoctorQA/DoctorDashboardPage';
+import { FloatingAnnouncementsWidget } from './components/Announcements/FloatingAnnouncementsWidget';
 import { getStoredUser, updateUserProfile, resetStoredUser, checkUserAccessStatus } from './services/storage';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { UserProfile, LabType, EngineeringBook } from './types';
@@ -532,6 +533,9 @@ export default function App() {
           }
         }}
       />
+
+      {/* Floating Announcements Widget */}
+      <FloatingAnnouncementsWidget user={user} />
 
       {/* Footer */}
       <footer className="w-full bg-[#F8FAFC] dark:bg-[#0D1B2A] border-t border-slate-200 dark:border-slate-800/80 py-6 pb-20 lg:pb-6 px-4 text-center text-xs text-[#475569] dark:text-slate-400">
