@@ -3,7 +3,7 @@ import {
   ShieldAlert, Users, BookOpen, Layers, Cpu, Key, Database, Download, Upload,
   Activity, CheckCircle, Trash2, Plus, Copy, Search, RefreshCw, Printer, AlertTriangle,
   CreditCard, DollarSign, Settings, Sliders, Lock, Zap, Eye, BarChart3, Bot, Check, FileText,
-  TrendingUp, PieChart as PieChartIcon
+  TrendingUp, PieChart as PieChartIcon, MessageSquare
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -22,6 +22,7 @@ import { getStoredDoctors, getStoredBooks, getStoredProjects, OFFICIAL_LOGO_URL 
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { SecurityLog, SupabaseActivationCode } from '../../types';
 import { fetchAnnouncements, saveAnnouncement, deleteAnnouncement, Announcement } from '../../services/announcementsService';
+import { fetchFeedbacks, updateFeedbackStatus, PlatformFeedback } from '../../services/feedbackService';
 
 export const OwnerDashboardPage: React.FC = () => {
   const doctors = getStoredDoctors();
@@ -29,8 +30,20 @@ export const OwnerDashboardPage: React.FC = () => {
   const projects = getStoredProjects();
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'students' | 'pricing' | 'codes' | 'doctors' | 'content' | 'labs3d' | 'ai_quota' | 'avatar' | 'logs' | 'system' | 'finance' | 'announcements'
+    'overview' | 'students' | 'pricing' | 'codes' | 'doctors' | 'content' | 'labs3d' | 'ai_quota' | 'avatar' | 'logs' | 'system' | 'finance' | 'announcements' | 'feedback'
   >('overview');
+
+  // Feedback state
+  const [feedbacksList, setFeedbacksList] = useState<PlatformFeedback[]>([]);
+  useEffect(() => {
+    fetchFeedbacks().then(setFeedbacksList).catch(console.error);
+  }, []);
+
+  const handleUpdateFeedbackStatus = async (id: string | number, status: 'جديد' | 'قيد المراجعة' | 'تم الحل') => {
+    await updateFeedbackStatus(id, status);
+    const updated = await fetchFeedbacks();
+    setFeedbacksList(updated);
+  };
 
   // Announcements management state
   const [adminAnnouncements, setAdminAnnouncements] = useState<Announcement[]>([]);
@@ -435,6 +448,7 @@ export const OwnerDashboardPage: React.FC = () => {
     { id: 'system', label: '11. إعدادات النظام', icon: Settings },
     { id: 'finance', label: '12. التقارير المالية', icon: CreditCard },
     { id: 'announcements', label: '13. 📢 إدارة التنويهات', icon: FileText },
+    { id: 'feedback', label: '14. 💡 الاقتراحات والمشاكل', icon: MessageSquare },
   ];
 
   return (
@@ -1567,6 +1581,87 @@ export const OwnerDashboardPage: React.FC = () => {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 14: FEEDBACK & SUGGESTIONS */}
+      {activeTab === 'feedback' && (
+        <div className="champagne-card p-6 rounded-2xl space-y-6">
+          <div className="flex items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#0F172A] dark:text-white flex items-center gap-2">
+                <span>💡 اقتراحات ومشاكل الطلاب (Platform Feedback)</span>
+              </h3>
+              <p className="text-xs text-[#475569] dark:text-slate-400 mt-0.5">
+                متابعة آراء ومقترحات الطلاب والإبلاغات الفنية وتغيير حالة المتابعة
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-[rgba(212,175,55,0.25)] dark:border-slate-800 text-[#475569] dark:text-slate-400">
+                  <th className="pb-3 px-3">اسم الطالب / المرسل</th>
+                  <th className="pb-3 px-3">نوع الرسالة</th>
+                  <th className="pb-3 px-3">نص الرسالة أو المقترح</th>
+                  <th className="pb-3 px-3">التاريخ</th>
+                  <th className="pb-3 px-3">الحالة</th>
+                  <th className="pb-3 px-3">تغيير الحالة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[rgba(212,175,55,0.15)] dark:divide-slate-800/60 font-sans">
+                {feedbacksList.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#64748B] dark:text-slate-500">
+                      لا توجد اقتراحات أو بلاغات مشكلات حتى الآن.
+                    </td>
+                  </tr>
+                ) : (
+                  feedbacksList.map((item) => (
+                    <tr key={item.id} className="hover:bg-[#F8FAFC] dark:hover:bg-slate-900/50">
+                      <td className="py-3.5 px-3 font-bold text-[#0F172A] dark:text-white">
+                        {item.student_name}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                          {item.type}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-[#334155] dark:text-slate-300 max-w-xs truncate" title={item.message}>
+                        {item.message}
+                      </td>
+                      <td className="py-3.5 px-3 font-mono text-slate-500 text-[11px]">
+                        {new Date(item.created_at).toLocaleString('ar-EG')}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.status === 'تم الحل'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                            : item.status === 'قيد المراجعة'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                        }`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <select
+                          value={item.status}
+                          onChange={(e) => handleUpdateFeedbackStatus(item.id, e.target.value as any)}
+                          className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-[#0F172A] dark:text-white"
+                        >
+                          <option value="جديد">جديد</option>
+                          <option value="قيد المراجعة">قيد المراجعة</option>
+                          <option value="تم الحل">تم الحل</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
