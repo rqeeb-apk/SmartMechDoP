@@ -119,7 +119,7 @@ export const DoctorDashboardPage: React.FC<DoctorDashboardPageProps> = ({ onExit
         localStorage.setItem('dr_smart_doctor_auth', 'true');
       } catch {}
     } else {
-      setAuthError('كلمة مرور الدكتور غير صحيحة. (جرب: doctor2025)');
+      setAuthError('كلمة مرور الدكتور غير صحيحة.');
     }
   };
 
@@ -274,7 +274,6 @@ export const DoctorDashboardPage: React.FC<DoctorDashboardPageProps> = ({ onExit
                   className="w-full pr-9 pl-3.5 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-[#0F172A] dark:text-white focus:border-[#0EA5E9] focus:outline-none font-mono"
                 />
               </div>
-              <p className="text-[10px] text-slate-400 mt-1">تجريبي: <code className="font-mono text-amber-500">doctor2025</code></p>
             </div>
 
             <button
